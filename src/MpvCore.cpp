@@ -31,10 +31,17 @@ bool MpvCore::initialize(WId windowId) {
     if (initialized_) return true;
 
     // ── mpv_initialize 이전에 설정해야 하는 옵션 ──────────────────
-    int64_t wid = static_cast<int64_t>(windowId);
-    check_error(mpv_set_option(mpv_, "wid", MPV_FORMAT_INT64, &wid));
+    if (windowId != 0) {
+        // 전통적 --wid 모드 (사용 안 함)
+        int64_t wid = static_cast<int64_t>(windowId);
+        check_error(mpv_set_option(mpv_, "wid", MPV_FORMAT_INT64, &wid));
+        check_error(mpv_set_option_string(mpv_, "vo", "gpu"));
+    } else {
+        // render API 모드 (QOpenGLWidget + mpv_render_context)
+        // vo=libmpv: MPV가 자체 윈도우 생성 안 함
+        check_error(mpv_set_option_string(mpv_, "vo", "libmpv"));
+    }
 
-    check_error(mpv_set_option_string(mpv_, "vo",        "gpu"));
     check_error(mpv_set_option_string(mpv_, "osc",       "no"));
     check_error(mpv_set_option_string(mpv_, "idle",      "yes"));
     check_error(mpv_set_option_string(mpv_, "keep-open", "yes"));
@@ -47,9 +54,8 @@ bool MpvCore::initialize(WId windowId) {
     }
 
     // ── 초기화 후 설정 ────────────────────────────────────────────
-    // 비디오
-    check_error(mpv_set_property_string(mpv_, "gpu-api",      "d3d11"));
-    check_error(mpv_set_property_string(mpv_, "hwdec",        "d3d11va"));
+    // 비디오 (render API 모드에서는 hwdec만 설정)
+    check_error(mpv_set_property_string(mpv_, "hwdec",        "auto"));
     check_error(mpv_set_property_string(mpv_, "video-sync",   "display-resample"));
 
     // 오디오 (WASAPI + 패스스루)

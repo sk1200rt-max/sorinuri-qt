@@ -1,38 +1,31 @@
 #include "MpvWidget.h"
-#include <QShowEvent>
 #include <QResizeEvent>
-#include <QPaintEvent>
-#include <QPainter>
-#include <QPixmap>
+#include <QOpenGLContext>
 #include <QDebug>
-#include <QApplication>
+#include <stdexcept>
 
-#ifdef Q_OS_WIN
-#include <windows.h>
-#endif
+static void* getGlProcAddress(void* /*ctx*/, const char* name) {
+    QOpenGLContext* ctx = QOpenGLContext::currentContext();
+    if (!ctx) return nullptr;
+    return reinterpret_cast<void*>(ctx->getProcAddress(QByteArray(name)));
+}
 
-MpvWidget::MpvWidget(QWidget* parent) : QWidget(parent) {
-    // MPV가 직접 렌더링하는 네이티브 윈도우
-    // Qt가 이 위젯에 절대 그리지 않도록 설정
-    setAttribute(Qt::WA_NativeWindow);           // 네이티브 HWND 생성
-    setAttribute(Qt::WA_PaintOnScreen);          // Qt 더블버퍼링 비활성화
-    setAttribute(Qt::WA_NoSystemBackground);     // 시스템 배경 그리기 비활성화
-    setAttribute(Qt::WA_OpaquePaintEvent);       // 불투명 이벤트 (배경 지우기 안 함)
+MpvWidget::MpvWidget(QWidget* parent) : QOpenGLWidget(parent) {
+    // QOpenGLWidget은 Qt가 직접 OpenGL FBO를 관리
+    // 배경은 Qt가 검은색으로 초기화 (clearColor)
     setAutoFillBackground(false);
 
     core_ = new MpvCore(this);
 
     // ── 소리누리 로고 오버레이 ────────────────────────────────────
-    // 별도 네이티브 위젯으로 만들어서 MPV 위에 올림
     logoLabel_ = new QLabel(this);
     logoLabel_->setAttribute(Qt::WA_TransparentForMouseEvents);
-    logoLabel_->setAttribute(Qt::WA_NoSystemBackground);
     logoLabel_->setStyleSheet("background: transparent; border: none;");
     logoLabel_->setAlignment(Qt::AlignCenter);
 
     QPixmap logo(":/sorinuri-logo-center.png");
     if (!logo.isNull()) {
-        QPixmap scaled = logo.scaledToWidth(340, Qt::SmoothTransformation);
+        QPixmap scaled = logo.scaledToWidth(320, Qt::SmoothTransformation);
         logoLabel_->setPixmap(scaled);
         logoLabel_->resize(scaled.size());
     } else {
@@ -46,55 +39,67 @@ MpvWidget::MpvWidget(QWidget* parent) : QWidget(parent) {
     logoLabel_->raise();
 }
 
-MpvWidget::~MpvWidget() = default;
-
-// WA_PaintOnScreen 설정 시 paintEngine을 nullptr 반환해야 함
-QPaintEngine* MpvWidget::paintEngine() const {
-    return nullptr;
+MpvWidget::~MpvWidget() {
+    makeCurrent();
+    if (renderCtx_) {
+        mpv_render_context_free(renderCtx_);
+        renderCtx_ = nullptr;
+    }
+    doneCurrent();
 }
 
-// paintEvent는 아무것도 하지 않음 - MPV가 직접 렌더링
-void MpvWidget::paintEvent(QPaintEvent*) {
-    // 의도적으로 비워둠: MPV가 이 창에 직접 렌더링
-}
+void MpvWidget::initializeGL() {
+    // OpenGL 컨텍스트가 준비된 후 MPV 초기화
+    // vo=libmpv 으로 설정하면 --wid 없이 render API 사용
+    if (!core_->initialize(0)) {  // wid=0 → render API 사용
+        qCritical() << "[MpvWidget] MPV 초기화 실패";
+        return;
+    }
 
-void MpvWidget::showEvent(QShowEvent* event) {
-    QWidget::showEvent(event);
-    if (!initialized_) initMpv();
+    // MPV render context 생성 (OpenGL)
+    mpv_opengl_init_params glInitParams = { getGlProcAddress, nullptr };
+    mpv_render_param params[] = {
+        { MPV_RENDER_PARAM_API_TYPE,            const_cast<char*>(MPV_RENDER_API_TYPE_OPENGL) },
+        { MPV_RENDER_PARAM_OPENGL_INIT_PARAMS,  &glInitParams },
+        { MPV_RENDER_PARAM_INVALID,             nullptr }
+    };
+
+    if (mpv_render_context_create(&renderCtx_, core_->handle(), params) < 0) {
+        qCritical() << "[MpvWidget] MPV render context 생성 실패";
+        return;
+    }
+
+    // MPV가 새 프레임을 준비하면 Qt update() 호출
+    mpv_render_context_set_update_callback(renderCtx_, MpvWidget::onUpdate,
+                                           reinterpret_cast<void*>(this));
+
+    qInfo() << "[MpvWidget] OpenGL render context 초기화 완료";
     updateLogoPos();
 }
 
-void MpvWidget::initMpv() {
-    // 위젯이 완전히 표시된 후 HWND를 가져와야 함
-    QApplication::processEvents();
-
-    WId wid = winId();
-    qInfo() << "[MpvWidget] WID:" << wid;
-
-#ifdef Q_OS_WIN
-    HWND hwnd = reinterpret_cast<HWND>(wid);
-    // 창 배경을 검은색으로 설정
-    SetClassLongPtr(hwnd, GCLP_HBRBACKGROUND, (LONG_PTR)GetStockObject(BLACK_BRUSH));
-    // 창을 검은색으로 초기화
-    HDC hdc = GetDC(hwnd);
-    RECT rc;
-    GetClientRect(hwnd, &rc);
-    HBRUSH black = CreateSolidBrush(RGB(0, 0, 0));
-    FillRect(hdc, &rc, black);
-    DeleteObject(black);
-    ReleaseDC(hwnd, hdc);
-#endif
-
-    if (core_->initialize(wid)) {
-        initialized_ = true;
-        qInfo() << "[MpvWidget] 초기화 완료";
-    } else {
-        qCritical() << "[MpvWidget] 초기화 실패";
+void MpvWidget::paintGL() {
+    if (!renderCtx_) {
+        // render context 없으면 검은 배경만
+        glClearColor(0, 0, 0, 1);
+        glClear(GL_COLOR_BUFFER_BIT);
+        return;
     }
+
+    mpv_opengl_fbo fbo = {
+        static_cast<int>(defaultFramebufferObject()),
+        width(), height(), 0
+    };
+    int flipY = 1;
+    mpv_render_param params[] = {
+        { MPV_RENDER_PARAM_OPENGL_FBO, &fbo      },
+        { MPV_RENDER_PARAM_FLIP_Y,     &flipY    },
+        { MPV_RENDER_PARAM_INVALID,    nullptr   }
+    };
+    mpv_render_context_render(renderCtx_, params);
 }
 
 void MpvWidget::resizeEvent(QResizeEvent* event) {
-    QWidget::resizeEvent(event);
+    QOpenGLWidget::resizeEvent(event);
     updateLogoPos();
 }
 
@@ -113,11 +118,28 @@ void MpvWidget::showLogo(bool show) {
 }
 
 void MpvWidget::loadFile(const QString& path) {
-    if (!initialized_) show();
     showLogo(false);
     core_->loadFile(path, false);
 }
 
 void MpvWidget::appendFile(const QString& path) {
     core_->loadFile(path, true);
+}
+
+// MPV가 새 프레임 준비 완료 시 호출 (별도 스레드에서 호출될 수 있음)
+void MpvWidget::onUpdate(void* ctx) {
+    QMetaObject::invokeMethod(reinterpret_cast<MpvWidget*>(ctx),
+                              "maybeUpdate", Qt::QueuedConnection);
+}
+
+void MpvWidget::maybeUpdate() {
+    if (window()->isMinimized()) {
+        // 최소화 상태에서는 수동으로 렌더링
+        makeCurrent();
+        paintGL();
+        context()->swapBuffers(context()->surface());
+        doneCurrent();
+    } else {
+        update();  // Qt가 paintGL() 호출하도록 요청
+    }
 }
