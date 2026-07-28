@@ -40,7 +40,7 @@ void YtdlpManager::downloadOrUpdate() {
 
     QNetworkRequest req(QUrl(YTDLP_DOWNLOAD_URL));
     req.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
-                     QNetworkRequest::NoLessSafeRedirectPolicy);
+                     static_cast<int>(QNetworkRequest::NoLessSafeRedirectPolicy));
     req.setRawHeader("User-Agent", "Sorinuri/1.0");
 
     QNetworkReply* reply = nam_->get(req);
