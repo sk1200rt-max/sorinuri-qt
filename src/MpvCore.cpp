@@ -98,8 +98,9 @@ void MpvCore::handleEvent(mpv_event* event) {
         break;
 
     case MPV_EVENT_FILE_LOADED: {
-        QString path = QString::fromUtf8(
-            mpv_get_property_string(mpv_, "path") ?: "");
+        char* rawPath = mpv_get_property_string(mpv_, "path");
+        QString path = rawPath ? QString::fromUtf8(rawPath) : QString();
+        mpv_free(rawPath);
         emit fileLoaded(path);
         emit playbackStarted();
         break;
