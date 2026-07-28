@@ -38,7 +38,6 @@ jobs:
       - name: Download libmpv
         shell: pwsh
         run: |
-          # mpv-player 공식 릴리즈에서 libmpv Windows dev 패키지 다운로드
           # 여러 소스를 시도하는 방식으로 안정성 확보
           $downloaded = $false
 
@@ -115,7 +114,6 @@ jobs:
           # DLL 복사
           $dll = Get-ChildItem -Recurse mpv-dev -Filter "libmpv-2.dll" | Select-Object -First 1
           if (-not $dll) {
-            # mpv-2.dll 이름으로도 시도
             $dll = Get-ChildItem -Recurse mpv-dev -Filter "mpv-2.dll" | Select-Object -First 1
           }
           if (-not $dll) {
@@ -127,16 +125,12 @@ jobs:
           Write-Host "DLL: $($dll.Name)"
 
           # import library (.lib) 생성
-          # 방법 1: dev 패키지에 이미 .lib 파일이 있으면 사용
           $existingLib = Get-ChildItem -Recurse mpv-dev -Filter "*.lib" | Select-Object -First 1
           if ($existingLib) {
             Copy-Item $existingLib.FullName deps/libmpv/lib/mpv.lib
             Write-Host "기존 .lib 사용: $($existingLib.Name)"
           } else {
-            # 방법 2: dumpbin + lib.exe로 생성
             Write-Host "mpv.lib 생성 중..."
-
-            # dumpbin으로 exports 추출
             $dumpbinOutput = & dumpbin /exports deps/libmpv/lib/libmpv-2.dll 2>&1
             $exports = $dumpbinOutput | Where-Object { $_ -match "^\s+\d+\s+[0-9A-F]+\s+[0-9A-F]+\s+(\S+)" } |
               ForEach-Object { [regex]::Match($_, "^\s+\d+\s+[0-9A-F]+\s+[0-9A-F]+\s+(\S+)").Groups[1].Value }
@@ -146,14 +140,10 @@ jobs:
               exit 1
             }
 
-            Write-Host "exports 수: $($exports.Count)"
-
-            # .def 파일 생성
             $defContent = @("LIBRARY libmpv-2", "EXPORTS")
             $defContent += $exports
             $defContent | Set-Content deps/libmpv/lib/libmpv-2.def -Encoding ASCII
 
-            # lib.exe로 .lib 생성 (MSVC 환경에서 실행)
             lib /def:deps/libmpv/lib/libmpv-2.def /out:deps/libmpv/lib/mpv.lib /machine:x64
             if ($LASTEXITCODE -ne 0) {
               Write-Error "lib.exe 실패"
@@ -162,7 +152,6 @@ jobs:
             Write-Host "mpv.lib 생성 완료"
           }
 
-          # 결과 확인
           Write-Host "=== deps/libmpv 구조 ==="
           Get-ChildItem -Recurse deps/libmpv | Select-Object FullName, Length
 
@@ -187,8 +176,8 @@ jobs:
           Write-Host "빌드 성공"
           Get-ChildItem build/Release/
 
-      # ── 배포 패키지 생성 ──────────────────────────────────────────
-      - name: Package
+      # ── 포터블 패키지 생성 ────────────────────────────────────────
+      - name: Package Portable
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force dist/Sorinuri-Portable | Out-Null
@@ -199,7 +188,7 @@ jobs:
           # libmpv DLL
           Copy-Item deps/libmpv/lib/libmpv-2.dll dist/Sorinuri-Portable/
 
-          # Qt DLL 배포
+          # Qt DLL 배포 (windeployqt)
           $windeployqt = "$env:QT_ROOT_DIR/bin/windeployqt.exe"
           Write-Host "windeployqt: $windeployqt"
           & $windeployqt `
@@ -208,19 +197,91 @@ jobs:
             --no-opengl-sw `
             dist/Sorinuri-Portable/Sorinuri.exe
 
+          # ── 시작속도 최적화: qt.conf 생성 ──────────────────────────
+          # 포터블 환경에서 플러그인 경로를 명시하여 탐색 시간 단축
+          $qtConf = @"
+          [Paths]
+          Prefix = .
+          Plugins = plugins
+          Libraries = .
+          "@
+          $qtConf.Trim() | Set-Content dist/Sorinuri-Portable/qt.conf -Encoding UTF8
+
+          # 디버그 배치 파일
+          if (Test-Path "소리누리-디버그.bat") {
+            Copy-Item "소리누리-디버그.bat" dist/Sorinuri-Portable/
+          }
+
           # 패키지 크기 확인
           $size = (Get-ChildItem -Recurse dist/Sorinuri-Portable | Measure-Object -Property Length -Sum).Sum
-          Write-Host "패키지 크기: $([math]::Round($size/1MB, 1)) MB"
-
-          # 디버그 배치 파일 포함
-          Copy-Item "소리누리-디버그.bat" dist/Sorinuri-Portable/
+          Write-Host "포터블 패키지 크기: $([math]::Round($size/1MB, 1)) MB"
 
           # ZIP 생성
           Compress-Archive -Path dist/Sorinuri-Portable -DestinationPath dist/Sorinuri-Qt-Portable.zip -Force
-          Write-Host "ZIP 생성 완료: $([math]::Round((Get-Item dist/Sorinuri-Qt-Portable.zip).Length/1MB,1)) MB"
+          Write-Host "포터블 ZIP: $([math]::Round((Get-Item dist/Sorinuri-Qt-Portable.zip).Length/1MB,1)) MB"
 
-      # ── Artifact 업로드 ───────────────────────────────────────────
-      - name: Upload Artifact
+      # ── Inno Setup 설치파일 생성 ──────────────────────────────────
+      - name: Build Installer
+        shell: pwsh
+        run: |
+          # Inno Setup 설치 확인 (windows-2022 runner에 기본 포함)
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            # Inno Setup 다운로드 및 설치
+            Write-Host "Inno Setup 설치 중..."
+            $url = "https://files.jrsoftware.org/is/6/innosetup-6.3.3.exe"
+            Invoke-WebRequest -Uri $url -OutFile "innosetup.exe" -TimeoutSec 120
+            Start-Process -FilePath "innosetup.exe" -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART" -Wait
+            Write-Host "Inno Setup 설치 완료"
+          }
+
+          # Korean.isl 언어 파일 확인
+          $koreanIsl = "C:\Program Files (x86)\Inno Setup 6\Languages\Korean.isl"
+          if (-not (Test-Path $koreanIsl)) {
+            Write-Host "Korean.isl 없음 - 영어로 대체"
+            # ISS 파일에서 Korean 언어 라인 제거
+            $issContent = Get-Content installer/sorinuri-setup.iss -Raw
+            $issContent = $issContent -replace 'Name: "korean";.*\n', ''
+            $issContent | Set-Content installer/sorinuri-setup-en.iss -Encoding UTF8
+            $issFile = "installer/sorinuri-setup-en.iss"
+          } else {
+            $issFile = "installer/sorinuri-setup.iss"
+          }
+
+          # 설치파일 빌드
+          & $iscc $issFile
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Inno Setup 빌드 실패"
+            exit 1
+          }
+
+          # 결과 확인
+          $installer = Get-ChildItem dist -Filter "Sorinuri-Setup-*.exe" | Select-Object -First 1
+          if ($installer) {
+            Write-Host "설치파일 생성: $($installer.Name) ($([math]::Round($installer.Length/1MB,1)) MB)"
+          } else {
+            Write-Error "설치파일을 찾을 수 없습니다"
+            Get-ChildItem dist/
+            exit 1
+          }
+
+      # ── Artifact 업로드 (포터블 + 설치파일) ─────────────────────
+      - name: Upload Portable
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sorinuri-Qt-Windows-Portable
+          path: dist/Sorinuri-Qt-Portable.zip
+          retention-days: 30
+
+      - name: Upload Installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sorinuri-Qt-Windows-Installer
+          path: dist/Sorinuri-Setup-*.exe
+          retention-days: 30
+
+      # ── 하위 호환성: 기존 아티팩트 이름도 유지 ───────────────────
+      - name: Upload Legacy Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Sorinuri-Qt-Windows
