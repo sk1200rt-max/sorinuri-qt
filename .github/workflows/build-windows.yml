@@ -180,6 +180,9 @@ jobs:
           $size = (Get-ChildItem -Recurse dist/Sorinuri-Portable | Measure-Object -Property Length -Sum).Sum
           Write-Host "패키지 크기: $([math]::Round($size/1MB, 1)) MB"
 
+          # 디버그 배치 파일 포함
+          Copy-Item "소리누리-디버그.bat" dist/Sorinuri-Portable/
+
           # ZIP 생성
           Compress-Archive -Path dist/Sorinuri-Portable -DestinationPath dist/Sorinuri-Qt-Portable.zip -Force
           Write-Host "ZIP 생성 완료: $([math]::Round((Get-Item dist/Sorinuri-Qt-Portable.zip).Length/1MB,1)) MB"

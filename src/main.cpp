@@ -5,7 +5,25 @@
 #include <QFile>
 #include "MainWindow.h"
 
+#ifdef Q_OS_WIN
+#include <windows.h>
+#include <stdio.h>
+#include <io.h>
+#include <fcntl.h>
+static void attachConsole() {
+    // 이미 콘솔이 열려있으면 (배치 파일에서 실행 시) 연결
+    if (AttachConsole(ATTACH_PARENT_PROCESS)) {
+        freopen("CONOUT$", "w", stdout);
+        freopen("CONOUT$", "w", stderr);
+        freopen("CONIN$",  "r", stdin);
+    }
+}
+#endif
+
 int main(int argc, char* argv[]) {
+#ifdef Q_OS_WIN
+    attachConsole();
+#endif
     // High DPI 지원
     QApplication::setHighDpiScaleFactorRoundingPolicy(
         Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
