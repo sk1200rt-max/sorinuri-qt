@@ -68,6 +68,17 @@ bool MpvCore::initialize(WId windowId) {
     check_error(mpv_set_property_string(mpv_, "cache",        "yes"));
     check_error(mpv_set_property_string(mpv_, "cache-secs",   "10"));
 
+    // ── yt-dlp 연동 (유튜브 5.1 서라운드 지원) ────────────────────
+    // ytdl=yes: MPV가 yt-dlp를 통해 스트리밍 URL 처리
+    check_error(mpv_set_property_string(mpv_, "ytdl", "yes"));
+    // 최고 품질 비디오 + 최고 품질 오디오 (5.1 E-AC3 포함)
+    // bestaudio: 유튜브 5.1 Dolby Digital+ (E-AC3) 스트림 자동 선택
+    check_error(mpv_set_property_string(mpv_, "ytdl-format",
+        "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best"));
+    // 스트리밍 버퍼 증가 (유튜브 고품질 스트림)
+    check_error(mpv_set_property_string(mpv_, "demuxer-max-bytes",       "150MiB"));
+    check_error(mpv_set_property_string(mpv_, "demuxer-max-back-bytes",  "75MiB"));
+
     // 관찰할 속성 등록
     mpv_observe_property(mpv_, 0, "time-pos",        MPV_FORMAT_DOUBLE);
     mpv_observe_property(mpv_, 0, "duration",        MPV_FORMAT_DOUBLE);

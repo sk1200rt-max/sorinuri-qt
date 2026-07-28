@@ -1,5 +1,8 @@
 #include "MainWindow.h"
+#include "UrlDialog.h"
 #include <QApplication>
+#include <QMessageBox>
+#include <QProgressDialog>
 #include <QFileDialog>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -27,6 +30,15 @@ MainWindow::MainWindow(QWidget* parent)
     setMinimumSize(800, 540);
     setAcceptDrops(true);
     setWindowFlags(Qt::FramelessWindowHint | Qt::Window);
+
+    // yt-dlp 관리자 초기화
+    ytdlp_ = new YtdlpManager(this);
+    connect(ytdlp_, &YtdlpManager::ytdlpReady,
+            this, &MainWindow::onYtdlpReady);
+    connect(ytdlp_, &YtdlpManager::downloadProgress,
+            this, &MainWindow::onYtdlpDownloadProgress);
+    connect(ytdlp_, &YtdlpManager::downloadFailed,
+            this, &MainWindow::onYtdlpDownloadFailed);
 
     setupUI();
     setupConnections();
@@ -329,6 +341,11 @@ void MainWindow::showContextMenu(const QPoint& globalPos) {
     actOpen->setShortcut(QKeySequence("Ctrl+O"));
     connect(actOpen, &QAction::triggered, this, &MainWindow::onOpenFile);
 
+    // URL 열기 (유튜브, 트위치 등)
+    QAction* actUrl = menu.addAction("▶  URL 열기... (YouTube/스트리밍)");
+    actUrl->setShortcut(QKeySequence("Ctrl+U"));
+    connect(actUrl, &QAction::triggered, this, &MainWindow::onOpenUrl);
+
     menu.addSeparator();
 
     // 재생 제어
@@ -429,6 +446,86 @@ void MainWindow::showContextMenu(const QPoint& globalPos) {
     connect(actQuit, &QAction::triggered, this, &QMainWindow::close);
 
     menu.exec(globalPos);
+}
+
+void MainWindow::onOpenUrl() {
+    UrlDialog dlg(this);
+    if (dlg.exec() != QDialog::Accepted) return;
+    QString url = dlg.url();
+    if (url.isEmpty()) return;
+    openUrl(url);
+}
+
+void MainWindow::openUrl(const QString& url) {
+    // URL을 직접 MPV에 전달 (ytdl=yes로 자동 처리)
+    // yt-dlp가 없으면 자동 다운로드
+    if (!ytdlp_->isAvailable() && YtdlpManager::isSupportedUrl(url)) {
+        // yt-dlp 다운로드 후 재생
+        pendingUrl_ = url;
+
+        ytdlpProgress_ = new QProgressDialog(
+            "yt-dlp 다운로드 중...\n"
+            "(유튜브 5.1 서라운드 지원을 위한 툴입니다)",
+            "취소", 0, 100, this);
+        ytdlpProgress_->setWindowTitle("yt-dlp 설치");
+        ytdlpProgress_->setWindowModality(Qt::WindowModal);
+        ytdlpProgress_->setStyleSheet(
+            "QProgressDialog { background: #1a1a1a; color: #ddd; }"
+            "QProgressBar { background: #111; border: 1px solid #333; }"
+            "QProgressBar::chunk { background: #1565c0; }");
+        ytdlpProgress_->show();
+
+        connect(ytdlpProgress_, &QProgressDialog::canceled, [this]() {
+            pendingUrl_.clear();
+        });
+
+        ytdlp_->downloadOrUpdate();
+        return;
+    }
+
+    // yt-dlp 있으면 경로 설정 후 재생
+    if (ytdlp_->isAvailable()) {
+        // MPV에 yt-dlp 경로 알려줘서 해당 앱의 yt-dlp 사용
+        QString ytdlpDir = QFileInfo(ytdlp_->ytdlpPath()).absolutePath();
+        mpvWidget_->core()->setProperty("ytdl-raw-options",
+            QString("paths=home:%1").arg(ytdlpDir));
+    }
+
+    mpvWidget_->showLogo(false);
+    mpvWidget_->core()->loadFile(url, false);
+    updateWindowTitle(url);
+}
+
+void MainWindow::onYtdlpReady(const QString& path) {
+    Q_UNUSED(path)
+    if (ytdlpProgress_) {
+        ytdlpProgress_->close();
+        ytdlpProgress_->deleteLater();
+        ytdlpProgress_ = nullptr;
+    }
+    if (!pendingUrl_.isEmpty()) {
+        QString url = pendingUrl_;
+        pendingUrl_.clear();
+        openUrl(url);
+    }
+}
+
+void MainWindow::onYtdlpDownloadProgress(int percent) {
+    if (ytdlpProgress_) ytdlpProgress_->setValue(percent);
+}
+
+void MainWindow::onYtdlpDownloadFailed(const QString& error) {
+    if (ytdlpProgress_) {
+        ytdlpProgress_->close();
+        ytdlpProgress_->deleteLater();
+        ytdlpProgress_ = nullptr;
+    }
+    pendingUrl_.clear();
+    QMessageBox::warning(this, "yt-dlp 다운로드 실패",
+        QString("yt-dlp를 다운로드할 수 없습니다.\n%1\n\n"
+                "yt-dlp.exe를 수동으로 다운로드하여 "
+                "소리누리 폴더에 넣어주세요.\n"
+                "https://github.com/yt-dlp/yt-dlp/releases").arg(error));
 }
 
 void MainWindow::loadSettings() {

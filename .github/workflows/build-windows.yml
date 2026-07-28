@@ -207,6 +207,16 @@ jobs:
           "@
           $qtConf.Trim() | Set-Content dist/Sorinuri-Portable/qt.conf -Encoding UTF8
 
+          # yt-dlp 다운로드 (유튜브 5.1 서라운드 지원)
+          Write-Host "yt-dlp 다운로드 중..."
+          try {
+            Invoke-WebRequest -Uri "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe" `
+              -OutFile "dist/Sorinuri-Portable/yt-dlp.exe" -TimeoutSec 120
+            Write-Host "yt-dlp 다운로드 완료: $([math]::Round((Get-Item dist/Sorinuri-Portable/yt-dlp.exe).Length/1MB,1)) MB"
+          } catch {
+            Write-Host "yt-dlp 다운로드 실패 (선택적 기능): $_"
+          }
+
           # 디버그 배치 파일
           if (Test-Path "소리누리-디버그.bat") {
             Copy-Item "소리누리-디버그.bat" dist/Sorinuri-Portable/

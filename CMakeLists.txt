@@ -15,6 +15,7 @@ find_package(Qt6 REQUIRED COMPONENTS
     OpenGL
     OpenGLWidgets
     Concurrent
+    Network
 )
 
 # libmpv 헤더/라이브러리 경로 (GitHub Actions에서 설정)
@@ -57,6 +58,10 @@ set(SOURCES
     src/SettingsDialog.h
     src/TrackSelector.cpp
     src/TrackSelector.h
+    src/UrlDialog.cpp
+    src/UrlDialog.h
+    src/YtdlpManager.cpp
+    src/YtdlpManager.h
     resources/resources.qrc
 )
 
@@ -80,6 +85,7 @@ target_link_libraries(Sorinuri PRIVATE
     Qt6::OpenGL
     Qt6::OpenGLWidgets
     Qt6::Concurrent
+    Qt6::Network
     ${MPV_LIBRARY}
 )
 
