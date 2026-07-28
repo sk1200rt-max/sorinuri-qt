@@ -216,11 +216,16 @@ void MpvCore::handlePropertyChange(mpv_event_property* prop) {
 
 // ─── 재생 제어 ────────────────────────────────────────────────────
 void MpvCore::loadFile(const QString& path, bool append) {
-    if (!initialized_) return;
+    if (!initialized_) {
+        qWarning() << "[MPV] loadFile 호출되었지만 초기화 안됨!";
+        return;
+    }
+    qInfo() << "[MPV] loadFile:" << path << "| mode:" << (append ? "append" : "replace");
     const char* mode = append ? "append-play" : "replace";
     QByteArray pathBytes = path.toUtf8();
     const char* args[] = { "loadfile", pathBytes.constData(), mode, nullptr };
-    mpv_command_async(mpv_, 0, args);
+    int ret = mpv_command_async(mpv_, 0, args);
+    qInfo() << "[MPV] mpv_command_async result:" << ret;
     // pause 해제는 MPV_EVENT_FILE_LOADED 이벤트에서 처리
 }
 

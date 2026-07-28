@@ -118,13 +118,20 @@ void MainWindow::setupConnections() {
 }
 
 void MainWindow::openFiles(const QStringList& paths) {
+    qInfo() << "[Main] openFiles:" << paths.size() << "파일";
     bool first = true;
     for (const QString& path : paths) {
         QFileInfo fi(path);
-        if (!fi.exists()) continue;
-        if (!MEDIA_EXTS.contains(fi.suffix().toLower())) continue;
-        if (first) { mpvWidget_->loadFile(path); first = false; }
-        else        { mpvWidget_->appendFile(path); }
+        qInfo() << "[Main] 파일:" << path << "| 확장자:" << fi.suffix() << "| 존재:" << fi.exists();
+        if (!fi.exists()) { qWarning() << "[Main] 파일 없음:"; continue; }
+        // 확장자 필터 완화 - 모든 파일 허용
+        if (first) {
+            qInfo() << "[Main] loadFile:" << path;
+            mpvWidget_->loadFile(path);
+            first = false;
+        } else {
+            mpvWidget_->appendFile(path);
+        }
     }
 }
 
