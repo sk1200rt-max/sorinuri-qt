@@ -1,0 +1,173 @@
+name: Build Windows (Qt6 + libmpv)
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 60
+
+    steps:
+      # ── 소스 체크아웃 ──────────────────────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── Qt6 설치 ───────────────────────────────────────────────────
+      - name: Install Qt6
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.7.3'
+          host: 'windows'
+          target: 'desktop'
+          arch: 'win64_msvc2019_64'
+          modules: ''
+          cache: true
+
+      # ── libmpv 다운로드 ────────────────────────────────────────────
+      - name: Download libmpv
+        shell: pwsh
+        run: |
+          # shinchiro mpv Windows 빌드 (MSVC 호환 MinGW 빌드)
+          $url = "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20250101/mpv-dev-x86_64-20250101-git-abc1234.7z"
+
+          # 최신 릴리즈 URL 자동 탐색
+          $releases = Invoke-RestMethod "https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/releases?per_page=5"
+          $devAsset = $null
+          foreach ($rel in $releases) {
+            foreach ($asset in $rel.assets) {
+              if ($asset.name -match "mpv-dev-x86_64.*\.7z$") {
+                $devAsset = $asset
+                break
+              }
+            }
+            if ($devAsset) { break }
+          }
+
+          if (-not $devAsset) {
+            Write-Error "libmpv dev 패키지를 찾을 수 없습니다"
+            exit 1
+          }
+
+          Write-Host "다운로드: $($devAsset.name)"
+          Invoke-WebRequest -Uri $devAsset.browser_download_url -OutFile "mpv-dev.7z"
+
+          # 압축 해제
+          7z x mpv-dev.7z -o"mpv-dev" -y
+
+          # 파일 구조 확인
+          Get-ChildItem -Recurse mpv-dev | Select-Object FullName
+
+      # ── libmpv 헤더 및 라이브러리 준비 ────────────────────────────
+      - name: Prepare libmpv deps
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force deps/libmpv/include/mpv
+          New-Item -ItemType Directory -Force deps/libmpv/lib
+
+          # 헤더 파일 복사
+          $headers = Get-ChildItem -Recurse mpv-dev -Filter "*.h" | Where-Object { $_.DirectoryName -match "mpv" }
+          foreach ($h in $headers) {
+            Copy-Item $h.FullName deps/libmpv/include/mpv/
+            Write-Host "헤더 복사: $($h.Name)"
+          }
+
+          # DLL 복사
+          $dll = Get-ChildItem -Recurse mpv-dev -Filter "libmpv-2.dll" | Select-Object -First 1
+          if ($dll) {
+            Copy-Item $dll.FullName deps/libmpv/lib/
+            Write-Host "DLL 복사: $($dll.FullName)"
+          } else {
+            Write-Error "libmpv-2.dll을 찾을 수 없습니다"
+            exit 1
+          }
+
+          # import library 생성 (MinGW DLL → MSVC .lib)
+          $dllPath = "deps/libmpv/lib/libmpv-2.dll"
+
+          # gendef로 .def 생성
+          $mingwBin = "C:\msys64\mingw64\bin"
+          if (Test-Path "$mingwBin\gendef.exe") {
+            & "$mingwBin\gendef.exe" $dllPath
+            Move-Item "libmpv-2.def" deps/libmpv/lib/
+          } else {
+            # dumpbin으로 .def 생성
+            $exports = & dumpbin /exports $dllPath 2>&1
+            $lines = $exports | Select-String "^\s+\d+\s+[0-9A-F]+\s+[0-9A-F]+\s+(\S+)" |
+              ForEach-Object { $_.Matches[0].Groups[1].Value }
+            "EXPORTS" | Set-Content deps/libmpv/lib/libmpv-2.def
+            $lines | Add-Content deps/libmpv/lib/libmpv-2.def
+          }
+
+          # lib.exe로 .lib 생성
+          $vsPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
+            -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+            -property installationPath
+          $libExe = Get-ChildItem "$vsPath\VC\Tools\MSVC" -Recurse -Filter "lib.exe" |
+            Where-Object { $_.FullName -match "x64\\lib.exe" } | Select-Object -First 1
+
+          if ($libExe) {
+            & $libExe.FullName /def:deps/libmpv/lib/libmpv-2.def /out:deps/libmpv/lib/mpv.lib /machine:x64
+            Write-Host "mpv.lib 생성 완료"
+          } else {
+            Write-Error "lib.exe를 찾을 수 없습니다"
+            exit 1
+          }
+
+          # 결과 확인
+          Write-Host "=== deps/libmpv 구조 ==="
+          Get-ChildItem -Recurse deps/libmpv | Select-Object FullName
+
+      # ── CMake 빌드 ────────────────────────────────────────────────
+      - name: Configure CMake
+        shell: pwsh
+        run: |
+          cmake -B build -S . `
+            -G "Visual Studio 17 2022" -A x64 `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DMPV_INCLUDE_DIR="${{ github.workspace }}/deps/libmpv/include" `
+            -DMPV_LIB_DIR="${{ github.workspace }}/deps/libmpv/lib"
+
+      - name: Build
+        shell: pwsh
+        run: |
+          cmake --build build --config Release --parallel 4
+
+      # ── 배포 패키지 생성 ──────────────────────────────────────────
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist/Sorinuri-Portable
+
+          # 실행 파일
+          Copy-Item build/Release/Sorinuri.exe dist/Sorinuri-Portable/
+
+          # libmpv DLL
+          Copy-Item deps/libmpv/lib/libmpv-2.dll dist/Sorinuri-Portable/
+
+          # Qt DLL 배포
+          & "$env:Qt6_DIR/bin/windeployqt.exe" `
+            --no-translations `
+            --no-system-d3d-compiler `
+            --no-opengl-sw `
+            dist/Sorinuri-Portable/Sorinuri.exe
+
+          # 패키지 크기 확인
+          $size = (Get-ChildItem -Recurse dist/Sorinuri-Portable | Measure-Object -Property Length -Sum).Sum
+          Write-Host "패키지 크기: $([math]::Round($size/1MB, 1)) MB"
+
+          # ZIP 생성
+          Compress-Archive -Path dist/Sorinuri-Portable -DestinationPath dist/Sorinuri-Qt-Portable.zip
+          Write-Host "ZIP 생성 완료"
+
+      # ── Artifact 업로드 ───────────────────────────────────────────
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sorinuri-Qt-Windows
+          path: dist/Sorinuri-Qt-Portable.zip
+          retention-days: 30
