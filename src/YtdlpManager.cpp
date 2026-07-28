@@ -5,6 +5,7 @@
 #include <QFileInfo>
 #include <QDebug>
 #include <QNetworkRequest>
+#include <QNetworkReply>
 #include <QUrl>
 
 // yt-dlp 최신 릴리즈 다운로드 URL (Windows x64)
@@ -13,8 +14,6 @@ static const char* YTDLP_DOWNLOAD_URL =
 
 YtdlpManager::YtdlpManager(QObject* parent) : QObject(parent) {
     nam_ = new QNetworkAccessManager(this);
-    connect(nam_, &QNetworkAccessManager::finished,
-            this, &YtdlpManager::onDownloadFinished);
 }
 
 QString YtdlpManager::appDir() const {
@@ -38,14 +37,25 @@ void YtdlpManager::downloadOrUpdate() {
     qInfo() << "[yt-dlp] 다운로드 시작:" << YTDLP_DOWNLOAD_URL;
     emit downloadProgress(0);
 
-    QNetworkRequest req(QUrl(YTDLP_DOWNLOAD_URL));
-    req.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
-                     static_cast<int>(QNetworkRequest::NoLessSafeRedirectPolicy));
-    req.setRawHeader("User-Agent", "Sorinuri/1.0");
+    // Qt6 방식: QNetworkRequest에 리다이렉트 정책 설정
+    QNetworkRequest req;
+    req.setUrl(QUrl(QString::fromUtf8(YTDLP_DOWNLOAD_URL)));
+    req.setHeader(QNetworkRequest::UserAgentHeader, "Sorinuri/1.1");
+    // Qt6에서는 setTransferTimeout 사용
+    req.setTransferTimeout(120000);  // 120초
 
     QNetworkReply* reply = nam_->get(req);
+    if (!reply) {
+        downloading_ = false;
+        emit downloadFailed("네트워크 요청 실패");
+        return;
+    }
+
+    // 리다이렉트 자동 처리 (Qt6에서는 기본 활성화)
     connect(reply, &QNetworkReply::downloadProgress,
             this, &YtdlpManager::onDownloadProgress);
+    connect(reply, &QNetworkReply::finished,
+            this, [this, reply]() { onDownloadFinished(reply); });
 }
 
 void YtdlpManager::onDownloadProgress(qint64 received, qint64 total) {
@@ -66,6 +76,23 @@ void YtdlpManager::onDownloadFinished(QNetworkReply* reply) {
         return;
     }
 
+    // 리다이렉트 처리
+    QVariant redirect = reply->attribute(QNetworkRequest::RedirectionTargetAttribute);
+    if (redirect.isValid()) {
+        // 리다이렉트가 있으면 다시 요청
+        QNetworkRequest req;
+        req.setUrl(redirect.toUrl());
+        req.setHeader(QNetworkRequest::UserAgentHeader, "Sorinuri/1.1");
+        req.setTransferTimeout(120000);
+        QNetworkReply* newReply = nam_->get(req);
+        connect(newReply, &QNetworkReply::downloadProgress,
+                this, &YtdlpManager::onDownloadProgress);
+        connect(newReply, &QNetworkReply::finished,
+                this, [this, newReply]() { onDownloadFinished(newReply); });
+        downloading_ = true;
+        return;
+    }
+
     QByteArray data = reply->readAll();
     if (data.isEmpty()) {
         emit downloadFailed("빈 응답");
@@ -73,8 +100,8 @@ void YtdlpManager::onDownloadFinished(QNetworkReply* reply) {
     }
 
     QString destPath = appDir() + "/yt-dlp.exe";
-    // 임시 파일로 먼저 저장 후 교체 (실행 중 덮어쓰기 방지)
-    QString tmpPath = destPath + ".tmp";
+    QString tmpPath  = destPath + ".tmp";
+
     QFile f(tmpPath);
     if (!f.open(QIODevice::WriteOnly)) {
         emit downloadFailed("파일 쓰기 실패: " + tmpPath);
@@ -83,7 +110,6 @@ void YtdlpManager::onDownloadFinished(QNetworkReply* reply) {
     f.write(data);
     f.close();
 
-    // 기존 파일 교체
     QFile::remove(destPath);
     if (!QFile::rename(tmpPath, destPath)) {
         emit downloadFailed("파일 교체 실패");
@@ -97,25 +123,21 @@ void YtdlpManager::onDownloadFinished(QNetworkReply* reply) {
 }
 
 bool YtdlpManager::isSupportedUrl(const QString& url) {
-    // yt-dlp가 지원하는 주요 사이트
     static const QStringList supported = {
         "youtube.com", "youtu.be",
         "twitch.tv",
         "vimeo.com",
         "dailymotion.com",
-        "niconico", "nicovideo.jp",
+        "nicovideo.jp",
         "bilibili.com",
         "soundcloud.com",
         "bandcamp.com",
-        // 직접 스트림 프로토콜
         "rtmp://", "rtsp://", "mms://",
-        // HTTP 직접 미디어
         ".m3u8", ".mpd"
     };
     for (const QString& s : supported) {
         if (url.contains(s)) return true;
     }
-    // http/https로 시작하는 모든 URL 허용
     return url.startsWith("http://") || url.startsWith("https://");
 }
 
