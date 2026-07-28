@@ -5,34 +5,37 @@
 #include <QPainter>
 #include <QPixmap>
 #include <QDebug>
+#include <QApplication>
 
 #ifdef Q_OS_WIN
 #include <windows.h>
 #endif
 
 MpvWidget::MpvWidget(QWidget* parent) : QWidget(parent) {
-    setAttribute(Qt::WA_NativeWindow);
-    setAutoFillBackground(true);
-    QPalette pal;
-    pal.setColor(QPalette::Window, Qt::black);
-    setPalette(pal);
+    // MPV가 직접 렌더링하는 네이티브 윈도우
+    // Qt가 이 위젯에 절대 그리지 않도록 설정
+    setAttribute(Qt::WA_NativeWindow);           // 네이티브 HWND 생성
+    setAttribute(Qt::WA_PaintOnScreen);          // Qt 더블버퍼링 비활성화
+    setAttribute(Qt::WA_NoSystemBackground);     // 시스템 배경 그리기 비활성화
+    setAttribute(Qt::WA_OpaquePaintEvent);       // 불투명 이벤트 (배경 지우기 안 함)
+    setAutoFillBackground(false);
 
     core_ = new MpvCore(this);
 
     // ── 소리누리 로고 오버레이 ────────────────────────────────────
+    // 별도 네이티브 위젯으로 만들어서 MPV 위에 올림
     logoLabel_ = new QLabel(this);
     logoLabel_->setAttribute(Qt::WA_TransparentForMouseEvents);
+    logoLabel_->setAttribute(Qt::WA_NoSystemBackground);
     logoLabel_->setStyleSheet("background: transparent; border: none;");
     logoLabel_->setAlignment(Qt::AlignCenter);
 
     QPixmap logo(":/sorinuri-logo-center.png");
     if (!logo.isNull()) {
-        // 화면 너비의 약 30% 크기로 표시
         QPixmap scaled = logo.scaledToWidth(340, Qt::SmoothTransformation);
         logoLabel_->setPixmap(scaled);
         logoLabel_->resize(scaled.size());
     } else {
-        // 폴백: 텍스트
         logoLabel_->setText("소리누리");
         logoLabel_->setStyleSheet(
             "background: transparent; color: rgba(255,255,255,80);"
@@ -45,13 +48,14 @@ MpvWidget::MpvWidget(QWidget* parent) : QWidget(parent) {
 
 MpvWidget::~MpvWidget() = default;
 
-void MpvWidget::paintEvent(QPaintEvent* e) {
-    QPainter p(this);
-    p.fillRect(e->rect(), Qt::black);
+// WA_PaintOnScreen 설정 시 paintEngine을 nullptr 반환해야 함
+QPaintEngine* MpvWidget::paintEngine() const {
+    return nullptr;
 }
 
-QPaintEngine* MpvWidget::paintEngine() const {
-    return QWidget::paintEngine();
+// paintEvent는 아무것도 하지 않음 - MPV가 직접 렌더링
+void MpvWidget::paintEvent(QPaintEvent*) {
+    // 의도적으로 비워둠: MPV가 이 창에 직접 렌더링
 }
 
 void MpvWidget::showEvent(QShowEvent* event) {
@@ -61,13 +65,24 @@ void MpvWidget::showEvent(QShowEvent* event) {
 }
 
 void MpvWidget::initMpv() {
+    // 위젯이 완전히 표시된 후 HWND를 가져와야 함
+    QApplication::processEvents();
+
     WId wid = winId();
     qInfo() << "[MpvWidget] WID:" << wid;
 
 #ifdef Q_OS_WIN
     HWND hwnd = reinterpret_cast<HWND>(wid);
+    // 창 배경을 검은색으로 설정
     SetClassLongPtr(hwnd, GCLP_HBRBACKGROUND, (LONG_PTR)GetStockObject(BLACK_BRUSH));
-    InvalidateRect(hwnd, nullptr, TRUE);
+    // 창을 검은색으로 초기화
+    HDC hdc = GetDC(hwnd);
+    RECT rc;
+    GetClientRect(hwnd, &rc);
+    HBRUSH black = CreateSolidBrush(RGB(0, 0, 0));
+    FillRect(hdc, &rc, black);
+    DeleteObject(black);
+    ReleaseDC(hwnd, hdc);
 #endif
 
     if (core_->initialize(wid)) {
