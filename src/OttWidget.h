@@ -9,6 +9,7 @@
 #include <QTimer>
 #include <QResizeEvent>
 #include <QStackedWidget>
+#include <QEvent>
 
 #ifdef Q_OS_WIN
 #ifndef WEBVIEW2_NOT_AVAILABLE
@@ -19,7 +20,15 @@
 #endif
 
 // 서비스 정보 구조체 (OttWidget.cpp에서 정의)
-struct ServiceInfo;
+struct ServiceInfo {
+    QString name;
+    QString url;
+    QString audioLabel;
+    QString audioBg;
+    QString logoText;
+    QString logoTextColor;
+    QString logoBg;
+};
 
 /**
  * OttWidget - Edge WebView2 기반 OTT 스트리밍 패널
@@ -56,6 +65,7 @@ signals:
 protected:
     void resizeEvent(QResizeEvent* e) override;
     void showEvent(QShowEvent* e) override;
+    bool eventFilter(QObject* obj, QEvent* event) override;
 
 private slots:
     void onNavigateClicked();

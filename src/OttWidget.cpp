@@ -1,11 +1,9 @@
 #include "OttWidget.h"
 #include <QDebug>
-#include <QMessageBox>
 #include <QApplication>
 #include <QScrollArea>
 #include <QGridLayout>
 #include <QFrame>
-#include <QGraphicsDropShadowEffect>
 
 // ── 서비스 데이터 ──────────────────────────────────────────────────────────
 const QStringList OttWidget::SERVICE_NAMES = {
@@ -34,27 +32,19 @@ const QStringList OttWidget::SERVICE_URLS = {
     "https://tv.apple.com",
 };
 
-// 서비스별 상세 정보 (홈 그리드용)
-struct ServiceInfo {
-    QString name;
-    QString url;
-    QString audioLabel;   // 배지 텍스트
-    QString audioColor;   // 배지 색상 (#hex)
-    QString logoText;     // 로고 대체 텍스트 (SVG 없을 때)
-    QString logoColor;    // 로고 텍스트 색상
-    QString description;  // 부가 설명
-};
+// ServiceInfo는 OttWidget.h에 정의됨
 
 static const QVector<ServiceInfo> SERVICES = {
-    { "Netflix",       "https://www.netflix.com",      "Dolby Atmos", "#1565c0", "N",  "#e50914", "PlayReady DRM · 4K HDR" },
-    { "Disney+",       "https://www.disneyplus.com",   "Dolby Atmos", "#1565c0", "D+", "#0063e5", "PlayReady DRM · 4K HDR" },
-    { "Prime Video",   "https://www.primevideo.com",   "Dolby Atmos", "#1565c0", "▶",  "#00a8e0", "PlayReady DRM · 4K HDR" },
-    { "YouTube",       "https://www.youtube.com",      "5.1 E-AC3",   "#1b5e20", "▶",  "#ff0000", "DRM 없음 · 자동 재생"    },
-    { "Wavve 웨이브",  "https://www.wavve.com",         "5.1",         "#1b5e20", "W",  "#00b4b4", "국내 OTT"               },
-    { "Watcha 왓챠",   "https://www.watcha.com",        "5.1",         "#1b5e20", "W",  "#e53935", "국내 OTT"               },
-    { "Tving 티빙",    "https://www.tving.com",         "5.1",         "#1b5e20", "T",  "#e53935", "국내 OTT"               },
-    { "Coupang Play",  "https://www.coupangplay.com",  "5.1",         "#1b5e20", "▶",  "#1565c0", "국내 OTT"               },
-    { "Apple TV+",     "https://tv.apple.com",         "Dolby Atmos", "#1565c0", "",   "#f5f5f5", "FairPlay DRM · 4K HDR"  },
+    // name           url                              audio      audioBg    logo  logoColor  logoBg
+    { "Netflix",      "https://www.netflix.com",      "Dolby Atmos", "#1565c0", "N",  "#e50914", "#1a0000" },
+    { "Disney+",      "https://www.disneyplus.com",   "Dolby Atmos", "#1565c0", "D+", "#0063e5", "#00001a" },
+    { "Prime Video",  "https://www.primevideo.com",   "Dolby Atmos", "#1565c0", "▶",  "#00a8e0", "#00101a" },
+    { "YouTube",      "https://www.youtube.com",      "5.1 E-AC3",   "#1b5e20", "▶",  "#ff0000", "#1a0000" },
+    { "Wavve 웨이브", "https://www.wavve.com",         "5.1",         "#1b5e20", "W",  "#00b4b4", "#001a1a" },
+    { "Watcha 왓챠",  "https://www.watcha.com",        "5.1",         "#1b5e20", "W",  "#e53935", "#1a0000" },
+    { "Tving 티빙",   "https://www.tving.com",         "5.1",         "#1b5e20", "T",  "#e53935", "#1a0000" },
+    { "Coupang Play", "https://www.coupangplay.com",  "5.1",         "#1b5e20", "▶",  "#1565c0", "#00001a" },
+    { "Apple TV+",    "https://tv.apple.com",         "Dolby Atmos", "#1565c0", "",   "#f5f5f5", "#111111" },
 };
 
 // ── 생성자 ─────────────────────────────────────────────────────────────────
@@ -90,7 +80,7 @@ void OttWidget::setupUI() {
 
     QString btnStyle =
         "QPushButton { background: #222; color: #ccc; border: 1px solid #333; "
-        "border-radius: 4px; padding: 3px 8px; font-size: 12px; min-width: 28px; }"
+        "border-radius: 4px; padding: 3px 10px; font-size: 13px; min-width: 30px; }"
         "QPushButton:hover { background: #2a2a2a; border-color: #4fc3f7; color: #fff; }"
         "QPushButton:disabled { color: #444; border-color: #222; }";
 
@@ -135,21 +125,19 @@ void OttWidget::setupUI() {
     auto* goBtn = new QPushButton("이동", toolBar_);
     goBtn->setStyleSheet(
         "QPushButton { background: #1565c0; color: #fff; border: none; "
-        "border-radius: 4px; padding: 4px 12px; font-size: 12px; }"
+        "border-radius: 4px; padding: 4px 14px; font-size: 12px; }"
         "QPushButton:hover { background: #1976d2; }");
     tbLayout->addWidget(goBtn);
 
     mainLayout->addWidget(toolBar_);
 
-    // ── 메인 스택 (홈 그리드 / WebView2) ─────────────────────────
+    // ── 콘텐츠 스택 ───────────────────────────────────────────────
     contentStack_ = new QStackedWidget(this);
     contentStack_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
-    // ── 페이지 0: 서비스 선택 그리드 홈 ──────────────────────────
     homeGrid_ = buildHomeGrid();
     contentStack_->addWidget(homeGrid_);   // index 0
 
-    // ── 페이지 1: WebView2 컨테이너 ──────────────────────────────
     webContainer_ = new QWidget(this);
     webContainer_->setStyleSheet("background: #000;");
     webContainer_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
@@ -166,11 +154,9 @@ void OttWidget::setupUI() {
 #else
     statusLabel_->setText(
         "Edge WebView2 초기화 중...\n\n"
-        "Windows 10/11에 Microsoft Edge가 설치되어 있으면\n"
-        "자동으로 넷플릭스, 디즈니+ 등 OTT 서비스를 이용할 수 있습니다.\n\n"
         "Dolby Atmos / 5.1 서라운드 완전 지원");
 #endif
-    contentStack_->addWidget(webContainer_);   // index 1
+    contentStack_->addWidget(webContainer_); // index 1
 
     mainLayout->addWidget(contentStack_, 1);
 
@@ -180,28 +166,24 @@ void OttWidget::setupUI() {
     statusBar->setStyleSheet("background: #0a0a0a; border-top: 1px solid #1a1a1a;");
     auto* sbLayout = new QHBoxLayout(statusBar);
     sbLayout->setContentsMargins(12, 0, 12, 0);
-    sbLayout->setSpacing(8);
-
     auto* statusText = new QLabel("Edge WebView2 준비 완료  ·  PlayReady DRM 활성", statusBar);
     statusText->setStyleSheet("color: #444; font-size: 10px; background: transparent;");
     sbLayout->addWidget(statusText);
     sbLayout->addStretch();
-
     mainLayout->addWidget(statusBar);
 
-    // 시그널 연결
-    connect(goBtn,      &QPushButton::clicked,   this, &OttWidget::onNavigateClicked);
+    connect(goBtn,      &QPushButton::clicked,    this, &OttWidget::onNavigateClicked);
     connect(urlBar_,    &QLineEdit::returnPressed, this, &OttWidget::onNavigateClicked);
-    connect(backBtn_,   &QPushButton::clicked,   this, &OttWidget::goBack);
-    connect(fwdBtn_,    &QPushButton::clicked,   this, &OttWidget::goForward);
-    connect(reloadBtn_, &QPushButton::clicked,   this, &OttWidget::reload);
-    connect(homeBtn_,   &QPushButton::clicked,   this, &OttWidget::goHome);
+    connect(backBtn_,   &QPushButton::clicked,    this, &OttWidget::goBack);
+    connect(fwdBtn_,    &QPushButton::clicked,    this, &OttWidget::goForward);
+    connect(reloadBtn_, &QPushButton::clicked,    this, &OttWidget::reload);
+    connect(homeBtn_,   &QPushButton::clicked,    this, &OttWidget::goHome);
     connect(serviceBox_, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &OttWidget::onServiceSelected);
 }
 
+// ── 홈 그리드 빌더 ─────────────────────────────────────────────────────────
 QWidget* OttWidget::buildHomeGrid() {
-    // 스크롤 가능한 그리드 컨테이너
     auto* scroll = new QScrollArea(this);
     scroll->setWidgetResizable(true);
     scroll->setFrameShape(QFrame::NoFrame);
@@ -214,12 +196,15 @@ QWidget* OttWidget::buildHomeGrid() {
     auto* container = new QWidget();
     container->setStyleSheet("background: #0e0e0e;");
     auto* gridLayout = new QGridLayout(container);
-    gridLayout->setContentsMargins(32, 28, 32, 28);
-    gridLayout->setSpacing(14);
+    gridLayout->setContentsMargins(28, 24, 28, 24);
+    gridLayout->setSpacing(12);
+    // 3열 균등 분배
+    gridLayout->setColumnStretch(0, 1);
+    gridLayout->setColumnStretch(1, 1);
+    gridLayout->setColumnStretch(2, 1);
 
     for (int i = 0; i < SERVICES.size(); ++i) {
-        const auto& svc = SERVICES[i];
-        auto* card = buildServiceCard(svc);
+        auto* card = buildServiceCard(SERVICES[i]);
         gridLayout->addWidget(card, i / 3, i % 3);
     }
 
@@ -227,70 +212,94 @@ QWidget* OttWidget::buildHomeGrid() {
     return scroll;
 }
 
+// ── 서비스 카드 빌더 ───────────────────────────────────────────────────────
 QWidget* OttWidget::buildServiceCard(const ServiceInfo& svc) {
-    auto* card = new QPushButton();
-    card->setFixedHeight(88);
+    // 카드 전체: QFrame (QPushButton 대신 클릭 감지용 이벤트 필터 사용)
+    auto* card = new QFrame();
+    card->setFixedHeight(90);
     card->setCursor(Qt::PointingHandCursor);
     card->setStyleSheet(
-        "QPushButton {"
+        "QFrame {"
         "  background: #1a1a1a;"
         "  border: 1px solid #2a2a2a;"
-        "  border-radius: 8px;"
-        "  text-align: left;"
-        "  padding: 0;"
+        "  border-radius: 10px;"
         "}"
-        "QPushButton:hover {"
-        "  background: #222;"
-        "  border-color: #3a3a3a;"
+        "QFrame:hover {"
+        "  background: #222222;"
+        "  border-color: #3d3d3d;"
         "}");
 
-    // 카드 내부 레이아웃
     auto* cardLayout = new QHBoxLayout(card);
     cardLayout->setContentsMargins(16, 0, 16, 0);
-    cardLayout->setSpacing(14);
+    cardLayout->setSpacing(16);
 
-    // 로고 영역 (48x48 원형)
+    // ── 로고 박스 (52×52 라운드 사각형) ─────────────────────────
     auto* logoBox = new QLabel();
     logoBox->setFixedSize(52, 52);
     logoBox->setAlignment(Qt::AlignCenter);
     logoBox->setStyleSheet(QString(
-        "background: #111; border-radius: 10px; "
-        "color: %1; font-size: 20px; font-weight: 900; "
-        "font-family: 'Arial Black', 'Segoe UI', sans-serif;").arg(svc.logoColor));
+        "background: %1;"
+        "border-radius: 10px;"
+        "color: %2;"
+        "font-size: 22px;"
+        "font-weight: 900;"
+        "font-family: 'Arial Black', 'Segoe UI Black', sans-serif;")
+        .arg(svc.logoBg, svc.logoTextColor));
     logoBox->setText(svc.logoText);
     cardLayout->addWidget(logoBox);
 
-    // 텍스트 영역
-    auto* textBox = new QWidget();
+    // ── 텍스트 영역 ───────────────────────────────────────────────
+    auto* textBox  = new QWidget();
     auto* textLayout = new QVBoxLayout(textBox);
     textLayout->setContentsMargins(0, 0, 0, 0);
-    textLayout->setSpacing(4);
+    textLayout->setSpacing(6);
 
     auto* nameLabel = new QLabel(svc.name);
     nameLabel->setStyleSheet(
-        "color: #e0e0e0; font-size: 14px; font-weight: 600; "
-        "font-family: 'Malgun Gothic', 'Segoe UI', sans-serif; background: transparent;");
+        "color: #e0e0e0;"
+        "font-size: 15px;"
+        "font-weight: 600;"
+        "font-family: 'Malgun Gothic', 'Segoe UI', sans-serif;"
+        "background: transparent;");
 
     // 오디오 배지
     auto* badgeLabel = new QLabel(svc.audioLabel);
-    badgeLabel->setFixedHeight(18);
+    badgeLabel->setFixedHeight(20);
     badgeLabel->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Fixed);
     badgeLabel->setStyleSheet(QString(
-        "background: %1; color: #fff; font-size: 10px; font-weight: 700; "
-        "font-family: 'Consolas', monospace; padding: 1px 7px; border-radius: 3px;")
-        .arg(svc.audioColor));
+        "background: %1;"
+        "color: #fff;"
+        "font-size: 11px;"
+        "font-weight: 700;"
+        "font-family: 'Consolas', 'Courier New', monospace;"
+        "padding: 1px 8px;"
+        "border-radius: 4px;")
+        .arg(svc.audioBg));
 
+    textLayout->addStretch();
     textLayout->addWidget(nameLabel);
     textLayout->addWidget(badgeLabel);
+    textLayout->addStretch();
     cardLayout->addWidget(textBox, 1);
 
-    // 클릭 시 해당 서비스 URL로 이동
+    // 클릭 이벤트: 마우스 릴리즈로 감지
     QString url = svc.url;
-    connect(card, &QPushButton::clicked, this, [this, url]() {
-        navigate(url);
-    });
+    card->installEventFilter(this);
+    card->setProperty("serviceUrl", url);
 
     return card;
+}
+
+// ── 이벤트 필터 (카드 클릭 감지) ──────────────────────────────────────────
+bool OttWidget::eventFilter(QObject* obj, QEvent* event) {
+    if (event->type() == QEvent::MouseButtonRelease) {
+        QString url = obj->property("serviceUrl").toString();
+        if (!url.isEmpty()) {
+            navigate(url);
+            return true;
+        }
+    }
+    return QWidget::eventFilter(obj, event);
 }
 
 // ── showEvent ─────────────────────────────────────────────────────────────
@@ -298,7 +307,6 @@ void OttWidget::showEvent(QShowEvent* e) {
     QWidget::showEvent(e);
     if (!initAttempted_) {
         initAttempted_ = true;
-        // WebView2를 백그라운드에서 미리 초기화 (홈 그리드 표시 중)
         QTimer::singleShot(200, this, &OttWidget::initWebView2);
     }
 }
@@ -314,33 +322,24 @@ void OttWidget::initWebView2() {
         Microsoft::WRL::Callback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>(
             [this, parentHwnd](HRESULT result, ICoreWebView2Environment* env) -> HRESULT {
                 if (FAILED(result) || !env) {
-                    qWarning() << "[WebView2] 환경 생성 실패:" << result;
                     QMetaObject::invokeMethod(this, [this]() {
                         statusLabel_->setText(
                             "Microsoft Edge WebView2를 찾을 수 없습니다.\n\n"
-                            "Edge 브라우저가 설치되어 있는지 확인해 주세요.\n"
-                            "Windows 10/11에는 기본 설치되어 있습니다.");
+                            "Edge 브라우저가 설치되어 있는지 확인해 주세요.");
                         emit webView2Unavailable();
                     }, Qt::QueuedConnection);
                     return S_OK;
                 }
-
                 webEnv_ = env;
                 webEnv_->AddRef();
-
                 env->CreateCoreWebView2Controller(
                     parentHwnd,
                     Microsoft::WRL::Callback<ICoreWebView2CreateCoreWebView2ControllerCompletedHandler>(
                         [this](HRESULT result, ICoreWebView2Controller* ctrl) -> HRESULT {
-                            if (FAILED(result) || !ctrl) {
-                                qWarning() << "[WebView2] 컨트롤러 생성 실패:" << result;
-                                return S_OK;
-                            }
-
+                            if (FAILED(result) || !ctrl) return S_OK;
                             webCtrl_ = ctrl;
                             webCtrl_->AddRef();
                             ctrl->get_CoreWebView2(&webView_);
-
                             if (webView_) {
                                 ICoreWebView2Settings* settings = nullptr;
                                 webView_->get_Settings(&settings);
@@ -350,7 +349,6 @@ void OttWidget::initWebView2() {
                                     settings->put_IsZoomControlEnabled(TRUE);
                                     settings->Release();
                                 }
-
                                 EventRegistrationToken token;
                                 webView_->add_DocumentTitleChanged(
                                     Microsoft::WRL::Callback<ICoreWebView2DocumentTitleChangedEventHandler>(
@@ -366,7 +364,6 @@ void OttWidget::initWebView2() {
                                             }
                                             return S_OK;
                                         }).Get(), &token);
-
                                 webView_->add_SourceChanged(
                                     Microsoft::WRL::Callback<ICoreWebView2SourceChangedEventHandler>(
                                         [this](ICoreWebView2* sender, ICoreWebView2SourceChangedEventArgs*) -> HRESULT {
@@ -383,31 +380,22 @@ void OttWidget::initWebView2() {
                                             return S_OK;
                                         }).Get(), &token);
                             }
-
                             QMetaObject::invokeMethod(this, [this]() {
                                 webView2Ready_ = true;
                                 updateWebViewBounds();
-                                // WebView2 준비 완료 - 홈 그리드는 그대로 유지
-                                // 서비스 카드 클릭 시 navigate() 호출로 전환됨
-                                qInfo() << "[WebView2] 백그라운드 초기화 완료 - PlayReady DRM 활성";
+                                qInfo() << "[WebView2] 초기화 완료 - PlayReady DRM 활성";
                             }, Qt::QueuedConnection);
-
                             return S_OK;
                         }).Get());
-
                 return S_OK;
             }).Get());
-
-    if (FAILED(hr)) {
-        qWarning() << "[WebView2] 초기화 실패:" << hr;
-    }
+    if (FAILED(hr)) qWarning() << "[WebView2] 초기화 실패:" << hr;
 #endif
 #else
     statusLabel_->setText("WebView2는 Windows에서만 지원됩니다.");
 #endif
 }
 
-// ── 크기 조절 ─────────────────────────────────────────────────────────────
 void OttWidget::resizeEvent(QResizeEvent* e) {
     QWidget::resizeEvent(e);
     if (statusLabel_) statusLabel_->resize(webContainer_->size());
@@ -420,23 +408,18 @@ void OttWidget::updateWebViewBounds() {
     if (!webCtrl_ || !webContainer_) return;
     RECT bounds = {0, 0, webContainer_->width(), webContainer_->height()};
     webCtrl_->put_Bounds(bounds);
-    // WebView2는 contentStack_이 index 1일 때만 보이게
     webCtrl_->put_IsVisible(contentStack_->currentIndex() == 1 ? TRUE : FALSE);
 #endif
 #endif
 }
 
-// ── 네비게이션 ────────────────────────────────────────────────────────────
 void OttWidget::navigate(const QString& url) {
     if (url.isEmpty()) return;
     urlBar_->setText(url);
-
-    // 홈 그리드에서 WebView2로 전환
     if (contentStack_->currentIndex() == 0) {
         contentStack_->setCurrentIndex(1);
         if (statusLabel_) statusLabel_->show();
     }
-
 #ifdef Q_OS_WIN
 #ifndef WEBVIEW2_NOT_AVAILABLE
     if (webView_) {
@@ -445,7 +428,6 @@ void OttWidget::navigate(const QString& url) {
         webView_->Navigate(wurl.c_str());
         if (statusLabel_) statusLabel_->hide();
     } else {
-        // WebView2 아직 초기화 중 - 대기 후 재시도
         QTimer::singleShot(500, this, [this, url]() { navigate(url); });
     }
 #endif
@@ -469,11 +451,7 @@ void OttWidget::onServiceSelected(int index) {
 void OttWidget::goBack() {
 #ifdef Q_OS_WIN
 #ifndef WEBVIEW2_NOT_AVAILABLE
-    if (webView_) {
-        BOOL canGoBack = FALSE;
-        webView_->get_CanGoBack(&canGoBack);
-        if (canGoBack) webView_->GoBack();
-    }
+    if (webView_) { BOOL can = FALSE; webView_->get_CanGoBack(&can); if (can) webView_->GoBack(); }
 #endif
 #endif
 }
@@ -481,11 +459,7 @@ void OttWidget::goBack() {
 void OttWidget::goForward() {
 #ifdef Q_OS_WIN
 #ifndef WEBVIEW2_NOT_AVAILABLE
-    if (webView_) {
-        BOOL canGoFwd = FALSE;
-        webView_->get_CanGoForward(&canGoFwd);
-        if (canGoFwd) webView_->GoForward();
-    }
+    if (webView_) { BOOL can = FALSE; webView_->get_CanGoForward(&can); if (can) webView_->GoForward(); }
 #endif
 #endif
 }
@@ -499,7 +473,6 @@ void OttWidget::reload() {
 }
 
 void OttWidget::goHome() {
-    // WebView2에서 홈 그리드로 돌아가기
     contentStack_->setCurrentIndex(0);
     urlBar_->clear();
     urlBar_->setPlaceholderText("URL 입력 또는 서비스 선택...");
@@ -510,6 +483,4 @@ void OttWidget::goHome() {
 #endif
 }
 
-bool OttWidget::isWebView2Available() const {
-    return webView2Ready_;
-}
+bool OttWidget::isWebView2Available() const { return webView2Ready_; }
