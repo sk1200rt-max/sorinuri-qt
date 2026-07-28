@@ -51,6 +51,12 @@ set(SOURCES
     src/Settings.h
     src/TitleBar.cpp
     src/TitleBar.h
+    src/AudioInfoBar.cpp
+    src/AudioInfoBar.h
+    src/SettingsDialog.cpp
+    src/SettingsDialog.h
+    src/TrackSelector.cpp
+    src/TrackSelector.h
     resources/resources.qrc
 )
 

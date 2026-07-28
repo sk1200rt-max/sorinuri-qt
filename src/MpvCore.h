@@ -39,7 +39,7 @@ public:
     void setSpeed(double speed);
     void setSubtitleTrack(int id);
     void setAudioTrack(int id);
-    void setVideoTrack(int id);
+    void setVideoTrack(int id) { if (initialized_) { int64_t v=id; mpv_set_property_async(mpv_,0,"vid",MPV_FORMAT_INT64,&v); } }
 
     // 오디오 설정
     void setAudioDevice(const QString& device);

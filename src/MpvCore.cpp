@@ -68,6 +68,10 @@ bool MpvCore::initialize(WId windowId) {
     mpv_observe_property(mpv_, 0, "audio-channels",  MPV_FORMAT_STRING);
     mpv_observe_property(mpv_, 0, "audio-samplerate",MPV_FORMAT_INT64);
     mpv_observe_property(mpv_, 0, "audio-out-detected-device", MPV_FORMAT_STRING);
+    mpv_observe_property(mpv_, 0, "video-params/w",  MPV_FORMAT_INT64);
+    mpv_observe_property(mpv_, 0, "video-params/h",  MPV_FORMAT_INT64);
+    mpv_observe_property(mpv_, 0, "container-fps",   MPV_FORMAT_DOUBLE);
+    mpv_observe_property(mpv_, 0, "video-codec",     MPV_FORMAT_STRING);
 
     // wakeup callback 대신 타이머 사용 (Qt 스레드 안전)
     mpv_set_wakeup_callback(mpv_, wakeupCallback, this);
@@ -166,6 +170,20 @@ void MpvCore::handlePropertyChange(mpv_event_property* prop) {
 
         emit audioFormatChanged(codecStr, 0, static_cast<int>(samplerate), channelStr);
     }
+    else if (name == "video-params/w" || name == "video-params/h" ||
+             name == "container-fps" || name == "video-codec") {
+        // 비디오 정보 업데이트
+        int64_t w = 0, h = 0;
+        mpv_get_property(mpv_, "video-params/w", MPV_FORMAT_INT64, &w);
+        mpv_get_property(mpv_, "video-params/h", MPV_FORMAT_INT64, &h);
+        double fps = 0;
+        mpv_get_property(mpv_, "container-fps", MPV_FORMAT_DOUBLE, &fps);
+        char* vcodec = mpv_get_property_string(mpv_, "video-codec");
+        QString vcodecStr = vcodec ? QString::fromUtf8(vcodec) : "";
+        mpv_free(vcodec);
+        if (w > 0 && h > 0)
+            emit videoInfoChanged(static_cast<int>(w), static_cast<int>(h), fps, vcodecStr);
+    }
 }
 
 // ─── 재생 제어 ────────────────────────────────────────────────────
@@ -198,6 +216,7 @@ void MpvCore::stop() {
     if (!initialized_) return;
     const char* args[] = { "stop", nullptr };
     mpv_command_async(mpv_, 0, args);
+    emit playbackStopped();
 }
 
 void MpvCore::seek(double seconds, bool relative) {
