@@ -4,6 +4,7 @@
 #include <QOpenGLContext>
 #include <QDebug>
 #include <QTimer>
+#include <QWindow>
 #include <stdexcept>
 
 static void* getGlProcAddress(void* /*ctx*/, const char* name) {
@@ -25,6 +26,8 @@ MpvWidget::MpvWidget(QWidget* parent) : QOpenGLWidget(parent) {
 
     QPixmap logo(":/sorinuri-logo-center.png");
     if (!logo.isNull()) {
+        // devicePixelRatio를 고려한 로고 크기 설정
+        // 논리 픽셀 320px → HiDPI에서도 동일한 논리 크기 유지
         QPixmap scaled = logo.scaledToWidth(320, Qt::SmoothTransformation);
         logoLabel_->setPixmap(scaled);
         logoLabel_->resize(scaled.size());
@@ -35,8 +38,7 @@ MpvWidget::MpvWidget(QWidget* parent) : QOpenGLWidget(parent) {
             "font-size: 36px; font-weight: 700; font-family: 'Malgun Gothic';");
         logoLabel_->adjustSize();
     }
-    // 생성자 시점에는 위젯 크기가 0이므로 위치를 숨겨둠
-    // showEvent / resizeEvent 에서 정확히 중앙 배치
+    // 생성자 시점에는 위젯 크기가 0이므로 화면 밖에 숨겨둠
     logoLabel_->move(-9999, -9999);
     logoLabel_->show();
     logoLabel_->raise();
@@ -83,9 +85,16 @@ void MpvWidget::paintGL() {
         return;
     }
 
+    // ── HiDPI 핵심: FBO 크기를 물리 픽셀(physical pixels)로 전달 ──
+    // width()/height()는 논리 픽셀이므로 devicePixelRatio를 곱해야
+    // 4K 250% 배율에서 영상이 전체 화면을 채움
+    const qreal dpr = devicePixelRatio();
+    const int physW = static_cast<int>(width()  * dpr);
+    const int physH = static_cast<int>(height() * dpr);
+
     mpv_opengl_fbo fbo = {
         static_cast<int>(defaultFramebufferObject()),
-        width(), height(), 0
+        physW, physH, 0
     };
     int flipY = 1;
     mpv_render_param params[] = {
@@ -101,16 +110,16 @@ void MpvWidget::resizeEvent(QResizeEvent* event) {
     updateLogoPos();
 }
 
-// showEvent: 위젯이 실제로 화면에 표시될 때 크기가 확정되므로 여기서 중앙 정렬
+// showEvent: 위젯이 실제로 화면에 표시될 때 크기가 확정
 void MpvWidget::showEvent(QShowEvent* event) {
     QOpenGLWidget::showEvent(event);
-    // 이벤트 루프 한 사이클 후 실행하여 레이아웃 완료 보장
     QTimer::singleShot(0, this, [this]() { updateLogoPos(); });
 }
 
 void MpvWidget::updateLogoPos() {
     if (!logoLabel_ || !logoLabel_->isVisible()) return;
-    if (width() <= 0 || height() <= 0) return;  // 크기 미확정 시 무시
+    if (width() <= 0 || height() <= 0) return;
+    // 논리 픽셀 기준으로 중앙 계산 (Qt 위젯 좌표계는 항상 논리 픽셀)
     int x = (width()  - logoLabel_->width())  / 2;
     int y = (height() - logoLabel_->height()) / 2;
     logoLabel_->move(x, y);

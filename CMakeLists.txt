@@ -71,6 +71,10 @@ set(SOURCES
 if(WIN32)
     set(SOURCES ${SOURCES} resources/sorinuri.rc)
     add_executable(Sorinuri WIN32 ${SOURCES})
+    # RC 컴파일러가 manifest 파일을 찾을 수 있도록 resources 디렉토리 추가
+    set_source_files_properties(resources/sorinuri.rc PROPERTIES
+        COMPILE_FLAGS "/I\"${CMAKE_SOURCE_DIR}/resources\""
+    )
 else()
     add_executable(Sorinuri ${SOURCES})
 endif()

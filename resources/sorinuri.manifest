@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0"
+          xmlns:asmv3="urn:schemas-microsoft-com:asm.v3">
+  <assemblyIdentity
+      version="1.0.0.0"
+      processorArchitecture="amd64"
+      name="Sorinuri.MediaPlayer"
+      type="win32"/>
+  <description>소리누리 미디어 플레이어</description>
+
+  <!-- Windows 10/11 Per-Monitor V2 DPI 인식 선언 -->
+  <!-- 이 설정이 없으면 Windows가 앱을 강제 확대(blurry scaling)하여
+       클릭 영역과 표시 위치가 어긋나는 문제 발생 -->
+  <asmv3:application>
+    <asmv3:windowsSettings>
+      <!-- Per-Monitor V2: 모니터별 DPI를 앱이 직접 처리 -->
+      <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">
+        PerMonitorV2
+      </dpiAwareness>
+      <!-- 레거시 호환: XP~Win8.1 -->
+      <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">
+        true/pm
+      </dpiAware>
+      <!-- 긴 경로 지원 -->
+      <longPathAware xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">
+        true
+      </longPathAware>
+    </asmv3:windowsSettings>
+  </asmv3:application>
+
+  <!-- Windows 10/11 호환성 선언 -->
+  <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
+    <application>
+      <!-- Windows 10 / 11 -->
+      <supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}"/>
+      <!-- Windows 8.1 -->
+      <supportedOS Id="{1f676c76-80e1-4239-95bb-83d0f6d0da78}"/>
+      <!-- Windows 8 -->
+      <supportedOS Id="{4a2f28e3-53b9-4441-ba9c-d69d4a4a6e38}"/>
+      <!-- Windows 7 -->
+      <supportedOS Id="{35138b9a-5d96-4fbd-8e2d-a2440225f93a}"/>
+    </application>
+  </compatibility>
+
+  <!-- UAC: 관리자 권한 불필요 -->
+  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
+    <security>
+      <requestedPrivileges>
+        <requestedExecutionLevel level="asInvoker" uiAccess="false"/>
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
+</assembly>

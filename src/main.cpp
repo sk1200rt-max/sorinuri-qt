@@ -11,12 +11,30 @@
 #include <stdio.h>
 #include <io.h>
 #include <fcntl.h>
+
 static void attachConsole() {
-    // 이미 콘솔이 열려있으면 (배치 파일에서 실행 시) 연결
     if (AttachConsole(ATTACH_PARENT_PROCESS)) {
         freopen("CONOUT$", "w", stdout);
         freopen("CONOUT$", "w", stderr);
         freopen("CONIN$",  "r", stdin);
+    }
+}
+
+// Qt6에서 Per-Monitor V2 DPI 인식을 소프트웨어적으로도 명시
+// (manifest의 하드웨어 선언과 함께 사용)
+static void setDpiAwareness() {
+    // SetProcessDpiAwarenessContext는 Windows 10 1607 이상에서 사용 가능
+    // Per Monitor V2: DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2
+    typedef BOOL (WINAPI* SetProcessDpiAwarenessContextFunc)(HANDLE);
+    HMODULE user32 = LoadLibraryW(L"user32.dll");
+    if (user32) {
+        auto fn = reinterpret_cast<SetProcessDpiAwarenessContextFunc>(
+            GetProcAddress(user32, "SetProcessDpiAwarenessContext"));
+        if (fn) {
+            // DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 = -4
+            fn(reinterpret_cast<HANDLE>(-4));
+        }
+        FreeLibrary(user32);
     }
 }
 #endif
@@ -24,7 +42,15 @@ static void attachConsole() {
 int main(int argc, char* argv[]) {
 #ifdef Q_OS_WIN
     attachConsole();
+    // QApplication 생성 전에 DPI 인식 설정 (반드시 먼저 호출)
+    setDpiAwareness();
 #endif
+
+    // ── Qt6 HiDPI 정책: 소수점 배율(125%, 150%, 175%, 250%)을 그대로 사용 ──
+    // PassThrough: 250% → 2.5배율로 정확히 처리 (반올림 없음)
+    QApplication::setHighDpiScaleFactorRoundingPolicy(
+        Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
+
     // ── 시작속도 최적화: OpenGL 포맷을 앱 생성 전에 설정 ─────────────
     QSurfaceFormat fmt;
     fmt.setVersion(3, 3);
@@ -32,10 +58,6 @@ int main(int argc, char* argv[]) {
     fmt.setSwapBehavior(QSurfaceFormat::DoubleBuffer);
     fmt.setSwapInterval(1);
     QSurfaceFormat::setDefaultFormat(fmt);
-
-    // High DPI 지원
-    QApplication::setHighDpiScaleFactorRoundingPolicy(
-        Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
 
     // 포터블 환경: 현재 디렉토리에서 Qt 플러그인 로드
     QApplication::addLibraryPath(QDir::currentPath());
@@ -74,7 +96,6 @@ int main(int argc, char* argv[]) {
         QStringList files;
         for (int i = 1; i < args.size(); ++i) {
             const QString& arg = args[i];
-            // URL 또는 존재하는 파일이면 재생
             if (arg.startsWith("http://") || arg.startsWith("https://") ||
                 arg.startsWith("rtmp://")  || arg.startsWith("rtsp://") ||
                 QFile::exists(arg)) {
