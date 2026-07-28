@@ -44,10 +44,33 @@ RestartIfNeededByRun=no
 Name: "korean"; MessagesFile: "compiler:Languages\Korean.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
+
+[CustomMessages]
+korean.DolbyPageTitle=Dolby Atmos / 5.1 서라운드 오디오 설정
+korean.DolbyPageDesc=소리누리는 Edge WebView2로 넷플릭스, 디즈니+ 등 OTT 서비스를 재생합니다. Dolby Atmos 및 5.1 서라운드 오디오를 AV 앰프나 사운드바로 전달하려면 Dolby Access가 필요합니다.
+korean.DolbyTaskDesc=Dolby Access 설치 (넷플릭스 Dolby Atmos / 5.1 서라운드 지원)
+korean.DolbyLinkText=>> Microsoft Store에서 Dolby Access 열기 (무료)
+korean.DolbyLine1=  [O]  Dolby Access는 Microsoft Store에서 무료로 설치할 수 있습니다.
+korean.DolbyLine2=  [O]  설치 후 별도 설정 없이 소리누리에서 자동으로 인식됩니다.
+korean.DolbyLine3=  [O]  AV 앰프 / 사운드바 / HDMI 연결 시 Dolby Atmos 패스스루 지원.
+korean.DolbyLine4=  [O]  헤드폰 사용자도 Dolby Atmos for Headphones 기능을 이용할 수 있습니다.
+korean.DolbyLine5=  [!]  Dolby Access 없이도 소리누리 기본 기능은 정상 동작합니다.
+korean.DolbyLine6=       OTT 멀티채널 오디오에만 필요합니다.
+english.DolbyPageTitle=Dolby Atmos / 5.1 Surround Audio Setup
+english.DolbyPageDesc=Sorinuri uses Edge WebView2 to play Netflix, Disney+ and other OTT services. Dolby Access is required to enable Dolby Atmos and 5.1 surround audio output.
+english.DolbyTaskDesc=Install Dolby Access (Netflix Dolby Atmos / 5.1 Surround Support)
+english.DolbyLinkText=>> Open Dolby Access on Microsoft Store (Free)
+english.DolbyLine1=  [O]  Dolby Access is FREE on Microsoft Store.
+english.DolbyLine2=  [O]  No extra configuration needed after install.
+english.DolbyLine3=  [O]  Supports Dolby Atmos passthrough via HDMI / optical.
+english.DolbyLine4=  [O]  Dolby Atmos for Headphones also supported.
+english.DolbyLine5=  [!]  Dolby Access is OPTIONAL.
+english.DolbyLine6=       Local file playback and passthrough work without it.
+
 [Tasks]
 Name: "desktopicon"; Description: "바탕화면에 아이콘 만들기(&D)"; GroupDescription: "추가 아이콘:"; Flags: unchecked
 Name: "quicklaunchicon"; Description: "빠른 실행에 아이콘 만들기(&Q)"; GroupDescription: "추가 아이콘:"; Flags: unchecked; OnlyBelowVersion: 6.1; Check: not IsAdminInstallMode
-Name: "installdolby"; Description: "Dolby Access 설치 (넷플릭스 Dolby Atmos / 5.1 서라운드 지원)"; GroupDescription: "Dolby 오디오 지원:"; Flags: unchecked
+Name: "installdolby"; Description: "{cm:DolbyTaskDesc}"; GroupDescription: "Dolby 오디오 지원:"; Flags: unchecked
 
 [Files]
 Source: "..\dist\Sorinuri-Portable\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
@@ -89,13 +112,26 @@ Root: HKCU; Subkey: "Software\Classes\Sorinuri.flac\shell\open\command"; ValueTy
 Type: filesandordirs; Name: "{app}"
 
 [Code]
-// ─────────────────────────────────────────────────────────────────────────────
-// Dolby Access 안내 커스텀 페이지
-// ─────────────────────────────────────────────────────────────────────────────
+// ============================================================================
+// Dolby Access Custom Page
+// ============================================================================
 var
   DolbyPage: TWizardPage;
   DolbyInfoLabel: TLabel;
   DolbyLinkLabel: TNewStaticText;
+
+function GetDolbyCaption(): String;
+begin
+  Result := CustomMessage('DolbyPageDesc') + #13#10 + #13#10 +
+    '------------------------------------------------------------' + #13#10 + #13#10 +
+    CustomMessage('DolbyLine1') + #13#10 +
+    CustomMessage('DolbyLine2') + #13#10 +
+    CustomMessage('DolbyLine3') + #13#10 +
+    CustomMessage('DolbyLine4') + #13#10 + #13#10 +
+    '------------------------------------------------------------' + #13#10 + #13#10 +
+    CustomMessage('DolbyLine5') + #13#10 +
+    CustomMessage('DolbyLine6');
+end;
 
 procedure DolbyLinkClick(Sender: TObject);
 var
@@ -108,8 +144,8 @@ procedure InitializeWizard;
 begin
   DolbyPage := CreateCustomPage(
     wpSelectTasks,
-    'Dolby Atmos / 5.1 Surround Audio Setup',
-    'To enjoy Dolby Atmos on Netflix, Disney+ and other OTT services, Dolby Access is required.');
+    CustomMessage('DolbyPageTitle'),
+    CustomMessage('DolbyPageDesc'));
 
   DolbyInfoLabel := TLabel.Create(DolbyPage);
   DolbyInfoLabel.Parent := DolbyPage.Surface;
@@ -119,18 +155,7 @@ begin
   DolbyInfoLabel.AutoSize := False;
   DolbyInfoLabel.Height := 260;
   DolbyInfoLabel.WordWrap := True;
-  DolbyInfoLabel.Caption :=
-    'Sorinuri uses Edge WebView2 to play Netflix, Disney+ and other OTT services.' + #13#10 +
-    'To enable Dolby Atmos and 5.1 surround audio output to your AV receiver,' + #13#10 +
-    'Dolby Access must be installed on Windows.' + #13#10 + #13#10 +
-    '------------------------------------------------------------' + #13#10 + #13#10 +
-    '  [O]  Dolby Access is FREE on Microsoft Store.' + #13#10 +
-    '  [O]  No extra configuration needed after install.' + #13#10 +
-    '  [O]  Supports Dolby Atmos passthrough via HDMI / optical.' + #13#10 +
-    '  [O]  Dolby Atmos for Headphones also supported.' + #13#10 + #13#10 +
-    '------------------------------------------------------------' + #13#10 + #13#10 +
-    '  [!]  Dolby Access is OPTIONAL.' + #13#10 +
-    '       Local file playback and passthrough work without it.';
+  DolbyInfoLabel.Caption := GetDolbyCaption();
 
   DolbyLinkLabel := TNewStaticText.Create(DolbyPage);
   DolbyLinkLabel.Parent := DolbyPage.Surface;
@@ -138,7 +163,7 @@ begin
   DolbyLinkLabel.Top := DolbyInfoLabel.Top + DolbyInfoLabel.Height + 8;
   DolbyLinkLabel.Width := DolbyPage.SurfaceWidth;
   DolbyLinkLabel.AutoSize := True;
-  DolbyLinkLabel.Caption := '>> Open Dolby Access on Microsoft Store (Free)';
+  DolbyLinkLabel.Caption := CustomMessage('DolbyLinkText');
   DolbyLinkLabel.Font.Color := $00CC6600;
   DolbyLinkLabel.Font.Style := [fsUnderline];
   DolbyLinkLabel.Cursor := crHand;
