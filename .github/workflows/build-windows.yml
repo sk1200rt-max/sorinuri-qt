@@ -17,6 +17,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # ── Visual Studio 환경 설정 ────────────────────────────────────
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
       # ── Qt6 설치 ───────────────────────────────────────────────────
       - name: Install Qt6
         uses: jurplel/install-qt-action@v4
@@ -32,11 +38,8 @@ jobs:
       - name: Download libmpv
         shell: pwsh
         run: |
-          # shinchiro mpv Windows 빌드 (MSVC 호환 MinGW 빌드)
-          $url = "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20250101/mpv-dev-x86_64-20250101-git-abc1234.7z"
-
-          # 최신 릴리즈 URL 자동 탐색
-          $releases = Invoke-RestMethod "https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/releases?per_page=5"
+          # shinchiro mpv Windows 빌드에서 최신 dev 패키지 다운로드
+          $releases = Invoke-RestMethod "https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/releases?per_page=10"
           $devAsset = $null
           foreach ($rel in $releases) {
             foreach ($asset in $rel.assets) {
@@ -53,74 +56,83 @@ jobs:
             exit 1
           }
 
-          Write-Host "다운로드: $($devAsset.name)"
-          Invoke-WebRequest -Uri $devAsset.browser_download_url -OutFile "mpv-dev.7z"
+          Write-Host "다운로드: $($devAsset.name) ($([math]::Round($devAsset.size/1MB,1)) MB)"
+          Invoke-WebRequest -Uri $devAsset.browser_download_url -OutFile "mpv-dev.7z" -TimeoutSec 120
 
           # 압축 해제
-          7z x mpv-dev.7z -o"mpv-dev" -y
+          7z x mpv-dev.7z -o"mpv-dev" -y | Out-Null
 
           # 파일 구조 확인
-          Get-ChildItem -Recurse mpv-dev | Select-Object FullName
+          Write-Host "=== mpv-dev 구조 ==="
+          Get-ChildItem -Recurse mpv-dev | Select-Object -ExpandProperty FullName
 
       # ── libmpv 헤더 및 라이브러리 준비 ────────────────────────────
       - name: Prepare libmpv deps
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force deps/libmpv/include/mpv
-          New-Item -ItemType Directory -Force deps/libmpv/lib
+          New-Item -ItemType Directory -Force deps/libmpv/include/mpv | Out-Null
+          New-Item -ItemType Directory -Force deps/libmpv/lib | Out-Null
 
           # 헤더 파일 복사
-          $headers = Get-ChildItem -Recurse mpv-dev -Filter "*.h" | Where-Object { $_.DirectoryName -match "mpv" }
+          $headers = Get-ChildItem -Recurse mpv-dev -Filter "*.h"
           foreach ($h in $headers) {
             Copy-Item $h.FullName deps/libmpv/include/mpv/
-            Write-Host "헤더 복사: $($h.Name)"
+            Write-Host "헤더: $($h.Name)"
           }
 
           # DLL 복사
           $dll = Get-ChildItem -Recurse mpv-dev -Filter "libmpv-2.dll" | Select-Object -First 1
-          if ($dll) {
-            Copy-Item $dll.FullName deps/libmpv/lib/
-            Write-Host "DLL 복사: $($dll.FullName)"
-          } else {
-            Write-Error "libmpv-2.dll을 찾을 수 없습니다"
+          if (-not $dll) {
+            # mpv-2.dll 이름으로도 시도
+            $dll = Get-ChildItem -Recurse mpv-dev -Filter "mpv-2.dll" | Select-Object -First 1
+          }
+          if (-not $dll) {
+            Write-Error "libmpv DLL을 찾을 수 없습니다"
+            Get-ChildItem -Recurse mpv-dev -Filter "*.dll" | Select-Object FullName
             exit 1
           }
+          Copy-Item $dll.FullName deps/libmpv/lib/libmpv-2.dll
+          Write-Host "DLL: $($dll.Name)"
 
-          # import library 생성 (MinGW DLL → MSVC .lib)
-          $dllPath = "deps/libmpv/lib/libmpv-2.dll"
-
-          # gendef로 .def 생성
-          $mingwBin = "C:\msys64\mingw64\bin"
-          if (Test-Path "$mingwBin\gendef.exe") {
-            & "$mingwBin\gendef.exe" $dllPath
-            Move-Item "libmpv-2.def" deps/libmpv/lib/
+          # import library (.lib) 생성
+          # 방법 1: dev 패키지에 이미 .lib 파일이 있으면 사용
+          $existingLib = Get-ChildItem -Recurse mpv-dev -Filter "*.lib" | Select-Object -First 1
+          if ($existingLib) {
+            Copy-Item $existingLib.FullName deps/libmpv/lib/mpv.lib
+            Write-Host "기존 .lib 사용: $($existingLib.Name)"
           } else {
-            # dumpbin으로 .def 생성
-            $exports = & dumpbin /exports $dllPath 2>&1
-            $lines = $exports | Select-String "^\s+\d+\s+[0-9A-F]+\s+[0-9A-F]+\s+(\S+)" |
-              ForEach-Object { $_.Matches[0].Groups[1].Value }
-            "EXPORTS" | Set-Content deps/libmpv/lib/libmpv-2.def
-            $lines | Add-Content deps/libmpv/lib/libmpv-2.def
-          }
+            # 방법 2: dumpbin + lib.exe로 생성
+            Write-Host "mpv.lib 생성 중..."
 
-          # lib.exe로 .lib 생성
-          $vsPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
-            -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
-            -property installationPath
-          $libExe = Get-ChildItem "$vsPath\VC\Tools\MSVC" -Recurse -Filter "lib.exe" |
-            Where-Object { $_.FullName -match "x64\\lib.exe" } | Select-Object -First 1
+            # dumpbin으로 exports 추출
+            $dumpbinOutput = & dumpbin /exports deps/libmpv/lib/libmpv-2.dll 2>&1
+            $exports = $dumpbinOutput | Where-Object { $_ -match "^\s+\d+\s+[0-9A-F]+\s+[0-9A-F]+\s+(\S+)" } |
+              ForEach-Object { [regex]::Match($_, "^\s+\d+\s+[0-9A-F]+\s+[0-9A-F]+\s+(\S+)").Groups[1].Value }
 
-          if ($libExe) {
-            & $libExe.FullName /def:deps/libmpv/lib/libmpv-2.def /out:deps/libmpv/lib/mpv.lib /machine:x64
+            if ($exports.Count -eq 0) {
+              Write-Error "DLL exports를 찾을 수 없습니다"
+              exit 1
+            }
+
+            Write-Host "exports 수: $($exports.Count)"
+
+            # .def 파일 생성
+            $defContent = @("LIBRARY libmpv-2", "EXPORTS")
+            $defContent += $exports
+            $defContent | Set-Content deps/libmpv/lib/libmpv-2.def -Encoding ASCII
+
+            # lib.exe로 .lib 생성 (MSVC 환경에서 실행)
+            lib /def:deps/libmpv/lib/libmpv-2.def /out:deps/libmpv/lib/mpv.lib /machine:x64
+            if ($LASTEXITCODE -ne 0) {
+              Write-Error "lib.exe 실패"
+              exit 1
+            }
             Write-Host "mpv.lib 생성 완료"
-          } else {
-            Write-Error "lib.exe를 찾을 수 없습니다"
-            exit 1
           }
 
           # 결과 확인
           Write-Host "=== deps/libmpv 구조 ==="
-          Get-ChildItem -Recurse deps/libmpv | Select-Object FullName
+          Get-ChildItem -Recurse deps/libmpv | Select-Object FullName, Length
 
       # ── CMake 빌드 ────────────────────────────────────────────────
       - name: Configure CMake
@@ -136,12 +148,18 @@ jobs:
         shell: pwsh
         run: |
           cmake --build build --config Release --parallel 4
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "빌드 실패"
+            exit 1
+          }
+          Write-Host "빌드 성공"
+          Get-ChildItem build/Release/
 
       # ── 배포 패키지 생성 ──────────────────────────────────────────
       - name: Package
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force dist/Sorinuri-Portable
+          New-Item -ItemType Directory -Force dist/Sorinuri-Portable | Out-Null
 
           # 실행 파일
           Copy-Item build/Release/Sorinuri.exe dist/Sorinuri-Portable/
@@ -150,7 +168,9 @@ jobs:
           Copy-Item deps/libmpv/lib/libmpv-2.dll dist/Sorinuri-Portable/
 
           # Qt DLL 배포
-          & "$env:Qt6_DIR/bin/windeployqt.exe" `
+          $windeployqt = "$env:QT_ROOT_DIR/bin/windeployqt.exe"
+          Write-Host "windeployqt: $windeployqt"
+          & $windeployqt `
             --no-translations `
             --no-system-d3d-compiler `
             --no-opengl-sw `
@@ -161,8 +181,8 @@ jobs:
           Write-Host "패키지 크기: $([math]::Round($size/1MB, 1)) MB"
 
           # ZIP 생성
-          Compress-Archive -Path dist/Sorinuri-Portable -DestinationPath dist/Sorinuri-Qt-Portable.zip
-          Write-Host "ZIP 생성 완료"
+          Compress-Archive -Path dist/Sorinuri-Portable -DestinationPath dist/Sorinuri-Qt-Portable.zip -Force
+          Write-Host "ZIP 생성 완료: $([math]::Round((Get-Item dist/Sorinuri-Qt-Portable.zip).Length/1MB,1)) MB"
 
       # ── Artifact 업로드 ───────────────────────────────────────────
       - name: Upload Artifact
