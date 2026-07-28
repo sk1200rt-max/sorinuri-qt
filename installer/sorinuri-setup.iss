@@ -108,8 +108,8 @@ procedure InitializeWizard;
 begin
   DolbyPage := CreateCustomPage(
     wpSelectTasks,
-    'Dolby Atmos / 5.1 서라운드 오디오 설정',
-    '넷플릭스, 디즈니+ 등 OTT 서비스에서 Dolby 고음질 오디오를 즐기려면 Dolby Access 앱이 필요합니다.');
+    'Dolby Atmos / 5.1 Surround Audio Setup',
+    'To enjoy Dolby Atmos on Netflix, Disney+ and other OTT services, Dolby Access is required.');
 
   DolbyInfoLabel := TLabel.Create(DolbyPage);
   DolbyInfoLabel.Parent := DolbyPage.Surface;
@@ -120,22 +120,17 @@ begin
   DolbyInfoLabel.Height := 260;
   DolbyInfoLabel.WordWrap := True;
   DolbyInfoLabel.Caption :=
-    '소리누리는 Edge WebView2를 통해 넷플릭스, 디즈니+ 등 OTT 서비스를 내장 브라우저로 ' +
-    '재생할 수 있습니다. 이때 Dolby Atmos 및 5.1 채널 서라운드 오디오를 AV 앰프나 사운드바로 ' +
-    '전달하려면 Windows에 Dolby Access 앱이 설치되어 있어야 합니다.' + #13#10 + #13#10 +
-    '------------------------------------------------------------' + #13#10 +
-    #13#10 +
-    '  [O]  Dolby Access는 Microsoft Store에서 무료로 설치할 수 있습니다.' + #13#10 +
-    '  [O]  설치 후 별도 설정 없이 소리누리에서 자동으로 인식됩니다.' + #13#10 +
-    '  [O]  AV 앰프 / 사운드바 / HDMI 연결 시 Dolby Atmos 패스스루 지원.' + #13#10 +
-    '  [O]  헤드폰 사용자도 Dolby Atmos for Headphones 기능을 이용할 수 있습니다.' + #13#10 +
-    #13#10 +
-    '------------------------------------------------------------' + #13#10 +
-    #13#10 +
-    '  [!]  Dolby Access 없이도 소리누리 기본 기능(로컬 파일 재생, 패스스루)은' + #13#10 +
-    '       정상 동작합니다. OTT 멀티채널 오디오에만 필요합니다.' + #13#10 +
-    #13#10 +
-    '다음 페이지에서 설치 완료 후 Dolby Access를 자동으로 열지 선택할 수 있습니다.';
+    'Sorinuri uses Edge WebView2 to play Netflix, Disney+ and other OTT services.' + #13#10 +
+    'To enable Dolby Atmos and 5.1 surround audio output to your AV receiver,' + #13#10 +
+    'Dolby Access must be installed on Windows.' + #13#10 + #13#10 +
+    '------------------------------------------------------------' + #13#10 + #13#10 +
+    '  [O]  Dolby Access is FREE on Microsoft Store.' + #13#10 +
+    '  [O]  No extra configuration needed after install.' + #13#10 +
+    '  [O]  Supports Dolby Atmos passthrough via HDMI / optical.' + #13#10 +
+    '  [O]  Dolby Atmos for Headphones also supported.' + #13#10 + #13#10 +
+    '------------------------------------------------------------' + #13#10 + #13#10 +
+    '  [!]  Dolby Access is OPTIONAL.' + #13#10 +
+    '       Local file playback and passthrough work without it.';
 
   DolbyLinkLabel := TNewStaticText.Create(DolbyPage);
   DolbyLinkLabel.Parent := DolbyPage.Surface;
@@ -143,7 +138,7 @@ begin
   DolbyLinkLabel.Top := DolbyInfoLabel.Top + DolbyInfoLabel.Height + 8;
   DolbyLinkLabel.Width := DolbyPage.SurfaceWidth;
   DolbyLinkLabel.AutoSize := True;
-  DolbyLinkLabel.Caption := '>> 지금 바로 Microsoft Store에서 Dolby Access 페이지 열기';
+  DolbyLinkLabel.Caption := '>> Open Dolby Access on Microsoft Store (Free)';
   DolbyLinkLabel.Font.Color := $00CC6600;
   DolbyLinkLabel.Font.Style := [fsUnderline];
   DolbyLinkLabel.Cursor := crHand;
