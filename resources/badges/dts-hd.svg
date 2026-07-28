@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130 36" width="130" height="36">
+  <rect width="130" height="36" rx="3" fill="#001a00"/>
+  <rect x="1" y="1" width="128" height="34" rx="2" fill="none" stroke="#004400" stroke-width="0.5"/>
+  <text x="65" y="14" text-anchor="middle" 
+        font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="900" 
+        letter-spacing="1" fill="#ffffff">DTS-HD</text>
+  <text x="65" y="28" text-anchor="middle" 
+        font-family="Arial, Helvetica, sans-serif" font-size="8" font-weight="400" 
+        letter-spacing="1" fill="#44cc44">MASTER AUDIO</text>
+</svg>

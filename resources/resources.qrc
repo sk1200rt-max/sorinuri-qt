@@ -23,5 +23,13 @@
         <file>icons/restore.svg</file>
         <file>icons/close.svg</file>
         <file>icons/expand.svg</file>
+        <file>badges/dolby-atmos.png</file>
+        <file>badges/truehd.png</file>
+        <file>badges/dts-hd.png</file>
+        <file>badges/dts-x.png</file>
+        <file>badges/dts.png</file>
+        <file>badges/dd-plus.png</file>
+        <file>badges/dd.png</file>
+        <file>badges/pcm.png</file>
     </qresource>
 </RCC>

@@ -168,7 +168,32 @@ void MpvCore::handlePropertyChange(mpv_event_property* prop) {
         mpv_free(codec);
         mpv_free(channels);
 
-        emit audioFormatChanged(codecStr, 0, static_cast<int>(samplerate), channelStr);
+        // 채널 수 파싱 ("stereo"=2, "5.1"=6, "7.1"=8, 숫자 등)
+        int channelCount = 0;
+        if (channelStr == "mono")   channelCount = 1;
+        else if (channelStr == "stereo") channelCount = 2;
+        else if (channelStr.contains("5.1")) channelCount = 6;
+        else if (channelStr.contains("7.1")) channelCount = 8;
+        else if (channelStr.contains("6.1")) channelCount = 7;
+        else {
+            // 숫자 형태 처리
+            bool ok;
+            int n = channelStr.toInt(&ok);
+            if (ok) channelCount = n;
+        }
+
+        // 현재 오디오 출력 드라이버에서 패스스루 여부 감지
+        char* aoFormat = mpv_get_property_string(mpv_, "audio-out-params/format");
+        QString outputStr = aoFormat ? QString::fromUtf8(aoFormat) : "";
+        mpv_free(aoFormat);
+        // spdif 출력 시 패스스루
+        if (outputStr.isEmpty()) {
+            char* ao = mpv_get_property_string(mpv_, "current-ao");
+            outputStr = ao ? QString::fromUtf8(ao) : "";
+            mpv_free(ao);
+        }
+
+        emit audioFormatChanged(codecStr, channelCount, static_cast<int>(samplerate), outputStr);
     }
     else if (name == "video-params/w" || name == "video-params/h" ||
              name == "container-fps" || name == "video-codec") {
@@ -190,8 +215,12 @@ void MpvCore::handlePropertyChange(mpv_event_property* prop) {
 void MpvCore::loadFile(const QString& path, bool append) {
     if (!initialized_) return;
     const char* mode = append ? "append-play" : "replace";
-    const char* args[] = { "loadfile", path.toUtf8().constData(), mode, nullptr };
+    QByteArray pathBytes = path.toUtf8();
+    const char* args[] = { "loadfile", pathBytes.constData(), mode, nullptr };
     mpv_command_async(mpv_, 0, args);
+    // 자동 재생: pause 상태 해제
+    int flag = 0;
+    mpv_set_property_async(mpv_, 0, "pause", MPV_FORMAT_FLAG, &flag);
 }
 
 void MpvCore::play() {

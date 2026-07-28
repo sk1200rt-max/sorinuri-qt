@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 36" width="80" height="36">
+  <rect width="80" height="36" rx="3" fill="#001a00"/>
+  <rect x="1" y="1" width="78" height="34" rx="2" fill="none" stroke="#004400" stroke-width="0.5"/>
+  <text x="40" y="23" text-anchor="middle" 
+        font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="900" 
+        letter-spacing="2" fill="#ffffff">DTS</text>
+</svg>

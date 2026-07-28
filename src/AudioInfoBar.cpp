@@ -1,11 +1,11 @@
 #include "AudioInfoBar.h"
 
 AudioInfoBar::AudioInfoBar(QWidget* parent) : QWidget(parent) {
-    setFixedHeight(28);
+    setFixedHeight(32);
     setStyleSheet("background: #080808; border-top: 1px solid #141414;");
 
     auto* layout = new QHBoxLayout(this);
-    layout->setContentsMargins(14, 0, 14, 0);
+    layout->setContentsMargins(12, 0, 12, 0);
     layout->setSpacing(0);
 
     auto makeLbl = [this](const QString& style) {
@@ -15,41 +15,44 @@ AudioInfoBar::AudioInfoBar(QWidget* parent) : QWidget(parent) {
         return lbl;
     };
 
-    codecLabel_ = makeLbl(
-        "color: #4fc3f7; font-size: 10px; font-weight: 700;"
-        "font-family: 'Consolas', monospace; padding: 0 10px 0 0;");
+    // 포맷 배지 이미지 (18px 높이로 표시)
+    badgeLabel_ = new QLabel(this);
+    badgeLabel_->setStyleSheet("background: transparent;");
+    badgeLabel_->setAlignment(Qt::AlignVCenter | Qt::AlignLeft);
+    badgeLabel_->setFixedHeight(22);
+    badgeLabel_->setContentsMargins(0, 0, 10, 0);
 
+    // THRU / DECODE
     modeLabel_ = makeLbl(
-        "color: #888; font-size: 9px; font-weight: 600;"
+        "color: #4caf50; font-size: 9px; font-weight: 700;"
         "font-family: 'Consolas', monospace; padding: 0 10px 0 0;");
 
+    // 채널
     chLabel_ = makeLbl(
-        "color: #555; font-size: 10px; font-family: 'Consolas', monospace;"
+        "color: #666; font-size: 10px; font-family: 'Consolas', monospace;"
         "padding: 0 10px 0 0;");
 
+    // 샘플레이트
     srLabel_ = makeLbl(
         "color: #444; font-size: 10px; font-family: 'Consolas', monospace;"
         "padding: 0 16px 0 0;");
 
-    sepLabel_ = makeLbl("color: #222; font-size: 12px; padding: 0 12px 0 0;");
+    // 구분선
+    sepLabel_ = makeLbl("color: #1e1e1e; font-size: 14px; padding: 0 12px 0 0;");
     sepLabel_->setText("│");
     sepLabel_->hide();
 
+    // 비디오 정보
     videoLabel_ = makeLbl(
         "color: #444; font-size: 10px; font-family: 'Consolas', monospace;");
 
-    layout->addWidget(codecLabel_);
+    layout->addWidget(badgeLabel_);
     layout->addWidget(modeLabel_);
     layout->addWidget(chLabel_);
     layout->addWidget(srLabel_);
     layout->addWidget(sepLabel_);
     layout->addWidget(videoLabel_);
     layout->addStretch();
-
-    syncLabel_ = makeLbl(
-        "color: #2a2a2a; font-size: 9px; font-family: 'Consolas', monospace;");
-    syncLabel_->setAlignment(Qt::AlignVCenter | Qt::AlignRight);
-    layout->addWidget(syncLabel_);
 }
 
 void AudioInfoBar::connectMpv(MpvCore* core) {
@@ -59,23 +62,41 @@ void AudioInfoBar::connectMpv(MpvCore* core) {
     connect(core, &MpvCore::playbackStopped,    this, &AudioInfoBar::onPlaybackStopped);
 }
 
+QString AudioInfoBar::getBadgeResource(const QString& codec) const {
+    QString c = codec.toLower();
+    if (c.contains("truehd") && c.contains("atmos")) return ":/badges/dolby-atmos.png";
+    if (c.contains("truehd"))                         return ":/badges/truehd.png";
+    if (c.contains("eac3")   && c.contains("atmos")) return ":/badges/dolby-atmos.png";
+    if (c.contains("eac3"))                           return ":/badges/dd-plus.png";
+    if (c.contains("ac3"))                            return ":/badges/dd.png";
+    if (c.contains("dts") && (c.contains("ma") || c.contains("hd"))) return ":/badges/dts-hd.png";
+    if (c.contains("dts") && c.contains("x"))        return ":/badges/dts-x.png";
+    if (c.contains("dts"))                            return ":/badges/dts.png";
+    if (c.contains("pcm") || c.contains("flac") || c.contains("lpcm")) return ":/badges/pcm.png";
+    return "";
+}
+
 void AudioInfoBar::onAudioFormatChanged(const QString& codec, int channels,
                                          int sampleRate, const QString& output) {
-    QString c = codec.toUpper();
-    QString displayCodec;
+    // 배지 이미지 표시
+    QString res = getBadgeResource(codec);
+    if (!res.isEmpty()) {
+        QPixmap px(res);
+        if (!px.isNull()) {
+            QPixmap scaled = px.scaledToHeight(20, Qt::SmoothTransformation);
+            badgeLabel_->setPixmap(scaled);
+            badgeLabel_->setFixedWidth(scaled.width() + 10);
+        }
+    } else {
+        // 이미지 없는 포맷은 텍스트로
+        badgeLabel_->clear();
+        badgeLabel_->setText(codec.toUpper().left(12));
+        badgeLabel_->setStyleSheet(
+            "background: #1a1a1a; color: #aaa; font-size: 10px; font-weight: 700;"
+            "font-family: 'Consolas', monospace; padding: 2px 6px; border-radius: 2px;");
+    }
 
-    if      (c.contains("TRUEHD") && c.contains("ATMOS")) displayCodec = "TrueHD Atmos";
-    else if (c.contains("TRUEHD"))                         displayCodec = "TrueHD";
-    else if (c.contains("EAC3")   && c.contains("ATMOS")) displayCodec = "DD+ Atmos";
-    else if (c.contains("EAC3"))                           displayCodec = "DD+";
-    else if (c.contains("AC3"))                            displayCodec = "Dolby Digital";
-    else if (c.contains("DTS-HD") || c.contains("DTSHD")) displayCodec = "DTS-HD MA";
-    else if (c.contains("DTS"))                            displayCodec = "DTS";
-    else if (c.contains("PCM") || c.contains("FLAC"))     displayCodec = "PCM";
-    else                                                   displayCodec = codec.isEmpty() ? "" : codec;
-
-    codecLabel_->setText(displayCodec);
-
+    // THRU / DECODE
     bool isPassthrough = output.toLower().contains("spdif") ||
                          output.toLower().contains("passthrough") ||
                          output.toLower().contains("thru");
@@ -105,16 +126,16 @@ void AudioInfoBar::onVideoInfoChanged(int width, int height, double fps, const Q
     if (fps > 0) info += QString("  %1fps").arg(fps, 0, 'f', 2);
 
     videoLabel_->setText(info);
-    sepLabel_->setVisible(!info.isEmpty() && !codecLabel_->text().isEmpty());
+    sepLabel_->setVisible(!info.isEmpty() && !badgeLabel_->pixmap().isNull());
 }
 
 void AudioInfoBar::onPlaybackStopped() {
-    codecLabel_->clear();
+    badgeLabel_->clear();
+    badgeLabel_->setFixedWidth(0);
     modeLabel_->clear();
     chLabel_->clear();
     srLabel_->clear();
     videoLabel_->clear();
-    syncLabel_->clear();
     sepLabel_->hide();
 }
 
