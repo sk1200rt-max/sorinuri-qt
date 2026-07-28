@@ -5,6 +5,7 @@
 #include <QStringList>
 #include <QVariant>
 #include <QTimer>
+#include <QWindow>
 #include <mpv/client.h>
 
 /**
