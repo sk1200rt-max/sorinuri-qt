@@ -2,7 +2,6 @@
 #include <QWidget>
 #include <QLabel>
 #include <QHBoxLayout>
-#include <QPixmap>
 #include "MpvCore.h"
 
 class AudioInfoBar : public QWidget {
@@ -18,7 +17,7 @@ public slots:
     void onPlaybackStopped();
 
 private:
-    QLabel*  badgeLabel_  = nullptr;  // 포맷 배지 이미지
+    QLabel*  codecLabel_  = nullptr;  // 오디오 코덱 텍스트
     QLabel*  modeLabel_   = nullptr;  // THRU / DECODE
     QLabel*  chLabel_     = nullptr;  // 채널
     QLabel*  srLabel_     = nullptr;  // 샘플레이트
@@ -28,5 +27,5 @@ private:
 
     QString formatChannels(int ch) const;
     QString formatResolution(int w, int h) const;
-    QString getBadgeResource(const QString& codec) const;
+    QString getDisplayCodec(const QString& codec) const;
 };

@@ -105,6 +105,9 @@ void MpvCore::handleEvent(mpv_event* event) {
         char* rawPath = mpv_get_property_string(mpv_, "path");
         QString path = rawPath ? QString::fromUtf8(rawPath) : QString();
         mpv_free(rawPath);
+        // 파일 로드 완료 후 자동 재생 보장
+        int flag = 0;
+        mpv_set_property(mpv_, "pause", MPV_FORMAT_FLAG, &flag);
         emit fileLoaded(path);
         emit playbackStarted();
         break;
@@ -218,9 +221,7 @@ void MpvCore::loadFile(const QString& path, bool append) {
     QByteArray pathBytes = path.toUtf8();
     const char* args[] = { "loadfile", pathBytes.constData(), mode, nullptr };
     mpv_command_async(mpv_, 0, args);
-    // 자동 재생: pause 상태 해제
-    int flag = 0;
-    mpv_set_property_async(mpv_, 0, "pause", MPV_FORMAT_FLAG, &flag);
+    // pause 해제는 MPV_EVENT_FILE_LOADED 이벤트에서 처리
 }
 
 void MpvCore::play() {

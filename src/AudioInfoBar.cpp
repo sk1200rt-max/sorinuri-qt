@@ -1,11 +1,11 @@
 #include "AudioInfoBar.h"
 
 AudioInfoBar::AudioInfoBar(QWidget* parent) : QWidget(parent) {
-    setFixedHeight(32);
+    setFixedHeight(28);
     setStyleSheet("background: #080808; border-top: 1px solid #141414;");
 
     auto* layout = new QHBoxLayout(this);
-    layout->setContentsMargins(12, 0, 12, 0);
+    layout->setContentsMargins(14, 0, 14, 0);
     layout->setSpacing(0);
 
     auto makeLbl = [this](const QString& style) {
@@ -15,12 +15,10 @@ AudioInfoBar::AudioInfoBar(QWidget* parent) : QWidget(parent) {
         return lbl;
     };
 
-    // 포맷 배지 이미지 (18px 높이로 표시)
-    badgeLabel_ = new QLabel(this);
-    badgeLabel_->setStyleSheet("background: transparent;");
-    badgeLabel_->setAlignment(Qt::AlignVCenter | Qt::AlignLeft);
-    badgeLabel_->setFixedHeight(22);
-    badgeLabel_->setContentsMargins(0, 0, 10, 0);
+    // 오디오 코덱 텍스트 (DTS-HD MA / TrueHD Atmos 등)
+    codecLabel_ = makeLbl(
+        "color: #4fc3f7; font-size: 10px; font-weight: 700;"
+        "font-family: 'Consolas', monospace; padding: 0 10px 0 0;");
 
     // THRU / DECODE
     modeLabel_ = makeLbl(
@@ -29,7 +27,7 @@ AudioInfoBar::AudioInfoBar(QWidget* parent) : QWidget(parent) {
 
     // 채널
     chLabel_ = makeLbl(
-        "color: #666; font-size: 10px; font-family: 'Consolas', monospace;"
+        "color: #555; font-size: 10px; font-family: 'Consolas', monospace;"
         "padding: 0 10px 0 0;");
 
     // 샘플레이트
@@ -46,7 +44,7 @@ AudioInfoBar::AudioInfoBar(QWidget* parent) : QWidget(parent) {
     videoLabel_ = makeLbl(
         "color: #444; font-size: 10px; font-family: 'Consolas', monospace;");
 
-    layout->addWidget(badgeLabel_);
+    layout->addWidget(codecLabel_);
     layout->addWidget(modeLabel_);
     layout->addWidget(chLabel_);
     layout->addWidget(srLabel_);
@@ -62,44 +60,41 @@ void AudioInfoBar::connectMpv(MpvCore* core) {
     connect(core, &MpvCore::playbackStopped,    this, &AudioInfoBar::onPlaybackStopped);
 }
 
-QString AudioInfoBar::getBadgeResource(const QString& codec) const {
-    QString c = codec.toLower();
-    if (c.contains("truehd") && c.contains("atmos")) return ":/badges/dolby-atmos.png";
-    if (c.contains("truehd"))                         return ":/badges/truehd.png";
-    if (c.contains("eac3")   && c.contains("atmos")) return ":/badges/dolby-atmos.png";
-    if (c.contains("eac3"))                           return ":/badges/dd-plus.png";
-    if (c.contains("ac3"))                            return ":/badges/dd.png";
-    if (c.contains("dts") && (c.contains("ma") || c.contains("hd"))) return ":/badges/dts-hd.png";
-    if (c.contains("dts") && c.contains("x"))        return ":/badges/dts-x.png";
-    if (c.contains("dts"))                            return ":/badges/dts.png";
-    if (c.contains("pcm") || c.contains("flac") || c.contains("lpcm")) return ":/badges/pcm.png";
-    return "";
+QString AudioInfoBar::getDisplayCodec(const QString& codec) const {
+    QString c = codec.toUpper();
+    if (c.contains("TRUEHD") && c.contains("ATMOS")) return "TrueHD Atmos";
+    if (c.contains("TRUEHD"))                         return "TrueHD";
+    if (c.contains("EAC3")   && c.contains("ATMOS")) return "DD+ Atmos";
+    if (c.contains("EAC3"))                           return "DD+";
+    if (c.contains("AC3"))                            return "Dolby Digital";
+    if (c.contains("DTS-HD") || c.contains("DTSHD")) return "DTS-HD MA";
+    if (c.contains("DTS"))                            return "DTS";
+    if (c.contains("FLAC"))                           return "FLAC";
+    if (c.contains("PCM") || c.contains("LPCM"))     return "PCM";
+    if (c.contains("AAC"))                            return "AAC";
+    if (c.contains("MP3"))                            return "MP3";
+    return codec.isEmpty() ? "" : codec.left(16);
 }
 
 void AudioInfoBar::onAudioFormatChanged(const QString& codec, int channels,
                                          int sampleRate, const QString& output) {
-    // 배지 이미지 표시
-    QString res = getBadgeResource(codec);
-    if (!res.isEmpty()) {
-        QPixmap px(res);
-        if (!px.isNull()) {
-            QPixmap scaled = px.scaledToHeight(20, Qt::SmoothTransformation);
-            badgeLabel_->setPixmap(scaled);
-            badgeLabel_->setFixedWidth(scaled.width() + 10);
-        }
-    } else {
-        // 이미지 없는 포맷은 텍스트로
-        badgeLabel_->clear();
-        badgeLabel_->setText(codec.toUpper().left(12));
-        badgeLabel_->setStyleSheet(
-            "background: #1a1a1a; color: #aaa; font-size: 10px; font-weight: 700;"
-            "font-family: 'Consolas', monospace; padding: 2px 6px; border-radius: 2px;");
+    codecLabel_->setText(getDisplayCodec(codec));
+
+    // 패스스루 여부: audio-out-params/format이 spdif 계열이면 THRU
+    bool isPassthrough = output.toLower().contains("spdif") ||
+                         output.toLower().contains("s16") == false && // PCM이 아니면
+                         (codec.toLower().contains("dts") ||
+                          codec.toLower().contains("truehd") ||
+                          codec.toLower().contains("eac3") ||
+                          codec.toLower().contains("ac3"));
+
+    // 더 정확한 판단: output 포맷이 비어있지 않고 pcm이 아니면 패스스루
+    if (!output.isEmpty() && !output.toLower().contains("pcm") &&
+        !output.toLower().contains("float") && !output.toLower().contains("s16") &&
+        !output.toLower().contains("s32")) {
+        isPassthrough = true;
     }
 
-    // THRU / DECODE
-    bool isPassthrough = output.toLower().contains("spdif") ||
-                         output.toLower().contains("passthrough") ||
-                         output.toLower().contains("thru");
     modeLabel_->setText(isPassthrough ? "THRU" : "DECODE");
     modeLabel_->setStyleSheet(
         QString("background: transparent; font-size: 9px; font-weight: 700;"
@@ -126,12 +121,11 @@ void AudioInfoBar::onVideoInfoChanged(int width, int height, double fps, const Q
     if (fps > 0) info += QString("  %1fps").arg(fps, 0, 'f', 2);
 
     videoLabel_->setText(info);
-    sepLabel_->setVisible(!info.isEmpty() && !badgeLabel_->pixmap().isNull());
+    sepLabel_->setVisible(!info.isEmpty() && !codecLabel_->text().isEmpty());
 }
 
 void AudioInfoBar::onPlaybackStopped() {
-    badgeLabel_->clear();
-    badgeLabel_->setFixedWidth(0);
+    codecLabel_->clear();
     modeLabel_->clear();
     chLabel_->clear();
     srLabel_->clear();
