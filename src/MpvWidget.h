@@ -2,6 +2,8 @@
 #include <QOpenGLWidget>
 #include <QLabel>
 #include "MpvCore.h"
+#include <mpv/render.h>
+#include <mpv/render_gl.h>
 
 // MPV 공식 예제(qt_opengl) 방식: QOpenGLWidget + mpv_render_context
 // WA_PaintOnScreen 없음 → 투명 문제 없음
