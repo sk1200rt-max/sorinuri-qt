@@ -178,3 +178,18 @@ begin
     Exec('taskkill.exe', '/F /IM Sorinuri.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   end;
 end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  AppDir: String;
+  ResultCode: Integer;
+begin
+  if CurUninstallStep = usPostUninstall then begin
+    AppDir := ExpandConstant('{app}');
+    // Force delete remaining files and folder
+    if DirExists(AppDir) then begin
+      Exec('cmd.exe', '/C rmdir /S /Q "' + AppDir + '"',
+           '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    end;
+  end;
+end;
