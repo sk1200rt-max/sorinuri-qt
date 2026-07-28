@@ -1,7 +1,9 @@
 #include "MpvWidget.h"
 #include <QResizeEvent>
+#include <QShowEvent>
 #include <QOpenGLContext>
 #include <QDebug>
+#include <QTimer>
 #include <stdexcept>
 
 static void* getGlProcAddress(void* /*ctx*/, const char* name) {
@@ -11,8 +13,6 @@ static void* getGlProcAddress(void* /*ctx*/, const char* name) {
 }
 
 MpvWidget::MpvWidget(QWidget* parent) : QOpenGLWidget(parent) {
-    // QOpenGLWidget은 Qt가 직접 OpenGL FBO를 관리
-    // 배경은 Qt가 검은색으로 초기화 (clearColor)
     setAutoFillBackground(false);
 
     core_ = new MpvCore(this);
@@ -35,6 +35,9 @@ MpvWidget::MpvWidget(QWidget* parent) : QOpenGLWidget(parent) {
             "font-size: 36px; font-weight: 700; font-family: 'Malgun Gothic';");
         logoLabel_->adjustSize();
     }
+    // 생성자 시점에는 위젯 크기가 0이므로 위치를 숨겨둠
+    // showEvent / resizeEvent 에서 정확히 중앙 배치
+    logoLabel_->move(-9999, -9999);
     logoLabel_->show();
     logoLabel_->raise();
 }
@@ -49,14 +52,11 @@ MpvWidget::~MpvWidget() {
 }
 
 void MpvWidget::initializeGL() {
-    // OpenGL 컨텍스트가 준비된 후 MPV 초기화
-    // vo=libmpv 으로 설정하면 --wid 없이 render API 사용
-    if (!core_->initialize(0)) {  // wid=0 → render API 사용
+    if (!core_->initialize(0)) {
         qCritical() << "[MpvWidget] MPV 초기화 실패";
         return;
     }
 
-    // MPV render context 생성 (OpenGL)
     mpv_opengl_init_params glInitParams = { getGlProcAddress, nullptr };
     mpv_render_param params[] = {
         { MPV_RENDER_PARAM_API_TYPE,            const_cast<char*>(MPV_RENDER_API_TYPE_OPENGL) },
@@ -69,7 +69,6 @@ void MpvWidget::initializeGL() {
         return;
     }
 
-    // MPV가 새 프레임을 준비하면 Qt update() 호출
     mpv_render_context_set_update_callback(renderCtx_, MpvWidget::onUpdate,
                                            reinterpret_cast<void*>(this));
 
@@ -79,7 +78,6 @@ void MpvWidget::initializeGL() {
 
 void MpvWidget::paintGL() {
     if (!renderCtx_) {
-        // render context 없으면 검은 배경만
         glClearColor(0, 0, 0, 1);
         glClear(GL_COLOR_BUFFER_BIT);
         return;
@@ -103,8 +101,16 @@ void MpvWidget::resizeEvent(QResizeEvent* event) {
     updateLogoPos();
 }
 
+// showEvent: 위젯이 실제로 화면에 표시될 때 크기가 확정되므로 여기서 중앙 정렬
+void MpvWidget::showEvent(QShowEvent* event) {
+    QOpenGLWidget::showEvent(event);
+    // 이벤트 루프 한 사이클 후 실행하여 레이아웃 완료 보장
+    QTimer::singleShot(0, this, [this]() { updateLogoPos(); });
+}
+
 void MpvWidget::updateLogoPos() {
     if (!logoLabel_ || !logoLabel_->isVisible()) return;
+    if (width() <= 0 || height() <= 0) return;  // 크기 미확정 시 무시
     int x = (width()  - logoLabel_->width())  / 2;
     int y = (height() - logoLabel_->height()) / 2;
     logoLabel_->move(x, y);
@@ -126,7 +132,6 @@ void MpvWidget::appendFile(const QString& path) {
     core_->loadFile(path, true);
 }
 
-// MPV가 새 프레임 준비 완료 시 호출 (별도 스레드에서 호출될 수 있음)
 void MpvWidget::onUpdate(void* ctx) {
     QMetaObject::invokeMethod(reinterpret_cast<MpvWidget*>(ctx),
                               "maybeUpdate", Qt::QueuedConnection);
@@ -134,12 +139,11 @@ void MpvWidget::onUpdate(void* ctx) {
 
 void MpvWidget::maybeUpdate() {
     if (window()->isMinimized()) {
-        // 최소화 상태에서는 수동으로 렌더링
         makeCurrent();
         paintGL();
         context()->swapBuffers(context()->surface());
         doneCurrent();
     } else {
-        update();  // Qt가 paintGL() 호출하도록 요청
+        update();
     }
 }

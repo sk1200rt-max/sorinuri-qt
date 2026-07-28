@@ -1,6 +1,7 @@
 #pragma once
 #include <QOpenGLWidget>
 #include <QLabel>
+#include <QShowEvent>
 #include "MpvCore.h"
 #include <mpv/render.h>
 #include <mpv/render_gl.h>
@@ -23,6 +24,7 @@ protected:
     void initializeGL() override;
     void paintGL() override;
     void resizeEvent(QResizeEvent* event) override;
+    void showEvent(QShowEvent* event) override;
 
 private slots:
     void maybeUpdate();
