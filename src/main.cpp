@@ -1,6 +1,8 @@
 #include <QApplication>
 #include <QDir>
 #include <QDebug>
+#include <QIcon>
+#include <QFile>
 #include "MainWindow.h"
 
 int main(int argc, char* argv[]) {
@@ -13,6 +15,7 @@ int main(int argc, char* argv[]) {
     app.setApplicationDisplayName("소리누리");
     app.setApplicationVersion("1.0.0");
     app.setOrganizationName("Sorinuri");
+    app.setWindowIcon(QIcon(":/sorinuri-app.png"));
 
     // 다크 테마
     app.setStyle("Fusion");
