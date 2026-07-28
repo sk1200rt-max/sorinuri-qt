@@ -3,7 +3,6 @@
 #include <QMessageBox>
 #include <QApplication>
 
-// OTT 서비스 목록
 const QStringList OttWidget::SERVICE_NAMES = {
     "서비스 선택...",
     "Netflix",
@@ -36,9 +35,11 @@ OttWidget::OttWidget(QWidget* parent) : QWidget(parent) {
 
 OttWidget::~OttWidget() {
 #ifdef Q_OS_WIN
-    if (webCtrl_) {
-        webCtrl_->Close();
-    }
+#ifndef WEBVIEW2_NOT_AVAILABLE
+    if (webCtrl_) { webCtrl_->Close(); webCtrl_->Release(); webCtrl_ = nullptr; }
+    if (webView_) { webView_->Release(); webView_ = nullptr; }
+    if (webEnv_)  { webEnv_->Release();  webEnv_  = nullptr; }
+#endif
 #endif
 }
 
@@ -81,7 +82,6 @@ void OttWidget::setupUI() {
     tbLayout->addWidget(reloadBtn_);
     tbLayout->addWidget(homeBtn_);
 
-    // 서비스 선택 콤보박스
     serviceBox_ = new QComboBox(toolBar_);
     serviceBox_->addItems(SERVICE_NAMES);
     serviceBox_->setFixedWidth(130);
@@ -94,7 +94,6 @@ void OttWidget::setupUI() {
         "selection-background-color: #2a2a2a; border: 1px solid #333; }");
     tbLayout->addWidget(serviceBox_);
 
-    // URL 입력창
     urlBar_ = new QLineEdit(toolBar_);
     urlBar_->setPlaceholderText("URL 입력 또는 서비스 선택...");
     urlBar_->setStyleSheet(
@@ -118,26 +117,34 @@ void OttWidget::setupUI() {
     webContainer_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     mainLayout->addWidget(webContainer_, 1);
 
-    // ── 상태 레이블 (WebView2 미설치 시) ─────────────────────────
+    // ── 상태 레이블 ───────────────────────────────────────────────
     statusLabel_ = new QLabel(webContainer_);
     statusLabel_->setAlignment(Qt::AlignCenter);
     statusLabel_->setWordWrap(true);
     statusLabel_->setStyleSheet(
-        "QLabel { color: #888; font-size: 14px; background: transparent; }");
+        "QLabel { color: #888; font-size: 14px; background: transparent; "
+        "padding: 40px; }");
+
+#ifdef WEBVIEW2_NOT_AVAILABLE
+    statusLabel_->setText(
+        "이 빌드에는 WebView2 SDK가 포함되지 않았습니다.\n\n"
+        "OTT 기능을 사용하려면 WebView2 SDK가 포함된 빌드가 필요합니다.");
+#else
     statusLabel_->setText(
         "Edge WebView2 초기화 중...\n\n"
         "Windows 10/11에 Microsoft Edge가 설치되어 있으면\n"
         "자동으로 넷플릭스, 디즈니+ 등 OTT 서비스를 이용할 수 있습니다.\n\n"
         "Dolby Atmos / 5.1 서라운드 완전 지원");
+#endif
+
     statusLabel_->resize(webContainer_->size());
 
-    // 시그널 연결
-    connect(goBtn,      &QPushButton::clicked,  this, &OttWidget::onNavigateClicked);
+    connect(goBtn,      &QPushButton::clicked,   this, &OttWidget::onNavigateClicked);
     connect(urlBar_,    &QLineEdit::returnPressed, this, &OttWidget::onNavigateClicked);
-    connect(backBtn_,   &QPushButton::clicked,  this, &OttWidget::goBack);
-    connect(fwdBtn_,    &QPushButton::clicked,  this, &OttWidget::goForward);
-    connect(reloadBtn_, &QPushButton::clicked,  this, &OttWidget::reload);
-    connect(homeBtn_,   &QPushButton::clicked,  this, &OttWidget::goHome);
+    connect(backBtn_,   &QPushButton::clicked,   this, &OttWidget::goBack);
+    connect(fwdBtn_,    &QPushButton::clicked,   this, &OttWidget::goForward);
+    connect(reloadBtn_, &QPushButton::clicked,   this, &OttWidget::reload);
+    connect(homeBtn_,   &QPushButton::clicked,   this, &OttWidget::goHome);
     connect(serviceBox_, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &OttWidget::onServiceSelected);
 }
@@ -146,21 +153,17 @@ void OttWidget::showEvent(QShowEvent* e) {
     QWidget::showEvent(e);
     if (!initAttempted_) {
         initAttempted_ = true;
-        // 첫 표시 시 WebView2 초기화
         QTimer::singleShot(100, this, &OttWidget::initWebView2);
     }
 }
 
 void OttWidget::initWebView2() {
 #ifdef Q_OS_WIN
+#ifndef WEBVIEW2_NOT_AVAILABLE
     HWND parentHwnd = reinterpret_cast<HWND>(webContainer_->winId());
 
-    // WebView2 환경 생성 (Evergreen 런타임 사용)
-    // Evergreen = 시스템에 설치된 Edge 런타임 → PlayReady DRM 완전 지원
     HRESULT hr = CreateCoreWebView2EnvironmentWithOptions(
-        nullptr,  // browserExecutableFolder: null = Evergreen 자동 탐색
-        nullptr,  // userDataFolder: null = 기본 경로
-        nullptr,  // options
+        nullptr, nullptr, nullptr,
         Microsoft::WRL::Callback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>(
             [this, parentHwnd](HRESULT result, ICoreWebView2Environment* env) -> HRESULT {
                 if (FAILED(result) || !env) {
@@ -169,16 +172,15 @@ void OttWidget::initWebView2() {
                         statusLabel_->setText(
                             "Microsoft Edge WebView2를 찾을 수 없습니다.\n\n"
                             "Edge 브라우저가 설치되어 있는지 확인해 주세요.\n"
-                            "Windows 10/11에는 기본 설치되어 있습니다.\n\n"
-                            "https://go.microsoft.com/fwlink/p/?LinkId=2124703");
+                            "Windows 10/11에는 기본 설치되어 있습니다.");
                         emit webView2Unavailable();
                     }, Qt::QueuedConnection);
                     return S_OK;
                 }
 
                 webEnv_ = env;
+                webEnv_->AddRef();
 
-                // 컨트롤러 생성
                 env->CreateCoreWebView2Controller(
                     parentHwnd,
                     Microsoft::WRL::Callback<ICoreWebView2CreateCoreWebView2ControllerCompletedHandler>(
@@ -189,19 +191,21 @@ void OttWidget::initWebView2() {
                             }
 
                             webCtrl_ = ctrl;
+                            webCtrl_->AddRef();
                             ctrl->get_CoreWebView2(&webView_);
 
                             if (webView_) {
-                                // 초기 설정
-                                wil::com_ptr<ICoreWebView2Settings> settings;
+                                ICoreWebView2Settings* settings = nullptr;
                                 webView_->get_Settings(&settings);
                                 if (settings) {
                                     settings->put_IsStatusBarEnabled(FALSE);
                                     settings->put_AreDefaultContextMenusEnabled(TRUE);
                                     settings->put_IsZoomControlEnabled(TRUE);
+                                    settings->Release();
                                 }
 
                                 // 타이틀 변경 이벤트
+                                EventRegistrationToken token;
                                 webView_->add_DocumentTitleChanged(
                                     Microsoft::WRL::Callback<ICoreWebView2DocumentTitleChangedEventHandler>(
                                         [this](ICoreWebView2* sender, IUnknown*) -> HRESULT {
@@ -215,7 +219,7 @@ void OttWidget::initWebView2() {
                                                 }, Qt::QueuedConnection);
                                             }
                                             return S_OK;
-                                        }).Get(), nullptr);
+                                        }).Get(), &token);
 
                                 // URL 변경 이벤트
                                 webView_->add_SourceChanged(
@@ -232,15 +236,13 @@ void OttWidget::initWebView2() {
                                                 }, Qt::QueuedConnection);
                                             }
                                             return S_OK;
-                                        }).Get(), nullptr);
+                                        }).Get(), &token);
                             }
 
-                            // 초기화 완료
                             QMetaObject::invokeMethod(this, [this]() {
                                 webView2Ready_ = true;
                                 statusLabel_->hide();
                                 updateWebViewBounds();
-                                // 기본 페이지: 소리누리 OTT 홈
                                 navigate("https://www.netflix.com");
                                 qInfo() << "[WebView2] 초기화 완료 - PlayReady DRM 활성";
                             }, Qt::QueuedConnection);
@@ -252,11 +254,12 @@ void OttWidget::initWebView2() {
             }).Get());
 
     if (FAILED(hr)) {
-        qWarning() << "[WebView2] CreateCoreWebView2EnvironmentWithOptions 실패:" << hr;
+        qWarning() << "[WebView2] 초기화 실패:" << hr;
         statusLabel_->setText(
             "WebView2 초기화 실패.\n\n"
             "Microsoft Edge가 설치되어 있는지 확인해 주세요.");
     }
+#endif
 #else
     statusLabel_->setText("WebView2는 Windows에서만 지원됩니다.");
 #endif
@@ -270,12 +273,12 @@ void OttWidget::resizeEvent(QResizeEvent* e) {
 
 void OttWidget::updateWebViewBounds() {
 #ifdef Q_OS_WIN
+#ifndef WEBVIEW2_NOT_AVAILABLE
     if (!webCtrl_ || !webContainer_) return;
-    RECT bounds = {0, 0,
-                   webContainer_->width(),
-                   webContainer_->height()};
+    RECT bounds = {0, 0, webContainer_->width(), webContainer_->height()};
     webCtrl_->put_Bounds(bounds);
     webCtrl_->put_IsVisible(TRUE);
+#endif
 #endif
 }
 
@@ -283,10 +286,12 @@ void OttWidget::navigate(const QString& url) {
     if (url.isEmpty()) return;
     urlBar_->setText(url);
 #ifdef Q_OS_WIN
+#ifndef WEBVIEW2_NOT_AVAILABLE
     if (webView_) {
         std::wstring wurl = url.toStdWString();
         webView_->Navigate(wurl.c_str());
     }
+#endif
 #endif
 }
 
@@ -301,32 +306,38 @@ void OttWidget::onNavigateClicked() {
 void OttWidget::onServiceSelected(int index) {
     if (index <= 0 || index >= SERVICE_URLS.size()) return;
     navigate(SERVICE_URLS[index]);
-    serviceBox_->setCurrentIndex(0);  // 선택 후 초기화
+    serviceBox_->setCurrentIndex(0);
 }
 
 void OttWidget::goBack() {
 #ifdef Q_OS_WIN
+#ifndef WEBVIEW2_NOT_AVAILABLE
     if (webView_) {
         BOOL canGoBack = FALSE;
         webView_->get_CanGoBack(&canGoBack);
         if (canGoBack) webView_->GoBack();
     }
 #endif
+#endif
 }
 
 void OttWidget::goForward() {
 #ifdef Q_OS_WIN
+#ifndef WEBVIEW2_NOT_AVAILABLE
     if (webView_) {
         BOOL canGoFwd = FALSE;
         webView_->get_CanGoForward(&canGoFwd);
         if (canGoFwd) webView_->GoForward();
     }
 #endif
+#endif
 }
 
 void OttWidget::reload() {
 #ifdef Q_OS_WIN
+#ifndef WEBVIEW2_NOT_AVAILABLE
     if (webView_) webView_->Reload();
+#endif
 #endif
 }
 

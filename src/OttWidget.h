@@ -10,27 +10,25 @@
 #include <QResizeEvent>
 
 #ifdef Q_OS_WIN
+#ifndef WEBVIEW2_NOT_AVAILABLE
 #include <windows.h>
 #include <wrl.h>
-#include <wil/com.h>
 #include "WebView2.h"
+#endif
 #endif
 
 /**
  * OttWidget - Edge WebView2 기반 OTT 스트리밍 패널
  *
  * Microsoft Edge WebView2 (Evergreen Runtime)를 Qt 위젯에 임베드합니다.
- * WebView2는 시스템에 설치된 Edge 런타임을 사용하므로:
- *   - PlayReady DRM 완전 지원 → 넷플릭스 4K, Dolby Atmos
- *   - Widevine L1 (하드웨어 보안) → 고화질 스트리밍
- *   - 오디오는 Windows 오디오 서브시스템 직접 사용
+ * WebView2 Evergreen 런타임은 PlayReady DRM을 완전 지원하므로:
+ *   - 넷플릭스 Dolby Atmos / 4K 재생 가능
+ *   - 디즈니+ Dolby Atmos 재생 가능
+ *   - 국내 OTT (웨이브, 왓챠, 티빙 등) 재생 가능
+ *   - 유튜브 5.1 E-AC3 재생 가능
  *
- * 지원 서비스:
- *   - 넷플릭스 (Netflix) - Dolby Atmos, 4K
- *   - 디즈니+ (Disney+) - Dolby Atmos
- *   - 아마존 프라임 (Amazon Prime Video)
- *   - 웨이브 (Wavve), 왓챠 (Watcha) 등 국내 OTT
- *   - 유튜브 (YouTube) - 5.1 E-AC3
+ * WebView2 SDK가 없으면 WEBVIEW2_NOT_AVAILABLE이 정의되어
+ * 안내 메시지만 표시하고 빌드는 정상 완료됩니다.
  */
 class OttWidget : public QWidget {
     Q_OBJECT
@@ -66,28 +64,28 @@ private:
     void updateWebViewBounds();
 
     // UI 위젯
-    QWidget*     toolBar_    = nullptr;
-    QLineEdit*   urlBar_     = nullptr;
-    QPushButton* backBtn_    = nullptr;
-    QPushButton* fwdBtn_     = nullptr;
-    QPushButton* reloadBtn_  = nullptr;
-    QPushButton* homeBtn_    = nullptr;
-    QComboBox*   serviceBox_ = nullptr;
+    QWidget*     toolBar_      = nullptr;
+    QLineEdit*   urlBar_       = nullptr;
+    QPushButton* backBtn_      = nullptr;
+    QPushButton* fwdBtn_       = nullptr;
+    QPushButton* reloadBtn_    = nullptr;
+    QPushButton* homeBtn_      = nullptr;
+    QComboBox*   serviceBox_   = nullptr;
     QWidget*     webContainer_ = nullptr;
     QLabel*      statusLabel_  = nullptr;
 
-    bool webView2Ready_ = false;
-    bool initAttempted_ = false;
+    bool webView2Ready_  = false;
+    bool initAttempted_  = false;
 
 #ifdef Q_OS_WIN
-    // WebView2 COM 인터페이스
-    wil::com_ptr<ICoreWebView2Environment> webEnv_;
-    wil::com_ptr<ICoreWebView2Controller>  webCtrl_;
-    wil::com_ptr<ICoreWebView2>            webView_;
-    HWND                                   webHwnd_ = nullptr;
+#ifndef WEBVIEW2_NOT_AVAILABLE
+    // WebView2 COM 인터페이스 (WIL 없이 순수 COM 포인터)
+    ICoreWebView2Environment* webEnv_  = nullptr;
+    ICoreWebView2Controller*  webCtrl_ = nullptr;
+    ICoreWebView2*            webView_ = nullptr;
+#endif
 #endif
 
-    // OTT 서비스 목록
     static const QStringList SERVICE_NAMES;
     static const QStringList SERVICE_URLS;
 };
