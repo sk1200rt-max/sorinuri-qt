@@ -38,26 +38,58 @@ jobs:
       - name: Download libmpv
         shell: pwsh
         run: |
-          # shinchiro mpv Windows 빌드에서 최신 dev 패키지 다운로드
-          $releases = Invoke-RestMethod "https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/releases?per_page=10"
-          $devAsset = $null
-          foreach ($rel in $releases) {
-            foreach ($asset in $rel.assets) {
-              if ($asset.name -match "mpv-dev-x86_64.*\.7z$") {
-                $devAsset = $asset
-                break
+          # mpv-player 공식 릴리즈에서 libmpv Windows dev 패키지 다운로드
+          # 여러 소스를 시도하는 방식으로 안정성 확보
+          $downloaded = $false
+
+          # 소스 1: shinchiro
+          try {
+            $releases = Invoke-RestMethod "https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/releases?per_page=5" -TimeoutSec 30
+            $devAsset = $null
+            foreach ($rel in $releases) {
+              foreach ($asset in $rel.assets) {
+                if ($asset.name -match "mpv-dev-x86_64.*\.7z$") {
+                  $devAsset = $asset; break
+                }
               }
+              if ($devAsset) { break }
             }
-            if ($devAsset) { break }
+            if ($devAsset) {
+              Write-Host "소스 1 (shinchiro): $($devAsset.name)"
+              Invoke-WebRequest -Uri $devAsset.browser_download_url -OutFile "mpv-dev.7z" -TimeoutSec 180
+              $downloaded = $true
+            }
+          } catch {
+            Write-Host "소스 1 실패: $_"
           }
 
-          if (-not $devAsset) {
-            Write-Error "libmpv dev 패키지를 찾을 수 없습니다"
+          # 소스 2: zhongfly (shinchiro 실패 시 대체)
+          if (-not $downloaded) {
+            try {
+              $releases = Invoke-RestMethod "https://api.github.com/repos/zhongfly/mpv-winbuild/releases?per_page=5" -TimeoutSec 30
+              $devAsset = $null
+              foreach ($rel in $releases) {
+                foreach ($asset in $rel.assets) {
+                  if ($asset.name -match "mpv-dev-x86_64.*\.7z$") {
+                    $devAsset = $asset; break
+                  }
+                }
+                if ($devAsset) { break }
+              }
+              if ($devAsset) {
+                Write-Host "소스 2 (zhongfly): $($devAsset.name)"
+                Invoke-WebRequest -Uri $devAsset.browser_download_url -OutFile "mpv-dev.7z" -TimeoutSec 180
+                $downloaded = $true
+              }
+            } catch {
+              Write-Host "소스 2 실패: $_"
+            }
+          }
+
+          if (-not $downloaded) {
+            Write-Error "libmpv dev 패키지를 다운로드할 수 없습니다"
             exit 1
           }
-
-          Write-Host "다운로드: $($devAsset.name) ($([math]::Round($devAsset.size/1MB,1)) MB)"
-          Invoke-WebRequest -Uri $devAsset.browser_download_url -OutFile "mpv-dev.7z" -TimeoutSec 120
 
           # 압축 해제
           7z x mpv-dev.7z -o"mpv-dev" -y | Out-Null
