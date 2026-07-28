@@ -104,6 +104,8 @@ Type: filesandordirs; Name: "{app}"
 [Code]
 // 설치 전 이전 버전 종료
 procedure CurStepChanged(CurStep: TSetupStep);
+var
+  ResultCode: Integer;
 begin
   if CurStep = ssInstall then begin
     // 실행 중인 소리누리 종료
