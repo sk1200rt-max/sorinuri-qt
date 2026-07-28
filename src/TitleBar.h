@@ -12,12 +12,14 @@ public:
     void setTitle(const QString& title);
     void setAudioBadge(const QString& codec);
     void setFullscreenMode(bool fs);
+    void setAlwaysOnTop(bool pinned);
 
 signals:
     void minimizeClicked();
     void maximizeClicked();
     void fullscreenClicked();
     void closeClicked();
+    void alwaysOnTopToggled(bool pinned);
 
 protected:
     void mousePressEvent(QMouseEvent* e) override;
@@ -31,11 +33,13 @@ private:
 
     QLabel*      titleLabel_    = nullptr;
     QLabel*      badgeLabel_    = nullptr;
+    QPushButton* btnPin_        = nullptr;
     QPushButton* btnMin_        = nullptr;
     QPushButton* btnMax_        = nullptr;
     QPushButton* btnFullscreen_ = nullptr;
     QPushButton* btnClose_      = nullptr;
 
     bool   dragging_  = false;
+    bool   pinned_    = false;
     QPoint dragStart_;
 };

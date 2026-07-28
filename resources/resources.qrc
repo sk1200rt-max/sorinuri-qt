@@ -23,6 +23,8 @@
         <file>icons/restore.svg</file>
         <file>icons/close.svg</file>
         <file>icons/expand.svg</file>
+        <file>icons/pin.svg</file>
+        <file>icons/pin_off.svg</file>
         <file>badges/dolby-atmos.png</file>
         <file>badges/truehd.png</file>
         <file>badges/dts-hd.png</file>

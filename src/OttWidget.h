@@ -8,6 +8,7 @@
 #include <QComboBox>
 #include <QTimer>
 #include <QResizeEvent>
+#include <QStackedWidget>
 
 #ifdef Q_OS_WIN
 #ifndef WEBVIEW2_NOT_AVAILABLE
@@ -17,18 +18,20 @@
 #endif
 #endif
 
+// 서비스 정보 구조체 (OttWidget.cpp에서 정의)
+struct ServiceInfo;
+
 /**
  * OttWidget - Edge WebView2 기반 OTT 스트리밍 패널
  *
- * Microsoft Edge WebView2 (Evergreen Runtime)를 Qt 위젯에 임베드합니다.
- * WebView2 Evergreen 런타임은 PlayReady DRM을 완전 지원하므로:
- *   - 넷플릭스 Dolby Atmos / 4K 재생 가능
- *   - 디즈니+ Dolby Atmos 재생 가능
- *   - 국내 OTT (웨이브, 왓챠, 티빙 등) 재생 가능
- *   - 유튜브 5.1 E-AC3 재생 가능
+ * 초기 화면: 서비스 선택 그리드 (목업 디자인 동일)
+ * 서비스 카드 클릭 시: WebView2로 전환하여 해당 서비스 재생
  *
- * WebView2 SDK가 없으면 WEBVIEW2_NOT_AVAILABLE이 정의되어
- * 안내 메시지만 표시하고 빌드는 정상 완료됩니다.
+ * WebView2 Evergreen 런타임 → PlayReady DRM 완전 지원
+ *   - Netflix Dolby Atmos / 4K
+ *   - Disney+ Dolby Atmos
+ *   - 국내 OTT (웨이브, 왓챠, 티빙 등)
+ *   - YouTube 5.1 E-AC3
  */
 class OttWidget : public QWidget {
     Q_OBJECT
@@ -63,23 +66,30 @@ private:
     void setupUI();
     void updateWebViewBounds();
 
-    // UI 위젯
-    QWidget*     toolBar_      = nullptr;
-    QLineEdit*   urlBar_       = nullptr;
-    QPushButton* backBtn_      = nullptr;
-    QPushButton* fwdBtn_       = nullptr;
-    QPushButton* reloadBtn_    = nullptr;
-    QPushButton* homeBtn_      = nullptr;
-    QComboBox*   serviceBox_   = nullptr;
-    QWidget*     webContainer_ = nullptr;
-    QLabel*      statusLabel_  = nullptr;
+    // 홈 그리드 빌더
+    QWidget* buildHomeGrid();
+    QWidget* buildServiceCard(const ServiceInfo& svc);
+
+    // ── UI 위젯 ──────────────────────────────────────────────────
+    QWidget*        toolBar_       = nullptr;
+    QLineEdit*      urlBar_        = nullptr;
+    QPushButton*    backBtn_       = nullptr;
+    QPushButton*    fwdBtn_        = nullptr;
+    QPushButton*    reloadBtn_     = nullptr;
+    QPushButton*    homeBtn_       = nullptr;
+    QComboBox*      serviceBox_    = nullptr;
+
+    // 콘텐츠 스택: 0=홈 그리드, 1=WebView2
+    QStackedWidget* contentStack_  = nullptr;
+    QWidget*        homeGrid_      = nullptr;
+    QWidget*        webContainer_  = nullptr;
+    QLabel*         statusLabel_   = nullptr;
 
     bool webView2Ready_  = false;
     bool initAttempted_  = false;
 
 #ifdef Q_OS_WIN
 #ifndef WEBVIEW2_NOT_AVAILABLE
-    // WebView2 COM 인터페이스 (WIL 없이 순수 COM 포인터)
     ICoreWebView2Environment* webEnv_  = nullptr;
     ICoreWebView2Controller*  webCtrl_ = nullptr;
     ICoreWebView2*            webView_ = nullptr;

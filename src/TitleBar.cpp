@@ -50,21 +50,65 @@ TitleBar::TitleBar(QWidget* parent) : QWidget(parent) {
     layout->addWidget(titleLabel_);
     layout->addStretch();
 
-    // 창 버튼
-    btnMin_        = makeIconBtn(":/icons/minimize.svg",       "최소화",     "#252525");
-    btnMax_        = makeIconBtn(":/icons/maximize.svg",       "화면 채우기", "#252525");
-    btnFullscreen_ = makeIconBtn(":/icons/expand.svg",         "전체화면",   "#1e3a5f");
-    btnClose_      = makeIconBtn(":/icons/close.svg",          "닫기",       "#c42b1c", 48);
+    // ── 항상 위에 고정 버튼 (핀) ─────────────────────────────────
+    btnPin_ = new QPushButton(this);
+    btnPin_->setToolTip("항상 위에 고정");
+    btnPin_->setFixedSize(38, 36);
+    btnPin_->setFlat(true);
+    btnPin_->setCursor(Qt::ArrowCursor);
+    btnPin_->setCheckable(true);
+    btnPin_->setIcon(QIcon(":/icons/pin_off.svg"));
+    btnPin_->setIconSize(QSize(14, 14));
+    btnPin_->setStyleSheet(
+        "QPushButton {"
+        "  background: transparent; border: none; border-radius: 0;"
+        "  color: #555;"
+        "}"
+        "QPushButton:hover {"
+        "  background: #252525;"
+        "}"
+        "QPushButton:checked {"
+        "  background: #0d2a4a;"
+        "  border-bottom: 2px solid #4fc3f7;"
+        "}"
+        "QPushButton:checked:hover {"
+        "  background: #1e3a5f;"
+        "}");
 
+    // ── 창 버튼 ───────────────────────────────────────────────────
+    btnMin_        = makeIconBtn(":/icons/minimize.svg",   "최소화",     "#252525");
+    btnMax_        = makeIconBtn(":/icons/maximize.svg",   "화면 채우기", "#252525");
+    btnFullscreen_ = makeIconBtn(":/icons/expand.svg",     "전체화면",   "#1e3a5f");
+    btnClose_      = makeIconBtn(":/icons/close.svg",      "닫기",       "#c42b1c", 48);
+
+    layout->addWidget(btnPin_);
     layout->addWidget(btnMin_);
     layout->addWidget(btnMax_);
     layout->addWidget(btnFullscreen_);
     layout->addWidget(btnClose_);
 
+    // 핀 버튼 토글 시 아이콘 및 툴팁 변경
+    connect(btnPin_, &QPushButton::toggled, this, [this](bool checked) {
+        pinned_ = checked;
+        btnPin_->setIcon(QIcon(checked ? ":/icons/pin.svg" : ":/icons/pin_off.svg"));
+        btnPin_->setToolTip(checked ? "항상 위에 고정 해제" : "항상 위에 고정");
+        emit alwaysOnTopToggled(checked);
+    });
+
     connect(btnMin_,        &QPushButton::clicked, this, &TitleBar::minimizeClicked);
     connect(btnMax_,        &QPushButton::clicked, this, &TitleBar::maximizeClicked);
     connect(btnFullscreen_, &QPushButton::clicked, this, &TitleBar::fullscreenClicked);
     connect(btnClose_,      &QPushButton::clicked, this, &TitleBar::closeClicked);
+}
+
+void TitleBar::setAlwaysOnTop(bool pinned) {
+    // 외부에서 상태 설정 (시그널 발생 없이)
+    btnPin_->blockSignals(true);
+    btnPin_->setChecked(pinned);
+    btnPin_->blockSignals(false);
+    pinned_ = pinned;
+    btnPin_->setIcon(QIcon(pinned ? ":/icons/pin.svg" : ":/icons/pin_off.svg"));
+    btnPin_->setToolTip(pinned ? "항상 위에 고정 해제" : "항상 위에 고정");
 }
 
 void TitleBar::setTitle(const QString& title) {

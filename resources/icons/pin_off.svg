@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <!-- 핀 머리 (외곽선만) -->
+  <path d="M12 2 L18 8 L14 12 L16 20 L12 16 L8 20 L10 12 L6 8 Z" fill="none" stroke="currentColor" stroke-width="1.8"/>
+  <!-- 핀 바늘 -->
+  <line x1="12" y1="16" x2="12" y2="22" stroke="currentColor" stroke-width="1.5"/>
+</svg>

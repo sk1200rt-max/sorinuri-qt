@@ -182,6 +182,19 @@ void MainWindow::setupConnections() {
     connect(titleBar_, &TitleBar::fullscreenClicked, this, &MainWindow::toggleFullscreen);
     connect(titleBar_, &TitleBar::closeClicked,      this, &QMainWindow::close);
 
+    // 항상 위에 고정 토글
+    connect(titleBar_, &TitleBar::alwaysOnTopToggled, this, [this](bool pinned) {
+        Qt::WindowFlags flags = windowFlags();
+        if (pinned) {
+            flags |= Qt::WindowStaysOnTopHint;
+        } else {
+            flags &= ~Qt::WindowStaysOnTopHint;
+        }
+        setWindowFlags(flags);
+        show();  // setWindowFlags 후 재표시 필요
+        settings_.setValue("window/alwaysOnTop", pinned);
+    });
+
     // 모드 전환 버튼
     connect(playerModeBtn_, &QPushButton::clicked, this, &MainWindow::switchToPlayerMode);
     connect(ottModeBtn_,    &QPushButton::clicked, this, &MainWindow::switchToOttMode);
@@ -609,6 +622,13 @@ void MainWindow::loadSettings() {
     resize(settings_.value("window/size", QSize(1280, 760)).toSize());
     QPoint p = settings_.value("window/pos", QPoint(-1,-1)).toPoint();
     if (p.x() >= 0) move(p);
+
+    // 항상 위에 고정 상태 복원
+    bool alwaysOnTop = settings_.value("window/alwaysOnTop", false).toBool();
+    if (alwaysOnTop) {
+        setWindowFlags(windowFlags() | Qt::WindowStaysOnTopHint);
+        titleBar_->setAlwaysOnTop(true);
+    }
     int vol = settings_.value("audio/volume", 100).toInt();
     mpvWidget_->core()->setVolume(vol);
     controlBar_->setVolume(vol);
