@@ -75,6 +75,13 @@ if(WIN32)
     set_source_files_properties(resources/sorinuri.rc PROPERTIES
         COMPILE_FLAGS "/I\"${CMAKE_SOURCE_DIR}/resources\""
     )
+    # MSVC 링커의 자동 manifest 삽입 비활성화
+    # (RC 파일에 이미 Per-Monitor V2 manifest가 포함되어 있으므로 중복 방지)
+    if(MSVC)
+        set_target_properties(Sorinuri PROPERTIES
+            LINK_FLAGS "/MANIFEST:NO"
+        )
+    endif()
 else()
     add_executable(Sorinuri ${SOURCES})
 endif()
