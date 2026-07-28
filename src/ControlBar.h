@@ -3,10 +3,8 @@
 #include <QSlider>
 #include <QPushButton>
 #include <QLabel>
-#include <QComboBox>
 #include <QHBoxLayout>
 #include <QVBoxLayout>
-#include "MpvCore.h"
 
 class ControlBar : public QWidget {
     Q_OBJECT
@@ -25,9 +23,7 @@ signals:
     void seeked(double seconds);
     void volumeChanged(int vol);
     void muteToggled(bool muted);
-    void speedChanged(double speed);
     void openFileClicked();
-    void fullscreenToggled();
     void prevClicked();
     void nextClicked();
 
@@ -36,21 +32,19 @@ private slots:
     void onVolMoved(int value);
 
 private:
-    static QPushButton* makeBtn(const QString& svg, const QString& tip, int size = 32);
+    static QPushButton* makeBtn(const QString& svg, const QString& tip, int size = 30);
     QString formatTime(double s) const;
 
-    QSlider*     seekSlider_  = nullptr;
-    QLabel*      timeLabel_   = nullptr;
-    QPushButton* btnOpen_     = nullptr;
-    QPushButton* btnPrev_     = nullptr;
-    QPushButton* btnPlay_     = nullptr;
-    QPushButton* btnNext_     = nullptr;
-    QPushButton* btnStop_     = nullptr;
-    QPushButton* btnMute_     = nullptr;
-    QSlider*     volSlider_   = nullptr;
-    QLabel*      volLabel_    = nullptr;
-    QComboBox*   speedCombo_  = nullptr;
-    QPushButton* btnFullscreen_ = nullptr;
+    QSlider*     seekSlider_ = nullptr;
+    QLabel*      timeLabel_  = nullptr;
+    QPushButton* btnOpen_    = nullptr;
+    QPushButton* btnPrev_    = nullptr;
+    QPushButton* btnPlay_    = nullptr;
+    QPushButton* btnNext_    = nullptr;
+    QPushButton* btnStop_    = nullptr;
+    QPushButton* btnMute_    = nullptr;
+    QSlider*     volSlider_  = nullptr;
+    QLabel*      volLabel_   = nullptr;
 
     double totalDuration_ = 0;
     bool   seeking_       = false;

@@ -107,9 +107,7 @@ void MainWindow::setupConnections() {
     connect(controlBar_, &ControlBar::seeked,            [core](double p) { core->seek(p); });
     connect(controlBar_, &ControlBar::volumeChanged,     core, &MpvCore::setVolume);
     connect(controlBar_, &ControlBar::muteToggled,       core, &MpvCore::setMuted);
-    connect(controlBar_, &ControlBar::speedChanged,      core, &MpvCore::setSpeed);
     connect(controlBar_, &ControlBar::openFileClicked,   this, &MainWindow::onOpenFile);
-    connect(controlBar_, &ControlBar::fullscreenToggled, this, &MainWindow::toggleFullscreen);
     connect(controlBar_, &ControlBar::prevClicked,       [core]() { core->command({"playlist-prev"}); });
     connect(controlBar_, &ControlBar::nextClicked,       [core]() { core->command({"playlist-next"}); });
 

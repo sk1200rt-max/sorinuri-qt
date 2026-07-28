@@ -1,6 +1,5 @@
 #pragma once
 #include <QWidget>
-#include <QPainter>
 #include "MpvCore.h"
 
 class MpvWidget : public QWidget {
@@ -17,7 +16,7 @@ protected:
     void showEvent(QShowEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;
     void paintEvent(QPaintEvent* event) override;
-    QPaintEngine* paintEngine() const override { return nullptr; }
+    QPaintEngine* paintEngine() const override;
 
 private:
     MpvCore* core_        = nullptr;
