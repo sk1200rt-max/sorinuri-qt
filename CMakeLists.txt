@@ -83,6 +83,11 @@ target_link_libraries(Sorinuri PRIVATE
     ${MPV_LIBRARY}
 )
 
+# Windows: OpenGL32 링크 (glClear, glClearColor 등)
+if(WIN32)
+    target_link_libraries(Sorinuri PRIVATE opengl32)
+endif()
+
 # Windows: DLL 복사
 if(WIN32)
     add_custom_command(TARGET Sorinuri POST_BUILD
