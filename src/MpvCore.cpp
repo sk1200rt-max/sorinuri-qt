@@ -57,6 +57,11 @@ bool MpvCore::initialize(WId windowId) {
     check_error(mpv_set_property_string(mpv_, "audio-spdif",  "ac3,eac3,dts,dts-hd,truehd"));
     check_error(mpv_set_property_string(mpv_, "af",           ""));
 
+    // 네트워크/NAS 드라이브 지원
+    check_error(mpv_set_property_string(mpv_, "demuxer-readahead-secs", "2"));
+    check_error(mpv_set_property_string(mpv_, "cache",        "yes"));
+    check_error(mpv_set_property_string(mpv_, "cache-secs",   "10"));
+
     // 관찰할 속성 등록
     mpv_observe_property(mpv_, 0, "time-pos",        MPV_FORMAT_DOUBLE);
     mpv_observe_property(mpv_, 0, "duration",        MPV_FORMAT_DOUBLE);
@@ -84,8 +89,8 @@ bool MpvCore::initialize(WId windowId) {
 
 void MpvCore::wakeupCallback(void* ctx) {
     MpvCore* self = static_cast<MpvCore*>(ctx);
-    // Qt 메인 스레드에서 이벤트 처리 요청
-    QMetaObject::invokeMethod(self, "onMpvEvents", Qt::QueuedConnection);
+    // Qt 메인 스레드에서 즉시 이벤트 처리
+    QTimer::singleShot(0, self, &MpvCore::onMpvEvents);
 }
 
 void MpvCore::onMpvEvents() {
@@ -105,6 +110,7 @@ void MpvCore::handleEvent(mpv_event* event) {
         char* rawPath = mpv_get_property_string(mpv_, "path");
         QString path = rawPath ? QString::fromUtf8(rawPath) : QString();
         mpv_free(rawPath);
+        qInfo() << "[MPV] FILE_LOADED:" << path;
         // 파일 로드 완료 후 자동 재생 보장
         int flag = 0;
         mpv_set_property(mpv_, "pause", MPV_FORMAT_FLAG, &flag);
