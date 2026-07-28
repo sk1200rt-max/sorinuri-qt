@@ -155,6 +155,31 @@ jobs:
           Write-Host "=== deps/libmpv 구조 ==="
           Get-ChildItem -Recurse deps/libmpv | Select-Object FullName, Length
 
+
+      # ── WebView2 SDK 다운로드 (OTT 스트리밍 - Netflix Dolby Atmos 지원) ──────
+      - name: Download WebView2 SDK
+        shell: pwsh
+        run: |
+          Write-Host "WebView2 SDK 다운로드 중..."
+          try {
+            $nupkgUrl = "https://www.nuget.org/api/v2/package/Microsoft.Web.WebView2/1.0.2792.45"
+            Invoke-WebRequest -Uri $nupkgUrl -OutFile "webview2.nupkg" -TimeoutSec 120
+            Rename-Item webview2.nupkg webview2.zip
+            Expand-Archive webview2.zip -DestinationPath webview2-sdk -Force
+
+            New-Item -ItemType Directory -Force deps/webview2/include | Out-Null
+            New-Item -ItemType Directory -Force deps/webview2/lib/x64  | Out-Null
+
+            Copy-Item webview2-sdk/build/native/include/*.h deps/webview2/include/
+            Copy-Item webview2-sdk/build/native/x64/WebView2Loader.dll.lib deps/webview2/lib/x64/
+            Copy-Item webview2-sdk/build/native/x64/WebView2Loader.dll     deps/webview2/lib/x64/
+
+            Write-Host "WebView2 SDK 준비 완료"
+            Get-ChildItem -Recurse deps/webview2 | Select-Object FullName
+          } catch {
+            Write-Host "WebView2 SDK 다운로드 실패 (OTT 기능 비활성화): $_"
+          }
+
       # ── CMake 빌드 ────────────────────────────────────────────────
       - name: Configure CMake
         shell: pwsh
@@ -206,6 +231,12 @@ jobs:
           Libraries = .
           "@
           $qtConf.Trim() | Set-Content dist/Sorinuri-Portable/qt.conf -Encoding UTF8
+
+          # WebView2Loader.dll 복사 (OTT 스트리밍 지원)
+          if (Test-Path "deps/webview2/lib/x64/WebView2Loader.dll") {
+            Copy-Item "deps/webview2/lib/x64/WebView2Loader.dll" dist/Sorinuri-Portable/
+            Write-Host "WebView2Loader.dll 복사 완료"
+          }
 
           # yt-dlp 다운로드 (유튜브 5.1 서라운드 지원)
           Write-Host "yt-dlp 다운로드 중..."

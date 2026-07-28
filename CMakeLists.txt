@@ -62,6 +62,8 @@ set(SOURCES
     src/UrlDialog.h
     src/YtdlpManager.cpp
     src/YtdlpManager.h
+    src/OttWidget.cpp
+    src/OttWidget.h
     resources/resources.qrc
 )
 
@@ -92,6 +94,23 @@ target_link_libraries(Sorinuri PRIVATE
 # Windows: OpenGL32 링크 (glClear, glClearColor 등)
 if(WIN32)
     target_link_libraries(Sorinuri PRIVATE opengl32)
+endif()
+
+# Windows: WebView2 SDK 연동 (OTT 스트리밍 - Netflix Dolby Atmos 지원)
+if(WIN32)
+    # WebView2 SDK NuGet 패키지에서 헤더/라이브러리 경로
+    set(WEBVIEW2_SDK_DIR "${CMAKE_SOURCE_DIR}/deps/webview2" CACHE PATH "WebView2 SDK dir")
+    if(EXISTS "${WEBVIEW2_SDK_DIR}/include/WebView2.h")
+        target_include_directories(Sorinuri PRIVATE "${WEBVIEW2_SDK_DIR}/include")
+        target_link_libraries(Sorinuri PRIVATE
+            "${WEBVIEW2_SDK_DIR}/lib/x64/WebView2Loader.dll.lib")
+        message(STATUS "WebView2 SDK: ${WEBVIEW2_SDK_DIR}")
+    else()
+        message(STATUS "WebView2 SDK not found - OTT 기능 비활성화")
+        target_compile_definitions(Sorinuri PRIVATE WEBVIEW2_NOT_AVAILABLE)
+    endif()
+    # WRL (Windows Runtime C++ Template Library) - WebView2 COM 인터페이스용
+    target_link_libraries(Sorinuri PRIVATE ole32 oleaut32 shlwapi)
 endif()
 
 # Windows: DLL 복사

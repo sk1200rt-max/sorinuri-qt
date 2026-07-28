@@ -12,6 +12,8 @@
 #include <QCloseEvent>
 #include <QResizeEvent>
 #include <QProgressDialog>
+#include <QStackedWidget>
+#include <QPushButton>
 
 #include "MpvWidget.h"
 #include "ControlBar.h"
@@ -20,6 +22,7 @@
 #include "SettingsDialog.h"
 #include "TrackSelector.h"
 #include "YtdlpManager.h"
+#include "OttWidget.h"
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -51,10 +54,14 @@ private slots:
     void onVideoInfoChanged(int w, int h, double fps, const QString& codec);
     void onTracksChanged();
     void onOpenFile();
-    void onOpenUrl();                    // URL 열기 (유튜브 등)
+    void onOpenUrl();
     void onSettingsRequested();
     void toggleFullscreen();
     void showContextMenu(const QPoint& pos);
+
+    // 모드 전환
+    void switchToPlayerMode();
+    void switchToOttMode();
 
     // yt-dlp 관련
     void onYtdlpReady(const QString& path);
@@ -67,7 +74,16 @@ private:
     void loadSettings();
     void saveSettings();
     void updateWindowTitle(const QString& filename = {});
-    void openUrl(const QString& url);    // URL 재생 (yt-dlp 필요 시 자동 다운로드)
+    void openUrl(const QString& url);
+
+    // ── 메인 스택 (플레이어 / OTT 모드) ──────────────────────────
+    QStackedWidget* mainStack_   = nullptr;
+    QWidget*        playerPage_  = nullptr;  // 인덱스 0: MPV 플레이어
+    OttWidget*      ottPage_     = nullptr;  // 인덱스 1: OTT 스트리밍
+
+    // 모드 전환 버튼 (타이틀바에 추가)
+    QPushButton* playerModeBtn_ = nullptr;
+    QPushButton* ottModeBtn_    = nullptr;
 
     // 위젯
     TitleBar*     titleBar_     = nullptr;
@@ -77,12 +93,13 @@ private:
     AudioInfoBar* audioInfoBar_ = nullptr;
 
     bool   isFullscreen_  = false;
+    bool   isOttMode_     = false;
     double totalDuration_ = 0;
     QSettings settings_;
 
     // yt-dlp 관리자
     YtdlpManager* ytdlp_ = nullptr;
-    QString pendingUrl_;             // yt-dlp 다운로드 중 대기 중인 URL
+    QString pendingUrl_;
     QProgressDialog* ytdlpProgress_ = nullptr;
 
     // 창 크기 조절

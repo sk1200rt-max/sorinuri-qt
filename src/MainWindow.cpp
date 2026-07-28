@@ -56,13 +56,48 @@ void MainWindow::setupUI() {
     mainLayout->setContentsMargins(0, 0, 0, 0);
     mainLayout->setSpacing(0);
 
-    // ── 타이틀바 ─────────────────────────────────────────────────
+    // ── 타이틀바 ─────────────────────────────────────────────
     titleBar_ = new TitleBar(this);
     mainLayout->addWidget(titleBar_);
 
-    // ── 비디오 영역 (전체) ────────────────────────────────────────
-    // 검은 배경 컨테이너 - WA_PaintOnScreen 위젯이 투명하게 보이는 것을 방지
-    auto* videoContainer = new QWidget(this);
+    // ── 모드 전환 버튼 바 (플레이어 / OTT) ───────────────────────
+    auto* modeBar = new QWidget(this);
+    modeBar->setFixedHeight(34);
+    modeBar->setStyleSheet("background: #0d0d0d; border-bottom: 1px solid #1e1e1e;");
+    auto* modeLayout = new QHBoxLayout(modeBar);
+    modeLayout->setContentsMargins(8, 3, 8, 3);
+    modeLayout->setSpacing(4);
+
+    QString modeBtnStyle =
+        "QPushButton { background: #1a1a1a; color: #888; border: 1px solid #2a2a2a; "
+        "border-radius: 4px; padding: 3px 14px; font-size: 12px; }"
+        "QPushButton:hover { color: #ccc; border-color: #333; }"
+        "QPushButton[active=true] { background: #1565c0; color: #fff; border-color: #1976d2; }";
+
+    playerModeBtn_ = new QPushButton("▶  파일 플레이어", modeBar);
+    ottModeBtn_    = new QPushButton("🌐  OTT 스트리밍 (Netflix · Disney+ · YouTube)", modeBar);
+    playerModeBtn_->setStyleSheet(modeBtnStyle);
+    ottModeBtn_->setStyleSheet(modeBtnStyle);
+    playerModeBtn_->setProperty("active", true);
+    playerModeBtn_->setToolTip("로컈 파일 재생 모드");
+    ottModeBtn_->setToolTip("Edge WebView2 기반 OTT 스트리밍\nNetflix Dolby Atmos / 5.1 완전 지원");
+
+    modeLayout->addWidget(playerModeBtn_);
+    modeLayout->addWidget(ottModeBtn_);
+    modeLayout->addStretch();
+    mainLayout->addWidget(modeBar);
+
+    // ── 메인 스택 (플레이어 / OTT 페이지) ───────────────────────
+    mainStack_ = new QStackedWidget(this);
+    mainStack_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+
+    // ── 페이지 0: MPV 플레이어 ───────────────────────────────────────
+    playerPage_ = new QWidget(this);
+    auto* playerLayout = new QVBoxLayout(playerPage_);
+    playerLayout->setContentsMargins(0, 0, 0, 0);
+    playerLayout->setSpacing(0);
+
+    auto* videoContainer = new QWidget(playerPage_);
     videoContainer->setStyleSheet("background: #000000;");
     videoContainer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     auto* videoLayout = new QVBoxLayout(videoContainer);
@@ -72,7 +107,15 @@ void MainWindow::setupUI() {
     mpvWidget_ = new MpvWidget(videoContainer);
     mpvWidget_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     videoLayout->addWidget(mpvWidget_);
-    mainLayout->addWidget(videoContainer, 1);
+    playerLayout->addWidget(videoContainer, 1);
+
+    mainStack_->addWidget(playerPage_);  // index 0
+
+    // ── 페이지 1: OTT (WebView2) ──────────────────────────────────────
+    ottPage_ = new OttWidget(this);
+    mainStack_->addWidget(ottPage_);     // index 1
+
+    mainLayout->addWidget(mainStack_, 1);
 
     // ── 트랙 선택 바 ─────────────────────────────────────────────
     auto* trackBar = new QWidget(this);
@@ -138,6 +181,15 @@ void MainWindow::setupConnections() {
     connect(titleBar_, &TitleBar::maximizeClicked,   [this]() { isMaximized() ? showNormal() : showMaximized(); });
     connect(titleBar_, &TitleBar::fullscreenClicked, this, &MainWindow::toggleFullscreen);
     connect(titleBar_, &TitleBar::closeClicked,      this, &QMainWindow::close);
+
+    // 모드 전환 버튼
+    connect(playerModeBtn_, &QPushButton::clicked, this, &MainWindow::switchToPlayerMode);
+    connect(ottModeBtn_,    &QPushButton::clicked, this, &MainWindow::switchToOttMode);
+
+    // OTT 타이틀 변경 시 윈도우 타이틀 업데이트
+    connect(ottPage_, &OttWidget::titleChanged, [this](const QString& t) {
+        if (isOttMode_) updateWindowTitle(t);
+    });
 }
 
 void MainWindow::openFiles(const QStringList& paths) {
@@ -446,6 +498,31 @@ void MainWindow::showContextMenu(const QPoint& globalPos) {
     connect(actQuit, &QAction::triggered, this, &QMainWindow::close);
 
     menu.exec(globalPos);
+}
+
+void MainWindow::switchToPlayerMode() {
+    isOttMode_ = false;
+    mainStack_->setCurrentIndex(0);
+    playerModeBtn_->setProperty("active", true);
+    ottModeBtn_->setProperty("active", false);
+    // Qt 스타일 재적용 (property 변경 후 필요)
+    playerModeBtn_->style()->unpolish(playerModeBtn_);
+    playerModeBtn_->style()->polish(playerModeBtn_);
+    ottModeBtn_->style()->unpolish(ottModeBtn_);
+    ottModeBtn_->style()->polish(ottModeBtn_);
+    updateWindowTitle();
+}
+
+void MainWindow::switchToOttMode() {
+    isOttMode_ = true;
+    mainStack_->setCurrentIndex(1);
+    playerModeBtn_->setProperty("active", false);
+    ottModeBtn_->setProperty("active", true);
+    playerModeBtn_->style()->unpolish(playerModeBtn_);
+    playerModeBtn_->style()->polish(playerModeBtn_);
+    ottModeBtn_->style()->unpolish(ottModeBtn_);
+    ottModeBtn_->style()->polish(ottModeBtn_);
+    updateWindowTitle("소리누리 OTT");
 }
 
 void MainWindow::onOpenUrl() {
