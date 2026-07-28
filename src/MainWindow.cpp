@@ -135,8 +135,8 @@ void MainWindow::onFileLoaded(const QString& path) {
 
 void MainWindow::onPlaybackStarted()  { controlBar_->setPlaying(true); }
 void MainWindow::onPlaybackPaused()   { controlBar_->setPlaying(false); }
-void MainWindow::onPlaybackEnded()    { controlBar_->setPlaying(false); }
-void MainWindow::onPlaybackStopped()  { controlBar_->setPlaying(false); updateWindowTitle(); }
+void MainWindow::onPlaybackEnded()    { controlBar_->setPlaying(false); mpvWidget_->showLogo(true); }
+void MainWindow::onPlaybackStopped()  { controlBar_->setPlaying(false); updateWindowTitle(); mpvWidget_->showLogo(true); }
 void MainWindow::onPositionChanged(double s) { controlBar_->setPosition(s, totalDuration_); }
 void MainWindow::onDurationChanged(double s) { totalDuration_ = s; controlBar_->setDuration(s); }
 void MainWindow::onVolumeChanged(int v)      { controlBar_->setVolume(v); }

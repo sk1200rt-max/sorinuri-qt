@@ -1,5 +1,6 @@
 #pragma once
 #include <QWidget>
+#include <QLabel>
 #include "MpvCore.h"
 
 class MpvWidget : public QWidget {
@@ -11,6 +12,7 @@ public:
     MpvCore* core() const { return core_; }
     void loadFile(const QString& path);
     void appendFile(const QString& path);
+    void showLogo(bool show);
 
 protected:
     void showEvent(QShowEvent* event) override;
@@ -19,7 +21,9 @@ protected:
     QPaintEngine* paintEngine() const override;
 
 private:
-    MpvCore* core_        = nullptr;
-    bool     initialized_ = false;
+    MpvCore* core_         = nullptr;
+    QLabel*  logoLabel_    = nullptr;
+    bool     initialized_  = false;
     void     initMpv();
+    void     updateLogoPos();
 };
