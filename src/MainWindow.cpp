@@ -5,6 +5,8 @@
 #include <QHBoxLayout>
 #include <QDebug>
 #include <QFileInfo>
+#include <QMimeData>
+#include <QUrl>
 
 #ifdef Q_OS_WIN
 #include <windows.h>
