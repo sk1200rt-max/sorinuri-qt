@@ -1,12 +1,25 @@
 <RCC>
     <qresource prefix="/">
         <file>icons/sorinuri.ico</file>
-        <file>sorinuri-logo-256.png</file>
         <file>sorinuri-logo.png</file>
-        <file>badge-dolby-atmos-small.png</file>
-        <file>badge-truehd-small.png</file>
-        <file>badge-dts-x-small.png</file>
-        <file>badge-dts-hd-small.png</file>
-        <file>badge-dts-small.png</file>
+        <file>icons/play.svg</file>
+        <file>icons/pause.svg</file>
+        <file>icons/stop.svg</file>
+        <file>icons/prev.svg</file>
+        <file>icons/next.svg</file>
+        <file>icons/open.svg</file>
+        <file>icons/volume.svg</file>
+        <file>icons/mute.svg</file>
+        <file>icons/fullscreen.svg</file>
+        <file>icons/fullscreen_exit.svg</file>
+        <file>icons/settings.svg</file>
+        <file>icons/subtitle.svg</file>
+        <file>icons/audio.svg</file>
+        <file>icons/playlist.svg</file>
+        <file>icons/minimize.svg</file>
+        <file>icons/maximize.svg</file>
+        <file>icons/restore.svg</file>
+        <file>icons/close.svg</file>
+        <file>icons/expand.svg</file>
     </qresource>
 </RCC>

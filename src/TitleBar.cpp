@@ -1,67 +1,60 @@
 #include "TitleBar.h"
-#include <QApplication>
+#include <QIcon>
+
+QPushButton* TitleBar::makeIconBtn(const QString& svgPath, const QString& tooltip,
+                                    const QString& hoverBg, int w) {
+    auto* btn = new QPushButton();
+    btn->setToolTip(tooltip);
+    btn->setFixedSize(w, 36);
+    btn->setFlat(true);
+    btn->setCursor(Qt::ArrowCursor);
+    btn->setIcon(QIcon(svgPath));
+    btn->setIconSize(QSize(16, 16));
+    btn->setStyleSheet(QString(
+        "QPushButton { background: transparent; border: none; border-radius: 0; }"
+        "QPushButton:hover { background: %1; }").arg(hoverBg));
+    return btn;
+}
 
 TitleBar::TitleBar(QWidget* parent) : QWidget(parent) {
-    setFixedHeight(40);
-    setStyleSheet("QWidget { background: #0f0f0f; border-bottom: 1px solid #1c1c1c; }");
+    setFixedHeight(36);
+    setStyleSheet("background: #111111; border-bottom: 1px solid #1e1e1e;");
 
-    QHBoxLayout* layout = new QHBoxLayout(this);
-    layout->setContentsMargins(12, 0, 0, 0);
+    auto* layout = new QHBoxLayout(this);
+    layout->setContentsMargins(10, 0, 0, 0);
     layout->setSpacing(0);
 
-    // ── 로고 ──────────────────────────────────────────────────────
-    logoLabel_ = new QLabel("소리누리", this);
-    logoLabel_->setStyleSheet(
-        "color:#fff; font-size:13px; font-weight:600;"
-        "font-family:'Malgun Gothic','Segoe UI',sans-serif;"
-        "letter-spacing:1px; background:transparent; border:none; padding-right:10px;");
-    layout->addWidget(logoLabel_);
+    // 소리누리 로고 텍스트
+    auto* logo = new QLabel("소리누리", this);
+    logo->setStyleSheet(
+        "color: #ffffff; font-size: 12px; font-weight: 600;"
+        "font-family: 'Malgun Gothic', 'Segoe UI', sans-serif;"
+        "letter-spacing: 1px; background: transparent; border: none; padding-right: 10px;");
+    layout->addWidget(logo);
 
-    // ── 오디오 포맷 배지 ──────────────────────────────────────────
+    // 오디오 포맷 배지
     badgeLabel_ = new QLabel(this);
-    badgeLabel_->setFixedHeight(20);
+    badgeLabel_->setFixedHeight(18);
     badgeLabel_->setStyleSheet(
-        "background:#1a3a5c; color:#4fc3f7; font-size:10px; font-weight:700;"
-        "font-family:'Consolas','Courier New',monospace;"
-        "padding:2px 7px; border-radius:3px; border:none;");
+        "background: #1a3a5c; color: #4fc3f7; font-size: 9px; font-weight: 700;"
+        "font-family: 'Consolas', monospace; padding: 1px 6px; border-radius: 2px; border: none;");
     badgeLabel_->hide();
     layout->addWidget(badgeLabel_);
     layout->addSpacing(8);
 
-    // ── 파일명 ────────────────────────────────────────────────────
+    // 파일명
     titleLabel_ = new QLabel(this);
     titleLabel_->setStyleSheet(
-        "color:#777; font-size:12px;"
-        "font-family:'Segoe UI','Malgun Gothic',sans-serif;"
-        "background:transparent; border:none;");
+        "color: #555; font-size: 11px; font-family: 'Segoe UI', sans-serif;"
+        "background: transparent; border: none;");
     layout->addWidget(titleLabel_);
     layout->addStretch();
 
-    // ── 창 컨트롤 버튼 공통 스타일 ───────────────────────────────
-    auto makeBtn = [&](const QString& text, const QString& tooltip,
-                       const QString& hoverBg) -> QPushButton* {
-        auto* btn = new QPushButton(text, this);
-        btn->setToolTip(tooltip);
-        btn->setFixedSize(46, 40);
-        btn->setFlat(true);
-        btn->setCursor(Qt::ArrowCursor);
-        btn->setStyleSheet(QString(
-            "QPushButton{background:transparent;color:#999;font-size:13px;border:none;border-radius:0;}"
-            "QPushButton:hover{background:%1;color:#fff;}").arg(hoverBg));
-        return btn;
-    };
-
-    btnMin_        = makeBtn("─",  "최소화",     "#2a2a2a");
-    btnMax_        = makeBtn("□",  "화면 채우기", "#2a2a2a");
-    btnFullscreen_ = makeBtn("⛶", "전체화면",   "#1e3a5f");
-    btnClose_      = new QPushButton("✕", this);
-    btnClose_->setToolTip("닫기");
-    btnClose_->setFixedSize(48, 40);
-    btnClose_->setFlat(true);
-    btnClose_->setCursor(Qt::ArrowCursor);
-    btnClose_->setStyleSheet(
-        "QPushButton{background:transparent;color:#999;font-size:13px;border:none;border-radius:0;}"
-        "QPushButton:hover{background:#c42b1c;color:#fff;}");
+    // 창 버튼
+    btnMin_        = makeIconBtn(":/icons/minimize.svg",       "최소화",     "#252525");
+    btnMax_        = makeIconBtn(":/icons/maximize.svg",       "화면 채우기", "#252525");
+    btnFullscreen_ = makeIconBtn(":/icons/expand.svg",         "전체화면",   "#1e3a5f");
+    btnClose_      = makeIconBtn(":/icons/close.svg",          "닫기",       "#c42b1c", 48);
 
     layout->addWidget(btnMin_);
     layout->addWidget(btnMax_);
@@ -94,13 +87,14 @@ void TitleBar::setAudioBadge(const QString& codec) {
 }
 
 void TitleBar::setFullscreenMode(bool fs) {
-    btnFullscreen_->setText(fs ? "⊡" : "⛶");
+    btnFullscreen_->setIcon(QIcon(fs ? ":/icons/fullscreen_exit.svg" : ":/icons/expand.svg"));
     btnFullscreen_->setToolTip(fs ? "전체화면 종료" : "전체화면");
+    btnMax_->setIcon(QIcon(fs ? ":/icons/restore.svg" : ":/icons/maximize.svg"));
 }
 
 void TitleBar::mousePressEvent(QMouseEvent* e) {
     if (e->button() == Qt::LeftButton) {
-        dragging_ = true;
+        dragging_  = true;
         dragStart_ = e->globalPosition().toPoint() - window()->pos();
     }
 }
@@ -111,5 +105,4 @@ void TitleBar::mouseMoveEvent(QMouseEvent* e) {
 }
 
 void TitleBar::mouseReleaseEvent(QMouseEvent*) { dragging_ = false; }
-
 void TitleBar::mouseDoubleClickEvent(QMouseEvent*) { emit maximizeClicked(); }

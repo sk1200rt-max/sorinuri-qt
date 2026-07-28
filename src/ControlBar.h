@@ -17,7 +17,7 @@ public:
     void setPosition(double pos, double dur);
     void setDuration(double dur);
     void setVolume(int vol);
-    void updateTracks(MpvCore* core);
+    void setMuted(bool muted);
 
 signals:
     void playPauseClicked();
@@ -32,30 +32,25 @@ signals:
     void nextClicked();
 
 private slots:
-    void onSeekSliderMoved(int value);
-    void onVolumeSliderMoved(int value);
+    void onSeekMoved(int value);
+    void onVolMoved(int value);
 
 private:
-    QString formatTime(double seconds) const;
+    static QPushButton* makeBtn(const QString& svg, const QString& tip, int size = 32);
+    QString formatTime(double s) const;
 
-    // 진행바
-    QSlider*     seekSlider_   = nullptr;
-    QLabel*      timeLabel_    = nullptr;
-
-    // 재생 버튼
-    QPushButton* btnPrev_      = nullptr;
-    QPushButton* btnPlay_      = nullptr;
-    QPushButton* btnNext_      = nullptr;
-    QPushButton* btnStop_      = nullptr;
-
-    // 볼륨
-    QPushButton* btnMute_      = nullptr;
-    QSlider*     volSlider_    = nullptr;
-    QLabel*      volLabel_     = nullptr;
-
-    // 기타
-    QComboBox*   speedCombo_   = nullptr;
-    QPushButton* btnOpen_      = nullptr;
+    QSlider*     seekSlider_  = nullptr;
+    QLabel*      timeLabel_   = nullptr;
+    QPushButton* btnOpen_     = nullptr;
+    QPushButton* btnPrev_     = nullptr;
+    QPushButton* btnPlay_     = nullptr;
+    QPushButton* btnNext_     = nullptr;
+    QPushButton* btnStop_     = nullptr;
+    QPushButton* btnMute_     = nullptr;
+    QSlider*     volSlider_   = nullptr;
+    QLabel*      volLabel_    = nullptr;
+    QComboBox*   speedCombo_  = nullptr;
+    QPushButton* btnFullscreen_ = nullptr;
 
     double totalDuration_ = 0;
     bool   seeking_       = false;

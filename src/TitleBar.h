@@ -26,14 +26,16 @@ protected:
     void mouseDoubleClickEvent(QMouseEvent* e) override;
 
 private:
-    QLabel*      logoLabel_    = nullptr;
-    QLabel*      badgeLabel_   = nullptr;
-    QLabel*      titleLabel_   = nullptr;
-    QPushButton* btnMin_       = nullptr;
-    QPushButton* btnMax_       = nullptr;
-    QPushButton* btnFullscreen_= nullptr;
-    QPushButton* btnClose_     = nullptr;
+    static QPushButton* makeIconBtn(const QString& svgPath, const QString& tooltip,
+                                    const QString& hoverBg, int w = 46);
 
-    bool   dragging_ = false;
+    QLabel*      titleLabel_    = nullptr;
+    QLabel*      badgeLabel_    = nullptr;
+    QPushButton* btnMin_        = nullptr;
+    QPushButton* btnMax_        = nullptr;
+    QPushButton* btnFullscreen_ = nullptr;
+    QPushButton* btnClose_      = nullptr;
+
+    bool   dragging_  = false;
     QPoint dragStart_;
 };
