@@ -1,4 +1,4 @@
-; 소리누리 플레이어 Inno Setup 설치 스크립트
+﻿; 소리누리 플레이어 Inno Setup 설치 스크립트
 ; Inno Setup 6.x 이상 필요
 
 #define MyAppName "소리누리"
