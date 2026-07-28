@@ -7,6 +7,8 @@
 #include <QFileInfo>
 #include <QMimeData>
 #include <QUrl>
+#include <QMenu>
+#include <QAction>
 
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -47,9 +49,18 @@ void MainWindow::setupUI() {
     mainLayout->addWidget(titleBar_);
 
     // ── 비디오 영역 (전체) ────────────────────────────────────────
-    mpvWidget_ = new MpvWidget(this);
+    // 검은 배경 컨테이너 - WA_PaintOnScreen 위젯이 투명하게 보이는 것을 방지
+    auto* videoContainer = new QWidget(this);
+    videoContainer->setStyleSheet("background: #000000;");
+    videoContainer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    auto* videoLayout = new QVBoxLayout(videoContainer);
+    videoLayout->setContentsMargins(0, 0, 0, 0);
+    videoLayout->setSpacing(0);
+
+    mpvWidget_ = new MpvWidget(videoContainer);
     mpvWidget_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-    mainLayout->addWidget(mpvWidget_, 1);
+    videoLayout->addWidget(mpvWidget_);
+    mainLayout->addWidget(videoContainer, 1);
 
     // ── 트랙 선택 바 ─────────────────────────────────────────────
     auto* trackBar = new QWidget(this);
@@ -290,8 +301,134 @@ void MainWindow::mouseMoveEvent(QMouseEvent* e) {
 }
 
 void MainWindow::mouseReleaseEvent(QMouseEvent* e) {
+    if (e->button() == Qt::RightButton) {
+        showContextMenu(e->globalPosition().toPoint());
+        return;
+    }
     resizing_ = false; resizeEdge_ = 0;
     QMainWindow::mouseReleaseEvent(e);
+}
+
+void MainWindow::showContextMenu(const QPoint& globalPos) {
+    auto* core = mpvWidget_->core();
+    bool playing = !core->isPaused() && !core->currentFile().isEmpty();
+    bool hasFile = !core->currentFile().isEmpty();
+
+    QMenu menu(this);
+    menu.setStyleSheet(
+        "QMenu { background: #1a1a1a; color: #ddd; border: 1px solid #333; "
+        "font-size: 12px; padding: 4px 0; } "
+        "QMenu::item { padding: 6px 24px 6px 16px; } "
+        "QMenu::item:selected { background: #2a2a2a; color: #fff; } "
+        "QMenu::item:disabled { color: #555; } "
+        "QMenu::separator { height: 1px; background: #2a2a2a; margin: 3px 8px; }"
+    );
+
+    // 파일 열기
+    QAction* actOpen = menu.addAction("파일 열기...");
+    actOpen->setShortcut(QKeySequence("Ctrl+O"));
+    connect(actOpen, &QAction::triggered, this, &MainWindow::onOpenFile);
+
+    menu.addSeparator();
+
+    // 재생 제어
+    QAction* actPlay = menu.addAction(playing ? "일시정지" : "재생");
+    actPlay->setEnabled(hasFile);
+    connect(actPlay, &QAction::triggered, core, &MpvCore::togglePause);
+
+    QAction* actStop = menu.addAction("정지");
+    actStop->setEnabled(hasFile);
+    connect(actStop, &QAction::triggered, core, &MpvCore::stop);
+
+    QAction* actPrev = menu.addAction("이전");
+    connect(actPrev, &QAction::triggered, [core]() { core->command({"playlist-prev"}); });
+
+    QAction* actNext = menu.addAction("다음");
+    connect(actNext, &QAction::triggered, [core]() { core->command({"playlist-next"}); });
+
+    menu.addSeparator();
+
+    // 오디오 트랙 서브메뉴
+    QMenu* audioMenu = menu.addMenu("오디오 트랙");
+    QVariantList audioTracks = core->audioTracks();
+    if (audioTracks.isEmpty()) {
+        audioMenu->addAction("트랙 없음")->setEnabled(false);
+    } else {
+        for (const QVariant& t : audioTracks) {
+            QVariantMap m = t.toMap();
+            QString label = QString("[%1] %2").arg(m["id"].toInt()).arg(m["lang"].toString());
+            if (!m["title"].toString().isEmpty()) label += " - " + m["title"].toString();
+            if (!m["codec"].toString().isEmpty()) label += " (" + m["codec"].toString() + ")";
+            QAction* a = audioMenu->addAction(label);
+            int id = m["id"].toInt();
+            connect(a, &QAction::triggered, [core, id]() { core->setAudioTrack(id); });
+        }
+    }
+
+    // 자막 서브메뉴
+    QMenu* subMenu = menu.addMenu("자막");
+    QAction* actSubOff = subMenu->addAction("자막 끄기");
+    connect(actSubOff, &QAction::triggered, [core]() { core->setSubtitleTrack(0); });
+    subMenu->addSeparator();
+    QVariantList subTracks = core->subtitleTracks();
+    for (const QVariant& t : subTracks) {
+        QVariantMap m = t.toMap();
+        QString label = QString("[%1] %2").arg(m["id"].toInt()).arg(m["lang"].toString());
+        if (!m["title"].toString().isEmpty()) label += " - " + m["title"].toString();
+        QAction* a = subMenu->addAction(label);
+        int id = m["id"].toInt();
+        connect(a, &QAction::triggered, [core, id]() { core->setSubtitleTrack(id); });
+    }
+
+    menu.addSeparator();
+
+    // 화면 크기
+    QMenu* sizeMenu = menu.addMenu("화면 크기");
+    QAction* act50  = sizeMenu->addAction("50%");
+    QAction* act100 = sizeMenu->addAction("100%");
+    QAction* act150 = sizeMenu->addAction("150%");
+    QAction* act200 = sizeMenu->addAction("200%");
+    connect(act50,  &QAction::triggered, [this, core]() {
+        int w = core->getProperty("video-params/w").toInt();
+        int h = core->getProperty("video-params/h").toInt();
+        if (w>0 && h>0) resize(w/2, h/2 + 120);
+    });
+    connect(act100, &QAction::triggered, [this, core]() {
+        int w = core->getProperty("video-params/w").toInt();
+        int h = core->getProperty("video-params/h").toInt();
+        if (w>0 && h>0) resize(w, h + 120);
+    });
+    connect(act150, &QAction::triggered, [this, core]() {
+        int w = core->getProperty("video-params/w").toInt();
+        int h = core->getProperty("video-params/h").toInt();
+        if (w>0 && h>0) resize(w*3/2, h*3/2 + 120);
+    });
+    connect(act200, &QAction::triggered, [this, core]() {
+        int w = core->getProperty("video-params/w").toInt();
+        int h = core->getProperty("video-params/h").toInt();
+        if (w>0 && h>0) resize(w*2, h*2 + 120);
+    });
+
+    // 전체화면
+    QAction* actFull = menu.addAction(isFullscreen_ ? "전체화면 해제" : "전체화면");
+    actFull->setShortcut(QKeySequence("F"));
+    connect(actFull, &QAction::triggered, this, &MainWindow::toggleFullscreen);
+
+    menu.addSeparator();
+
+    // 설정
+    QAction* actSettings = menu.addAction("환경 설정...");
+    actSettings->setShortcut(QKeySequence("F5"));
+    connect(actSettings, &QAction::triggered, this, &MainWindow::onSettingsRequested);
+
+    menu.addSeparator();
+
+    // 종료
+    QAction* actQuit = menu.addAction("종료");
+    actQuit->setShortcut(QKeySequence("Alt+F4"));
+    connect(actQuit, &QAction::triggered, this, &QMainWindow::close);
+
+    menu.exec(globalPos);
 }
 
 void MainWindow::loadSettings() {

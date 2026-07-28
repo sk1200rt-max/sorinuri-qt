@@ -51,6 +51,7 @@ private slots:
     void onOpenFile();
     void onSettingsRequested();
     void toggleFullscreen();
+    void showContextMenu(const QPoint& pos);
 
 private:
     void setupUI();
