@@ -26,7 +26,7 @@ AllowNoIcons=yes
 OutputDir=..\dist
 OutputBaseFilename=Sorinuri-Setup-{#MyAppVersion}
 ; 아이콘
-SetupIconFile=..\resources\sorinuri-app.ico
+SetupIconFile=..\resources\sorinuri.ico
 ; 압축
 Compression=lzma2/ultra64
 SolidCompression=yes
