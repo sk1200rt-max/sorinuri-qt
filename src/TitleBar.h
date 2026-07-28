@@ -11,10 +11,12 @@ public:
     explicit TitleBar(QWidget* parent = nullptr);
     void setTitle(const QString& title);
     void setAudioBadge(const QString& codec);
+    void setFullscreenMode(bool fs);
 
 signals:
     void minimizeClicked();
     void maximizeClicked();
+    void fullscreenClicked();
     void closeClicked();
 
 protected:
@@ -24,12 +26,13 @@ protected:
     void mouseDoubleClickEvent(QMouseEvent* e) override;
 
 private:
-    QLabel*      logoLabel_  = nullptr;
-    QLabel*      badgeLabel_ = nullptr;
-    QLabel*      titleLabel_ = nullptr;
-    QPushButton* btnMin_     = nullptr;
-    QPushButton* btnMax_     = nullptr;
-    QPushButton* btnClose_   = nullptr;
+    QLabel*      logoLabel_    = nullptr;
+    QLabel*      badgeLabel_   = nullptr;
+    QLabel*      titleLabel_   = nullptr;
+    QPushButton* btnMin_       = nullptr;
+    QPushButton* btnMax_       = nullptr;
+    QPushButton* btnFullscreen_= nullptr;
+    QPushButton* btnClose_     = nullptr;
 
     bool   dragging_ = false;
     QPoint dragStart_;

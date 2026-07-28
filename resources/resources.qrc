@@ -1,5 +1,12 @@
 <RCC>
     <qresource prefix="/">
         <file>icons/sorinuri.ico</file>
+        <file>sorinuri-logo-256.png</file>
+        <file>sorinuri-logo.png</file>
+        <file>badge-dolby-atmos-small.png</file>
+        <file>badge-truehd-small.png</file>
+        <file>badge-dts-x-small.png</file>
+        <file>badge-dts-hd-small.png</file>
+        <file>badge-dts-small.png</file>
     </qresource>
 </RCC>

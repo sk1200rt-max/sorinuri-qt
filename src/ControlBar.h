@@ -56,7 +56,6 @@ private:
     // 기타
     QComboBox*   speedCombo_   = nullptr;
     QPushButton* btnOpen_      = nullptr;
-    QPushButton* btnFullscreen_= nullptr;
 
     double totalDuration_ = 0;
     bool   seeking_       = false;

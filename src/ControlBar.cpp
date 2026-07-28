@@ -1,25 +1,28 @@
 #include "ControlBar.h"
 #include <QTime>
+#include <QPainter>
+#include <QStyleOption>
 
+// ── 공통 스타일 ────────────────────────────────────────────────────
 static const QString BTN_STYLE = R"(
     QPushButton {
         background: transparent;
         border: none;
-        color: #ccc;
-        font-size: 16px;
-        padding: 4px 8px;
-        min-width: 32px;
-        min-height: 32px;
+        color: #bbb;
+        font-size: 15px;
+        padding: 0;
+        min-width: 34px;
+        min-height: 34px;
         border-radius: 4px;
     }
-    QPushButton:hover { background: #2a2a2a; color: #fff; }
-    QPushButton:pressed { background: #333; }
+    QPushButton:hover  { background: #252525; color: #fff; }
+    QPushButton:pressed{ background: #303030; }
 )";
 
-static const QString SLIDER_STYLE = R"(
+static const QString SEEK_STYLE = R"(
     QSlider::groove:horizontal {
         height: 4px;
-        background: #2a2a2a;
+        background: #252525;
         border-radius: 2px;
     }
     QSlider::sub-page:horizontal {
@@ -27,68 +30,92 @@ static const QString SLIDER_STYLE = R"(
         border-radius: 2px;
     }
     QSlider::handle:horizontal {
-        width: 12px;
-        height: 12px;
+        width: 12px; height: 12px;
         margin: -4px 0;
         background: #fff;
         border-radius: 6px;
     }
-    QSlider::handle:horizontal:hover {
+    QSlider::handle:horizontal:hover { background: #4fc3f7; }
+)";
+
+static const QString VOL_STYLE = R"(
+    QSlider::groove:horizontal {
+        height: 3px;
+        background: #252525;
+        border-radius: 2px;
+    }
+    QSlider::sub-page:horizontal {
         background: #4fc3f7;
+        border-radius: 2px;
+    }
+    QSlider::handle:horizontal {
+        width: 10px; height: 10px;
+        margin: -4px 0;
+        background: #4fc3f7;
+        border-radius: 5px;
     }
 )";
 
 ControlBar::ControlBar(QWidget* parent) : QWidget(parent) {
-    setFixedHeight(80);
-    setStyleSheet("background: #0d0d0d; border-top: 1px solid #1e1e1e;");
+    setFixedHeight(76);
+    setStyleSheet("background: #0d0d0d; border-top: 1px solid #1c1c1c;");
 
     QVBoxLayout* mainLayout = new QVBoxLayout(this);
-    mainLayout->setContentsMargins(12, 6, 12, 6);
+    mainLayout->setContentsMargins(12, 5, 12, 5);
     mainLayout->setSpacing(4);
 
     // ── 진행바 ────────────────────────────────────────────────────
-    QHBoxLayout* seekLayout = new QHBoxLayout();
-    seekLayout->setSpacing(8);
+    QHBoxLayout* seekRow = new QHBoxLayout();
+    seekRow->setSpacing(8);
 
     seekSlider_ = new QSlider(Qt::Horizontal, this);
-    seekSlider_->setRange(0, 1000);
-    seekSlider_->setStyleSheet(SLIDER_STYLE);
-    connect(seekSlider_, &QSlider::sliderMoved, this, &ControlBar::onSeekSliderMoved);
-    connect(seekSlider_, &QSlider::sliderPressed, [this]() { seeking_ = true; });
+    seekSlider_->setRange(0, 10000);
+    seekSlider_->setStyleSheet(SEEK_STYLE);
+    connect(seekSlider_, &QSlider::sliderMoved,   this, &ControlBar::onSeekSliderMoved);
+    connect(seekSlider_, &QSlider::sliderPressed,  [this]() { seeking_ = true; });
     connect(seekSlider_, &QSlider::sliderReleased, [this]() {
         seeking_ = false;
-        double pos = (seekSlider_->value() / 1000.0) * totalDuration_;
-        emit seeked(pos);
+        emit seeked((seekSlider_->value() / 10000.0) * totalDuration_);
     });
 
-    timeLabel_ = new QLabel("0:00:00 / 0:00:00", this);
-    timeLabel_->setStyleSheet("color: #888; font-size: 11px; min-width: 130px;");
+    timeLabel_ = new QLabel("00:00 / 00:00", this);
+    timeLabel_->setStyleSheet(
+        "color: #666; font-size: 11px; font-family: 'Consolas','Courier New',monospace;"
+        "min-width: 120px;");
     timeLabel_->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
 
-    seekLayout->addWidget(seekSlider_, 1);
-    seekLayout->addWidget(timeLabel_);
-    mainLayout->addLayout(seekLayout);
+    seekRow->addWidget(seekSlider_, 1);
+    seekRow->addWidget(timeLabel_);
+    mainLayout->addLayout(seekRow);
 
     // ── 버튼 영역 ─────────────────────────────────────────────────
-    QHBoxLayout* btnLayout = new QHBoxLayout();
-    btnLayout->setSpacing(2);
+    QHBoxLayout* btnRow = new QHBoxLayout();
+    btnRow->setSpacing(2);
 
     // 파일 열기
-    btnOpen_ = new QPushButton("📂", this);
-    btnOpen_->setStyleSheet(BTN_STYLE);
+    btnOpen_ = new QPushButton(this);
+    btnOpen_->setIcon(style()->standardIcon(QStyle::SP_DirOpenIcon));
+    btnOpen_->setIconSize(QSize(16, 16));
     btnOpen_->setToolTip("파일 열기 (Ctrl+O)");
+    btnOpen_->setStyleSheet(BTN_STYLE);
     connect(btnOpen_, &QPushButton::clicked, this, &ControlBar::openFileClicked);
 
-    // 이전/재생/다음/정지
+    // 이전 / 재생 / 다음 / 정지
     btnPrev_ = new QPushButton("⏮", this);
     btnPlay_ = new QPushButton("▶", this);
     btnNext_ = new QPushButton("⏭", this);
-    btnStop_ = new QPushButton("⏹", this);
+    btnStop_ = new QPushButton("■", this);
 
-    for (auto* btn : {btnPrev_, btnPlay_, btnNext_, btnStop_})
-        btn->setStyleSheet(BTN_STYLE);
+    btnPrev_->setToolTip("이전 (←)");
+    btnPlay_->setToolTip("재생/일시정지 (Space)");
+    btnNext_->setToolTip("다음 (→)");
+    btnStop_->setToolTip("정지");
 
-    btnPlay_->setStyleSheet(BTN_STYLE + "QPushButton { font-size: 20px; }");
+    for (auto* b : {btnPrev_, btnPlay_, btnNext_, btnStop_})
+        b->setStyleSheet(BTN_STYLE);
+
+    btnPlay_->setStyleSheet(BTN_STYLE +
+        "QPushButton { font-size: 18px; min-width: 40px; min-height: 40px; }");
 
     connect(btnPrev_, &QPushButton::clicked, this, &ControlBar::prevClicked);
     connect(btnPlay_, &QPushButton::clicked, this, &ControlBar::playPauseClicked);
@@ -97,6 +124,7 @@ ControlBar::ControlBar(QWidget* parent) : QWidget(parent) {
 
     // 볼륨
     btnMute_ = new QPushButton("🔊", this);
+    btnMute_->setToolTip("음소거 (M)");
     btnMute_->setStyleSheet(BTN_STYLE);
     connect(btnMute_, &QPushButton::clicked, [this]() {
         muted_ = !muted_;
@@ -107,63 +135,53 @@ ControlBar::ControlBar(QWidget* parent) : QWidget(parent) {
     volSlider_ = new QSlider(Qt::Horizontal, this);
     volSlider_->setRange(0, 200);
     volSlider_->setValue(100);
-    volSlider_->setFixedWidth(90);
-    volSlider_->setStyleSheet(SLIDER_STYLE);
+    volSlider_->setFixedWidth(80);
+    volSlider_->setStyleSheet(VOL_STYLE);
     connect(volSlider_, &QSlider::valueChanged, this, &ControlBar::onVolumeSliderMoved);
 
     volLabel_ = new QLabel("100%", this);
-    volLabel_->setStyleSheet("color: #888; font-size: 11px; min-width: 36px;");
+    volLabel_->setStyleSheet(
+        "color: #666; font-size: 11px; font-family: 'Consolas','Courier New',monospace;"
+        "min-width: 36px;");
     volLabel_->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
 
     // 배속
     speedCombo_ = new QComboBox(this);
-    speedCombo_->addItems({"0.5x", "0.75x", "1.0x", "1.25x", "1.5x", "2.0x"});
-    speedCombo_->setCurrentIndex(2);
+    speedCombo_->addItems({"0.25x","0.5x","0.75x","1.0x","1.25x","1.5x","2.0x","3.0x","4.0x"});
+    speedCombo_->setCurrentIndex(3);
+    speedCombo_->setFixedWidth(64);
     speedCombo_->setStyleSheet(R"(
         QComboBox {
-            background: #1a1a1a;
-            color: #ccc;
-            border: 1px solid #333;
-            border-radius: 3px;
-            padding: 2px 6px;
-            font-size: 11px;
-            min-width: 60px;
+            background: #1a1a1a; color: #888;
+            border: 1px solid #2a2a2a; border-radius: 3px;
+            padding: 2px 6px; font-size: 11px;
         }
-        QComboBox::drop-down { border: none; }
+        QComboBox::drop-down { border: none; width: 14px; }
         QComboBox QAbstractItemView {
-            background: #1a1a1a;
-            color: #ccc;
+            background: #1a1a1a; color: #ccc;
             selection-background-color: #1a3a5c;
+            font-size: 11px;
         }
     )");
-    connect(speedCombo_, &QComboBox::currentTextChanged, [this](const QString& text) {
-        double speed = text.chopped(1).toDouble();
-        emit speedChanged(speed);
+    connect(speedCombo_, &QComboBox::currentTextChanged, [this](const QString& t) {
+        emit speedChanged(t.chopped(1).toDouble());
     });
 
-    // 전체화면
-    btnFullscreen_ = new QPushButton("⛶", this);
-    btnFullscreen_->setStyleSheet(BTN_STYLE);
-    btnFullscreen_->setToolTip("전체화면 (F)");
-    connect(btnFullscreen_, &QPushButton::clicked, this, &ControlBar::fullscreenToggled);
-
     // 레이아웃 조립
-    btnLayout->addWidget(btnOpen_);
-    btnLayout->addSpacing(8);
-    btnLayout->addWidget(btnPrev_);
-    btnLayout->addWidget(btnPlay_);
-    btnLayout->addWidget(btnNext_);
-    btnLayout->addWidget(btnStop_);
-    btnLayout->addSpacing(8);
-    btnLayout->addWidget(btnMute_);
-    btnLayout->addWidget(volSlider_);
-    btnLayout->addWidget(volLabel_);
-    btnLayout->addStretch();
-    btnLayout->addWidget(speedCombo_);
-    btnLayout->addSpacing(8);
-    btnLayout->addWidget(btnFullscreen_);
+    btnRow->addWidget(btnOpen_);
+    btnRow->addSpacing(6);
+    btnRow->addWidget(btnPrev_);
+    btnRow->addWidget(btnPlay_);
+    btnRow->addWidget(btnNext_);
+    btnRow->addWidget(btnStop_);
+    btnRow->addSpacing(10);
+    btnRow->addWidget(btnMute_);
+    btnRow->addWidget(volSlider_);
+    btnRow->addWidget(volLabel_);
+    btnRow->addStretch();
+    btnRow->addWidget(speedCombo_);
 
-    mainLayout->addLayout(btnLayout);
+    mainLayout->addLayout(btnRow);
 }
 
 void ControlBar::setPlaying(bool playing) {
@@ -171,15 +189,12 @@ void ControlBar::setPlaying(bool playing) {
 }
 
 void ControlBar::setPosition(double pos, double dur) {
-    if (!seeking_ && dur > 0) {
-        seekSlider_->setValue(static_cast<int>((pos / dur) * 1000));
-    }
+    if (!seeking_ && dur > 0)
+        seekSlider_->setValue(static_cast<int>((pos / dur) * 10000));
     timeLabel_->setText(formatTime(pos) + " / " + formatTime(dur));
 }
 
-void ControlBar::setDuration(double dur) {
-    totalDuration_ = dur;
-}
+void ControlBar::setDuration(double dur) { totalDuration_ = dur; }
 
 void ControlBar::setVolume(int vol) {
     volSlider_->blockSignals(true);
@@ -188,15 +203,12 @@ void ControlBar::setVolume(int vol) {
     volLabel_->setText(QString("%1%").arg(vol));
 }
 
-void ControlBar::updateTracks(MpvCore* /*core*/) {
-    // TODO: 오디오/자막 트랙 콤보박스 업데이트
-}
+void ControlBar::updateTracks(MpvCore*) {}
 
 void ControlBar::onSeekSliderMoved(int value) {
-    if (totalDuration_ > 0) {
-        double pos = (value / 1000.0) * totalDuration_;
-        timeLabel_->setText(formatTime(pos) + " / " + formatTime(totalDuration_));
-    }
+    if (totalDuration_ > 0)
+        timeLabel_->setText(formatTime((value / 10000.0) * totalDuration_)
+                            + " / " + formatTime(totalDuration_));
 }
 
 void ControlBar::onVolumeSliderMoved(int value) {
@@ -206,11 +218,9 @@ void ControlBar::onVolumeSliderMoved(int value) {
 
 QString ControlBar::formatTime(double seconds) const {
     if (seconds < 0) seconds = 0;
-    int h = static_cast<int>(seconds) / 3600;
-    int m = (static_cast<int>(seconds) % 3600) / 60;
-    int s = static_cast<int>(seconds) % 60;
-    return QString("%1:%2:%3")
-        .arg(h)
-        .arg(m, 2, 10, QChar('0'))
-        .arg(s, 2, 10, QChar('0'));
+    int total = static_cast<int>(seconds);
+    int h = total / 3600, m = (total % 3600) / 60, s = total % 60;
+    if (h > 0)
+        return QString("%1:%2:%3").arg(h).arg(m,2,10,QChar('0')).arg(s,2,10,QChar('0'));
+    return QString("%1:%2").arg(m,2,10,QChar('0')).arg(s,2,10,QChar('0'));
 }
