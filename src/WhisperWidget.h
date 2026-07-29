@@ -3,6 +3,7 @@
 #include <QProcess>
 #include <QTimer>
 #include <QStringList>
+#include <QVector>
 
 class QLabel;
 class QComboBox;
@@ -10,16 +11,63 @@ class QCheckBox;
 class QPushButton;
 class QProgressBar;
 class QListWidget;
-class QSlider;
+class QLineEdit;
+class QStackedWidget;
+class QTabBar;
 
-struct WhisperConfig {
-    QString language   = "auto";   // auto, en, ja, zh, ko ...
-    bool    translate  = true;     // 한국어 번역 여부
-    QString model      = "medium"; // base, small, medium, large-v3
-    bool    realtime   = true;     // 실시간 vs 오프라인 사전 생성
-    bool    saveToFile = false;    // SRT 파일 저장
+// ─── 자막 항목 ────────────────────────────────────────────────────────────
+struct SubtitleEntry {
+    double  startSec   = 0.0;
+    double  endSec     = 0.0;
+    QString text;
+    int     confidence = 0;   // 0~100
+    int     speaker    = 0;   // 화자 인덱스 (0=기본)
 };
 
+// ─── Whisper 설정 ─────────────────────────────────────────────────────────
+struct WhisperConfig {
+    QString language        = "auto";
+    bool    translate       = true;
+    QString model           = "medium";
+    bool    realtime        = true;
+    bool    saveToFile      = false;
+    bool    speakerDiarize  = false;
+    bool    timestampInclude= true;
+};
+
+// ─── 원형 신뢰도 게이지 (커스텀 위젯) ────────────────────────────────────
+class ConfidenceGauge : public QWidget {
+    Q_OBJECT
+public:
+    explicit ConfidenceGauge(QWidget* parent = nullptr);
+    void setValue(int pct);
+    QSize sizeHint() const override { return QSize(88, 88); }
+protected:
+    void paintEvent(QPaintEvent*) override;
+private:
+    int value_ = 0;
+};
+
+// ─── 오디오 파형 위젯 ─────────────────────────────────────────────────────
+class AudioWaveform : public QWidget {
+    Q_OBJECT
+public:
+    explicit AudioWaveform(QWidget* parent = nullptr);
+    void setPosition(double pos, double duration);
+    QSize sizeHint() const override { return QSize(200, 40); }
+protected:
+    void paintEvent(QPaintEvent*) override;
+    void mousePressEvent(QMouseEvent*) override;
+signals:
+    void seekRequested(double sec);
+private:
+    QVector<float> samples_;
+    double pos_      = 0.0;
+    double duration_ = 0.0;
+    QTimer* animTimer_ = nullptr;
+};
+
+// ─── WhisperWidget 메인 ───────────────────────────────────────────────────
 class WhisperWidget : public QWidget {
     Q_OBJECT
 public:
@@ -35,9 +83,10 @@ public slots:
     void onPositionChanged(double sec);
 
 signals:
-    void subtitleGenerated(const QString& text, double startSec, double endSec);
+    void subtitleGenerated(const QString& text, double startSec, double endSec, int confidence);
     void statusChanged(const QString& msg);
     void activeChanged(bool on);
+    void seekToSubtitle(double sec);
 
 private slots:
     void onProcessOutput();
@@ -47,34 +96,68 @@ private slots:
     void onModelChanged(int idx);
     void onTranslateToggled(bool on);
     void onSaveToggled(bool on);
+    void onSpeakerToggled(bool on);
     void checkWhisperAvailable();
+    void onSearchChanged(const QString& text);
+    void onFilterChanged(int filter);   // 0=all, 1=high, 2=low
+    void exportSRT();
+    void copyAll();
 
 private:
     void buildUI();
+    void buildSettingsTab(QWidget* parent);
+    void buildHistoryTab(QWidget* parent);
     void startProcess();
     void stopProcess();
-    void updateStatusLabel();
+    void addSubtitleEntry(const SubtitleEntry& e);
+    void refreshHistoryList();
     QString detectGpu() const;
+    QString formatTime(double sec) const;
+    QString confidenceLabel(int pct) const;
+    QColor  confidenceColor(int pct) const;
 
-    // UI
-    QLabel*       lblStatus_    = nullptr;
-    QLabel*       lblGpu_       = nullptr;
-    QLabel*       lblGpuName_   = nullptr;
-    QProgressBar* barConf_      = nullptr;
-    QLabel*       lblConfPct_   = nullptr;
-    QComboBox*    cmbLang_      = nullptr;
-    QComboBox*    cmbModel_     = nullptr;
-    QCheckBox*    chkTranslate_ = nullptr;
-    QCheckBox*    chkSave_      = nullptr;
-    QProgressBar* barConfidence_= nullptr;
-    QListWidget*  lstRecent_    = nullptr;
-    QPushButton*  btnToggle_    = nullptr;
+    // ── 탭 구조 ──────────────────────────────────────────
+    QStackedWidget* stack_          = nullptr;
+    QPushButton*    tabSettings_    = nullptr;
+    QPushButton*    tabHistory_     = nullptr;
 
-    // State
-    WhisperConfig cfg_;
-    QProcess*     proc_         = nullptr;
-    QString       mediaPath_;
-    bool          active_       = false;
-    bool          whisperReady_ = false;
-    QStringList   recentLines_;
+    // ── 설정 탭 ──────────────────────────────────────────
+    QLabel*         lblGpuName_     = nullptr;
+    QComboBox*      cmbLang_        = nullptr;
+    QComboBox*      cmbModel_       = nullptr;
+    QCheckBox*      chkTranslate_   = nullptr;
+    QCheckBox*      chkSave_        = nullptr;
+    QCheckBox*      chkSpeaker_     = nullptr;
+    QCheckBox*      chkTimestamp_   = nullptr;
+    ConfidenceGauge* gauge_         = nullptr;
+    QLabel*         lblConfLabel_   = nullptr;
+    QProgressBar*   barProgress_    = nullptr;
+    QLabel*         lblElapsed_     = nullptr;
+    QLabel*         lblRemaining_   = nullptr;
+    AudioWaveform*  waveform_       = nullptr;
+    QLabel*         lblPreview_     = nullptr;   // 실시간 자막 미리보기
+    QLabel*         lblPreviewConf_ = nullptr;
+    QPushButton*    btnToggle_      = nullptr;
+    QLabel*         lblStatus_      = nullptr;
+
+    // ── 히스토리 탭 ──────────────────────────────────────
+    QLineEdit*      editSearch_     = nullptr;
+    QPushButton*    btnFilterAll_   = nullptr;
+    QPushButton*    btnFilterHigh_  = nullptr;
+    QPushButton*    btnFilterLow_   = nullptr;
+    QListWidget*    lstHistory_     = nullptr;
+
+    // ── 상태 ─────────────────────────────────────────────
+    WhisperConfig   cfg_;
+    QProcess*       proc_           = nullptr;
+    QString         mediaPath_;
+    bool            active_         = false;
+    bool            whisperReady_   = false;
+    QVector<SubtitleEntry> entries_;
+    int             filterMode_     = 0;
+    QString         searchText_;
+    double          currentPos_     = 0.0;
+    double          mediaDuration_  = 0.0;
+    QTimer*         elapsedTimer_   = nullptr;
+    int             elapsedSec_     = 0;
 };

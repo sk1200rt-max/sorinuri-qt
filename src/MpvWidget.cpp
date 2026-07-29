@@ -4,6 +4,7 @@
 #include <QOpenGLContext>
 #include <QDebug>
 #include <QTimer>
+#include <QRegularExpression>
 #include <QWindow>
 #include <stdexcept>
 
@@ -158,4 +159,23 @@ void MpvWidget::maybeUpdate() {
     } else {
         update();
     }
+}
+
+void MpvWidget::setAiSubtitle(const QString& text, int confidence) {
+    aiSubText_ = text;
+    aiSubConf_ = confidence;
+    // 5초 후 자동 소거
+    if (!aiSubTimer_) {
+        aiSubTimer_ = new QTimer(this);
+        aiSubTimer_->setSingleShot(true);
+        connect(aiSubTimer_, &QTimer::timeout, this, &MpvWidget::clearAiSubtitle);
+    }
+    aiSubTimer_->start(5000);
+    update();
+}
+
+void MpvWidget::clearAiSubtitle() {
+    aiSubText_.clear();
+    aiSubConf_ = 0;
+    update();
 }

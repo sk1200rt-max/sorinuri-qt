@@ -246,10 +246,14 @@ void MainWindow::setupConnections() {
     connect(core, &MpvCore::playbackPaused,  miniPlayer_, [this]() { miniPlayer_->setPlaying(false); });
     // AI 자막 연결
     connect(whisperWidget_, &WhisperWidget::subtitleGenerated,
-            this, [this](const QString& text, double start, double end) {
+            this, [this](const QString& text, double start, double end, int conf) {
         Q_UNUSED(start); Q_UNUSED(end);
-        mpvWidget_->core()->setProperty("sub-text", text);
+        // AI 배지 포함 자막 텍스트 구성
+        QString badge = (conf >= 90) ? " [AI]" : (conf >= 80 ? " [AI?]" : " [AI!]");
+        mpvWidget_->core()->setProperty("sub-text", text + badge);
     });
+    connect(whisperWidget_, &WhisperWidget::seekToSubtitle,
+            mpvWidget_->core(), [this](double s){ mpvWidget_->core()->seek(s); });
     // 챕터 연결
     connect(chapterWidget_, &ChapterWidget::seekRequested,
             mpvWidget_->core(), [this](double s){ mpvWidget_->core()->seek(s); });

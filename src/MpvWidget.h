@@ -19,6 +19,8 @@ public:
     void loadFile(const QString& path);
     void appendFile(const QString& path);
     void showLogo(bool show);
+    void setAiSubtitle(const QString& text, int confidence);
+    void clearAiSubtitle();
 
 protected:
     void initializeGL() override;
@@ -37,4 +39,9 @@ private:
 
     QLabel*  logoLabel_  = nullptr;
     void     updateLogoPos();
+
+    // AI 자막 오버레이
+    QString  aiSubText_;
+    int      aiSubConf_  = 0;
+    QTimer*  aiSubTimer_ = nullptr;  // 자막 자동 소거 타이머
 };
