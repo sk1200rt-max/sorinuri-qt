@@ -223,7 +223,7 @@ void MainWindow::setupConnections() {
     connect(core, &MpvCore::playbackPaused,  musicPage_, [this]() { musicPage_->setPlaying(false); });
     // 미니 플레이어 연결
     connect(musicPage_, &MusicWidget::miniModeRequested, this, &MainWindow::toggleMiniPlayer);
-    connect(miniPlayer_, &MiniPlayerWidget::playPauseRequested, core, &MpvCore::togglePlayPause);
+    connect(miniPlayer_, &MiniPlayerWidget::playPauseRequested, core, &MpvCore::togglePause);
     connect(miniPlayer_, &MiniPlayerWidget::prevRequested, [core]() { core->command({"playlist-prev"}); });
     connect(miniPlayer_, &MiniPlayerWidget::nextRequested, [core]() { core->command({"playlist-next"}); });
     connect(miniPlayer_, &MiniPlayerWidget::expandRequested, this, &MainWindow::toggleMiniPlayer);
