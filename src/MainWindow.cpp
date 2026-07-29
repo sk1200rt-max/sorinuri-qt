@@ -10,6 +10,7 @@
 #include <QHBoxLayout>
 #include <QDebug>
 #include <QFileInfo>
+#include <QDir>
 #include <QMimeData>
 #include <QUrl>
 #include <QMenu>
@@ -109,7 +110,14 @@ void MainWindow::setupUI() {
     mpvWidget_ = new MpvWidget(videoContainer);
     mpvWidget_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     videoLayout->addWidget(mpvWidget_);
-    playerLayout->addWidget(videoContainer, 1);
+    // ── 플레이어 페이지 내부: 영상 vs 음악 스택 ────────────────────────────
+    playerStack_ = new QStackedWidget(playerPage_);
+    playerStack_->addWidget(videoContainer);  // index 0: 영상
+    musicPage_ = new MusicWidget(mpvWidget_->core(), playerPage_);
+    playerStack_->addWidget(musicPage_);      // index 1: 음악
+    playerLayout->addWidget(playerStack_, 1);
+    // HiFi 엔진 초기화
+    hifiEngine_ = new HiFiEngine(mpvWidget_->core(), this);
 
     mainStack_->addWidget(playerPage_);  // index 0
 
@@ -197,18 +205,35 @@ void MainWindow::setupConnections() {
     connect(ottPage_, &OttWidget::titleChanged, [this](const QString& t) {
         if (isOttMode_) updateWindowTitle(t);
     });
+
+    // 음악 모드 MusicWidget 시그널 연결
+    connect(musicPage_, &MusicWidget::seekRequested,    this, &MainWindow::onMusicSeekRequested);
+    connect(musicPage_, &MusicWidget::volumeChanged,    this, &MainWindow::onMusicVolumeChanged);
+    connect(musicPage_, &MusicWidget::playPauseRequested, core, &MpvCore::togglePause);
+    connect(musicPage_, &MusicWidget::prevRequested,    [core]() { core->command({"playlist-prev"}); });
+    connect(musicPage_, &MusicWidget::nextRequested,    [core]() { core->command({"playlist-next"}); });
+    connect(musicPage_, &MusicWidget::eqRequested,      this, &MainWindow::onSettingsRequested);
+    connect(musicPage_, &MusicWidget::settingsRequested, this, &MainWindow::onSettingsRequested);
+    // 음악 모드에서도 위치/재생 상태 업데이트
+    connect(core, &MpvCore::positionChanged, musicPage_, &MusicWidget::updatePosition);
+    connect(core, &MpvCore::playbackStarted, musicPage_, [this]() { musicPage_->setPlaying(true); });
+    connect(core, &MpvCore::playbackPaused,  musicPage_, [this]() { musicPage_->setPlaying(false); });
 }
 
 void MainWindow::openFiles(const QStringList& paths) {
-    qInfo() << "[Main] openFiles:" << paths.size() << "파일";
     bool first = true;
     for (const QString& path : paths) {
         QFileInfo fi(path);
-        qInfo() << "[Main] 파일:" << path << "| 확장자:" << fi.suffix() << "| 존재:" << fi.exists();
-        if (!fi.exists()) { qWarning() << "[Main] 파일 없음:"; continue; }
-        // 확장자 필터 완화 - 모든 파일 허용
+        if (!fi.exists()) continue;
         if (first) {
-            qInfo() << "[Main] loadFile:" << path;
+            currentFilePath_ = path;
+            // 음악 파일이면 자동으로 HiFi 모드로 전환
+            if (HiFiEngine::isMusicFile(path)) {
+                switchToMusicMode();
+                hifiEngine_->applyAll();
+            } else {
+                switchToVideoMode();
+            }
             mpvWidget_->loadFile(path);
             first = false;
         } else {
@@ -217,9 +242,58 @@ void MainWindow::openFiles(const QStringList& paths) {
     }
 }
 
+void MainWindow::switchToMusicMode() {
+    isMusicMode_ = true;
+    playerStack_->setCurrentIndex(1);
+    controlBar_->hide();
+    audioInfoBar_->hide();
+}
+
+void MainWindow::switchToVideoMode() {
+    isMusicMode_ = false;
+    playerStack_->setCurrentIndex(0);
+    controlBar_->show();
+    audioInfoBar_->show();
+}
+
+void MainWindow::loadMusicMeta(const QString& path) {
+    if (!musicPage_) return;
+    auto* core = mpvWidget_->core();
+    MusicMeta meta;
+    meta.codec      = core->getPropertyString("audio-codec-name");
+    meta.sampleRate = core->getPropertyInt("audio-params/samplerate");
+    meta.bitDepth   = 24;
+    meta.channels   = core->getPropertyInt("audio-params/channel-count");
+    meta.title      = core->getPropertyString("media-title");
+    meta.artist     = core->getPropertyString("metadata/by-key/artist");
+    meta.album      = core->getPropertyString("metadata/by-key/album");
+    meta.year       = core->getPropertyString("metadata/by-key/date");
+    // 폴더 내 커버 이미지 탐색
+    QFileInfo fi(path);
+    QDir dir = fi.dir();
+    for (const QString& name : {"cover.jpg", "cover.png", "folder.jpg", "albumart.jpg"}) {
+        if (dir.exists(name)) { meta.albumArt = QPixmap(dir.filePath(name)); break; }
+    }
+    musicPage_->loadMeta(meta);
+}
+
+void MainWindow::onMusicSeekRequested(double pos) {
+    mpvWidget_->core()->seek(pos);
+}
+
+void MainWindow::onMusicVolumeChanged(int vol) {
+    mpvWidget_->core()->setVolume(vol);
+}
+
 void MainWindow::onFileLoaded(const QString& path) {
     updateWindowTitle(QFileInfo(path).fileName());
-    controlBar_->setPlaying(true);
+    if (isMusicMode_) {
+        // 음악 모드: 메타데이터 로드 (파일 로드 후 MPV가 태그를 읽은 시점)
+        QTimer::singleShot(200, this, [this, path]() { loadMusicMeta(path); });
+        musicPage_->setPlaying(true);
+    } else {
+        controlBar_->setPlaying(true);
+    }
 }
 
 void MainWindow::onPlaybackStarted()  { controlBar_->setPlaying(true); }

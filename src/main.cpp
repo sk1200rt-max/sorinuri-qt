@@ -46,6 +46,11 @@ int main(int argc, char* argv[]) {
     setDpiAwareness();
 #endif
 
+    // ── 깜빡임 수정: OpenGL 컨텍스트 공유 ──────────────────────────────
+    // 창이 포커스를 잃었다가 받을 때 OpenGL 컨텍스트 재생성을 방지
+    // QApplication 생성 전에 반드시 설정해야 효과가 있음
+    QApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
+
     // ── Qt6 HiDPI 정책: 소수점 배율(125%, 150%, 175%, 250%)을 그대로 사용 ──
     // PassThrough: 250% → 2.5배율로 정확히 처리 (반올림 없음)
     QApplication::setHighDpiScaleFactorRoundingPolicy(

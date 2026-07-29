@@ -15,6 +15,9 @@ static void* getGlProcAddress(void* /*ctx*/, const char* name) {
 
 MpvWidget::MpvWidget(QWidget* parent) : QOpenGLWidget(parent) {
     setAutoFillBackground(false);
+    // 깜빡임 수정: 프레임 버퍼를 유지하여 포커스 전환 시 깜빡임 제거
+    // PartialUpdate: 이전 프레임을 지우지 않고 유지 → 검은 화면 깜빡임 없음
+    setUpdateBehavior(QOpenGLWidget::PartialUpdate);
 
     core_ = new MpvCore(this);
 

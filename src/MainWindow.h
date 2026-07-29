@@ -25,6 +25,8 @@
 #include "OttWidget.h"
 #include "ProFeaturesWidget.h"
 #include "ShortcutOverlay.h"
+#include "MusicWidget.h"
+#include "HiFiEngine.h"
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -66,6 +68,12 @@ private slots:
     // 모드 전환
     void switchToPlayerMode();
     void switchToOttMode();
+    void switchToMusicMode();
+    void switchToVideoMode();
+
+    // 음악 모드 관련
+    void onMusicSeekRequested(double pos);
+    void onMusicVolumeChanged(int vol);
 
     // yt-dlp 관련
     void onYtdlpReady(const QString& path);
@@ -79,8 +87,9 @@ private:
     void saveSettings();
     void updateWindowTitle(const QString& filename = {});
     void openUrl(const QString& url);
+    void loadMusicMeta(const QString& path);
 
-    // ── 메인 스택 (플레이어 / OTT 모드) ──────────────────────────
+    // ── 메인 스택 (플레이어 / OTT 모드) ──────────────
     QStackedWidget* mainStack_   = nullptr;
     QWidget*        playerPage_  = nullptr;
     OttWidget*      ottPage_     = nullptr;
@@ -89,19 +98,29 @@ private:
     QPushButton* playerModeBtn_ = nullptr;
     QPushButton* ottModeBtn_    = nullptr;
 
-    // 위젯
-    TitleBar*          titleBar_       = nullptr;
-    MpvWidget*         mpvWidget_      = nullptr;
-    TrackSelector*     trackSelector_  = nullptr;
-    ControlBar*        controlBar_     = nullptr;
-    AudioInfoBar*      audioInfoBar_   = nullptr;
-    ProFeaturesWidget* proFeatures_    = nullptr;  // 전문 기능 패널
-    ShortcutOverlay*   shortcutOverlay_= nullptr;  // 단축키 오버레이
+    // ── 플레이어 페이지 내부 스택 (영상 / 음악) ───────────
+    QStackedWidget* playerStack_  = nullptr;
+    QWidget*        videoPage_    = nullptr;
+    MusicWidget*    musicPage_    = nullptr;
 
-    bool   isFullscreen_     = false;
-    bool   isOttMode_        = false;
-    bool   isProFeaturesOpen_= false;
-    double totalDuration_    = 0;
+    // 위젯
+    TitleBar*          titleBar_        = nullptr;
+    MpvWidget*         mpvWidget_       = nullptr;
+    TrackSelector*     trackSelector_   = nullptr;
+    ControlBar*        controlBar_      = nullptr;
+    AudioInfoBar*      audioInfoBar_    = nullptr;
+    ProFeaturesWidget* proFeatures_     = nullptr;
+    ShortcutOverlay*   shortcutOverlay_ = nullptr;
+
+    // HiFi 엔진
+    HiFiEngine*        hifiEngine_      = nullptr;
+
+    bool   isFullscreen_      = false;
+    bool   isOttMode_         = false;
+    bool   isMusicMode_       = false;
+    bool   isProFeaturesOpen_ = false;
+    double totalDuration_     = 0;
+    QString currentFilePath_;
     QSettings settings_;
 
     // yt-dlp 관리자

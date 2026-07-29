@@ -68,6 +68,12 @@ set(SOURCES
     src/ProFeaturesWidget.h
     src/ShortcutOverlay.cpp
     src/ShortcutOverlay.h
+    src/MusicWidget.cpp
+    src/MusicWidget.h
+    src/LyricsWidget.cpp
+    src/LyricsWidget.h
+    src/HiFiEngine.cpp
+    src/HiFiEngine.h
     resources/resources.qrc
 )
 
