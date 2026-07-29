@@ -1,7 +1,6 @@
 // ChapterWidget.cpp
-// forward declaration
-static QString formatTimeStatic(double sec); — 목업 v4_chapter_ui.png 픽셀 정밀 일치 구현
-// 레이아웃: 영상 아래 타임라인 + 썸네일 스트립 / 우측 챕터 패널
+// v4_chapter_ui.png 목업 정밀 일치 구현
+//
 
 #include "ChapterWidget.h"
 #include "MpvCore.h"
@@ -19,6 +18,9 @@ static QString formatTimeStatic(double sec); — 목업 v4_chapter_ui.png 픽셀
 #include <QFont>
 #include <QFontMetrics>
 #include <QToolTip>
+
+// forward declaration
+static QString formatTimeStatic(double sec);
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ChapterTimeline
