@@ -215,7 +215,9 @@ void MainWindow::setupConnections() {
     connect(musicPage_, &MusicWidget::eqRequested,      this, &MainWindow::onSettingsRequested);
     connect(musicPage_, &MusicWidget::settingsRequested, this, &MainWindow::onSettingsRequested);
     // 음악 모드에서도 위치/재생 상태 업데이트
-    connect(core, &MpvCore::positionChanged, musicPage_, &MusicWidget::updatePosition);
+    connect(core, &MpvCore::positionChanged, musicPage_, [this](double pos) {
+        musicPage_->updatePosition(pos, totalDuration_);
+    });
     connect(core, &MpvCore::playbackStarted, musicPage_, [this]() { musicPage_->setPlaying(true); });
     connect(core, &MpvCore::playbackPaused,  musicPage_, [this]() { musicPage_->setPlaying(false); });
 }
