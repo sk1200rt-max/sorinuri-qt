@@ -15,10 +15,12 @@ AudioInfoBar::AudioInfoBar(QWidget* parent) : QWidget(parent) {
         return lbl;
     };
 
-    // 오디오 코덱 텍스트 (DTS-HD MA / TrueHD Atmos 등)
+    // 오디오 코덱 텍스트 - 타이틀바 배지와 중복이므로 숨김 처리
+    // (타이틀바에 AAC/DTS-HD MA 등 배지가 표시되므로 하단 정보바에서는 제거)
     codecLabel_ = makeLbl(
         "color: #4fc3f7; font-size: 10px; font-weight: 700;"
         "font-family: 'Consolas', monospace; padding: 0 10px 0 0;");
+    codecLabel_->hide();  // 타이틀바 배지와 중복 → 숨김
 
     // THRU / DECODE
     modeLabel_ = makeLbl(
@@ -44,7 +46,8 @@ AudioInfoBar::AudioInfoBar(QWidget* parent) : QWidget(parent) {
     videoLabel_ = makeLbl(
         "color: #444; font-size: 10px; font-family: 'Consolas', monospace;");
 
-    layout->addWidget(codecLabel_);
+    // codecLabel_은 숨겨져 있으므로 레이아웃에 추가하지 않음
+    // layout->addWidget(codecLabel_);  // 타이틀바 배지와 중복
     layout->addWidget(modeLabel_);
     layout->addWidget(chLabel_);
     layout->addWidget(srLabel_);

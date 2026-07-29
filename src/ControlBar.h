@@ -5,6 +5,7 @@
 #include <QLabel>
 #include <QHBoxLayout>
 #include <QVBoxLayout>
+#include "TrackSelector.h"
 
 class ControlBar : public QWidget {
     Q_OBJECT
@@ -16,6 +17,7 @@ public:
     void setDuration(double dur);
     void setVolume(int vol);
     void setMuted(bool muted);
+    void embedTrackSelector(TrackSelector* selector);
 
 signals:
     void playPauseClicked();
@@ -26,6 +28,7 @@ signals:
     void openFileClicked();
     void prevClicked();
     void nextClicked();
+    void settingsClicked();
 
 private slots:
     void onSeekMoved(int value);
@@ -45,6 +48,8 @@ private:
     QPushButton* btnMute_    = nullptr;
     QSlider*     volSlider_  = nullptr;
     QLabel*      volLabel_   = nullptr;
+    QPushButton* btnSettings_ = nullptr;
+    QHBoxLayout* btnRow_     = nullptr;  // 중앙 TrackSelector 삽입용
 
     double totalDuration_ = 0;
     bool   seeking_       = false;

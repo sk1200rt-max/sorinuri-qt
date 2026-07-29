@@ -58,7 +58,7 @@ TitleBar::TitleBar(QWidget* parent) : QWidget(parent) {
     btnPin_->setCursor(Qt::ArrowCursor);
     btnPin_->setCheckable(true);
     btnPin_->setIcon(QIcon(":/icons/pin_off.svg"));
-    btnPin_->setIconSize(QSize(14, 14));
+    btnPin_->setIconSize(QSize(18, 18));
     btnPin_->setStyleSheet(
         "QPushButton {"
         "  background: transparent; border: none; border-radius: 0;"

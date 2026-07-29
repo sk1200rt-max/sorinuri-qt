@@ -1,5 +1,7 @@
 #include "MainWindow.h"
 #include "UrlDialog.h"
+#include "ProFeaturesWidget.h"
+#include "ShortcutOverlay.h"
 #include <QApplication>
 #include <QMessageBox>
 #include <QProgressDialog>
@@ -117,37 +119,25 @@ void MainWindow::setupUI() {
 
     mainLayout->addWidget(mainStack_, 1);
 
-    // ── 트랙 선택 바 ─────────────────────────────────────────────
-    auto* trackBar = new QWidget(this);
-    trackBar->setFixedHeight(32);
-    trackBar->setStyleSheet("background: #0a0a0a; border-top: 1px solid #1a1a1a;");
-    auto* trackLayout = new QHBoxLayout(trackBar);
-    trackLayout->setContentsMargins(10, 0, 10, 0);
-    trackLayout->setSpacing(6);
-
+    // ── 컨트롤바 + 트랙 선택기 통합 ─────────────────────────────────────────
+    // 이전의 별도 trackBar 제거 → ControlBar 내부 중앙 영역에 TrackSelector 통합
     trackSelector_ = new TrackSelector(this);
-    trackLayout->addWidget(trackSelector_);
-    trackLayout->addStretch();
-
-    auto* settingsBtn = new QPushButton(this);
-    settingsBtn->setIcon(QIcon(":/icons/settings.svg"));
-    settingsBtn->setIconSize(QSize(14, 14));
-    settingsBtn->setFixedSize(26, 26);
-    settingsBtn->setToolTip("설정");
-    settingsBtn->setStyleSheet(
-        "QPushButton { background: transparent; border: 1px solid #222; border-radius: 3px; }"
-        "QPushButton:hover { border-color: #4fc3f7; }");
-    connect(settingsBtn, &QPushButton::clicked, this, &MainWindow::onSettingsRequested);
-    trackLayout->addWidget(settingsBtn);
-    mainLayout->addWidget(trackBar);
-
-    // ── 컨트롤바 ─────────────────────────────────────────────────
     controlBar_ = new ControlBar(this);
+    controlBar_->embedTrackSelector(trackSelector_);
     mainLayout->addWidget(controlBar_);
 
     // ── 오디오 정보 바 ────────────────────────────────────────────
     audioInfoBar_ = new AudioInfoBar(this);
     mainLayout->addWidget(audioInfoBar_);
+
+    // ── 전문 기능 패널 (기본 숨김, P 키로 토글) ──────────────────────
+    proFeatures_ = new ProFeaturesWidget(this);
+    proFeatures_->hide();
+    mainLayout->addWidget(proFeatures_);
+
+    // ── 단축키 오버레이 (영상 위에 표시) ─────────────────────────────
+    shortcutOverlay_ = new ShortcutOverlay(mpvWidget_);
+    shortcutOverlay_->hide();
 }
 
 void MainWindow::setupConnections() {
@@ -176,6 +166,10 @@ void MainWindow::setupConnections() {
     connect(controlBar_, &ControlBar::openFileClicked,   this, &MainWindow::onOpenFile);
     connect(controlBar_, &ControlBar::prevClicked,       [core]() { core->command({"playlist-prev"}); });
     connect(controlBar_, &ControlBar::nextClicked,       [core]() { core->command({"playlist-next"}); });
+    connect(controlBar_, &ControlBar::settingsClicked,   this, &MainWindow::onSettingsRequested);
+
+    // 전문 기능 패널 연결
+    proFeatures_->connectMpv(core);
 
     connect(titleBar_, &TitleBar::minimizeClicked,   this, &QMainWindow::showMinimized);
     connect(titleBar_, &TitleBar::maximizeClicked,   [this]() { isMaximized() ? showNormal() : showMaximized(); });
@@ -299,7 +293,57 @@ void MainWindow::keyPressEvent(QKeyEvent* e) {
     case Qt::Key_O:
         if (e->modifiers() & Qt::ControlModifier) onOpenFile();
         break;
+    // ── 전문 기능 단축키 ────────────────────────────────────────────
+    case Qt::Key_A:
+        if (e->modifiers() & Qt::ControlModifier)
+            proFeatures_->clearAbLoop();
+        else
+            proFeatures_->setAbPointA();
+        break;
+    case Qt::Key_B:
+        proFeatures_->setAbPointB();
+        break;
+    case Qt::Key_S:
+        proFeatures_->takeScreenshot();
+        break;
+    case Qt::Key_D:
+        if (e->modifiers() & Qt::ShiftModifier)
+            proFeatures_->setAudioDelay(proFeatures_->audioDelay() - 100);
+        else
+            proFeatures_->setAudioDelay(proFeatures_->audioDelay() + 100);
+        break;
+    case Qt::Key_Z:
+        if (e->modifiers() & Qt::ShiftModifier)
+            proFeatures_->setSubDelay(proFeatures_->subDelay() - 100);
+        else
+            proFeatures_->setSubDelay(proFeatures_->subDelay() + 100);
+        break;
+    case Qt::Key_Greater:  // >
+        proFeatures_->setSpeed(qMin(proFeatures_->currentSpeed() + 0.25, 4.0));
+        break;
+    case Qt::Key_Less:     // <
+        proFeatures_->setSpeed(qMax(proFeatures_->currentSpeed() - 0.25, 0.25));
+        break;
+    case Qt::Key_P:
+        toggleProFeatures();
+        break;
+    case Qt::Key_Question:
+        shortcutOverlay_->toggle();
+        break;
     default: QMainWindow::keyPressEvent(e); break;
+    }
+}
+
+void MainWindow::toggleProFeatures() {
+    isProFeaturesOpen_ = !isProFeaturesOpen_;
+    proFeatures_->setVisible(isProFeaturesOpen_);
+}
+
+void MainWindow::resizeEvent(QResizeEvent* e) {
+    QMainWindow::resizeEvent(e);
+    // 단축키 오버레이 크기를 영상 위젯에 맞춤
+    if (shortcutOverlay_ && mpvWidget_) {
+        shortcutOverlay_->setGeometry(mpvWidget_->rect());
     }
 }
 

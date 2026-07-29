@@ -64,6 +64,10 @@ set(SOURCES
     src/YtdlpManager.h
     src/OttWidget.cpp
     src/OttWidget.h
+    src/ProFeaturesWidget.cpp
+    src/ProFeaturesWidget.h
+    src/ShortcutOverlay.cpp
+    src/ShortcutOverlay.h
     resources/resources.qrc
 )
 

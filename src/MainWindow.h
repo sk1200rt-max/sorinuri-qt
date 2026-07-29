@@ -23,6 +23,8 @@
 #include "TrackSelector.h"
 #include "YtdlpManager.h"
 #include "OttWidget.h"
+#include "ProFeaturesWidget.h"
+#include "ShortcutOverlay.h"
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -40,6 +42,7 @@ protected:
     void mousePressEvent(QMouseEvent* e) override;
     void mouseMoveEvent(QMouseEvent* e) override;
     void mouseReleaseEvent(QMouseEvent* e) override;
+    void resizeEvent(QResizeEvent* e) override;
 
 private slots:
     void onFileLoaded(const QString& path);
@@ -58,6 +61,7 @@ private slots:
     void onSettingsRequested();
     void toggleFullscreen();
     void showContextMenu(const QPoint& pos);
+    void toggleProFeatures();
 
     // 모드 전환
     void switchToPlayerMode();
@@ -78,23 +82,26 @@ private:
 
     // ── 메인 스택 (플레이어 / OTT 모드) ──────────────────────────
     QStackedWidget* mainStack_   = nullptr;
-    QWidget*        playerPage_  = nullptr;  // 인덱스 0: MPV 플레이어
-    OttWidget*      ottPage_     = nullptr;  // 인덱스 1: OTT 스트리밍
+    QWidget*        playerPage_  = nullptr;
+    OttWidget*      ottPage_     = nullptr;
 
-    // 모드 전환 버튼 (타이틀바에 추가)
+    // 모드 전환 버튼
     QPushButton* playerModeBtn_ = nullptr;
     QPushButton* ottModeBtn_    = nullptr;
 
     // 위젯
-    TitleBar*     titleBar_     = nullptr;
-    MpvWidget*    mpvWidget_    = nullptr;
-    TrackSelector* trackSelector_ = nullptr;
-    ControlBar*   controlBar_   = nullptr;
-    AudioInfoBar* audioInfoBar_ = nullptr;
+    TitleBar*          titleBar_       = nullptr;
+    MpvWidget*         mpvWidget_      = nullptr;
+    TrackSelector*     trackSelector_  = nullptr;
+    ControlBar*        controlBar_     = nullptr;
+    AudioInfoBar*      audioInfoBar_   = nullptr;
+    ProFeaturesWidget* proFeatures_    = nullptr;  // 전문 기능 패널
+    ShortcutOverlay*   shortcutOverlay_= nullptr;  // 단축키 오버레이
 
-    bool   isFullscreen_  = false;
-    bool   isOttMode_     = false;
-    double totalDuration_ = 0;
+    bool   isFullscreen_     = false;
+    bool   isOttMode_        = false;
+    bool   isProFeaturesOpen_= false;
+    double totalDuration_    = 0;
     QSettings settings_;
 
     // yt-dlp 관리자

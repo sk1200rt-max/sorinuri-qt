@@ -76,7 +76,8 @@ ControlBar::ControlBar(QWidget* parent) : QWidget(parent) {
     mainLayout->addLayout(seekRow);
 
     // ── 버튼 행 ────────────────────────────────────────────────
-    auto* btnRow = new QHBoxLayout();
+    btnRow_ = new QHBoxLayout();
+    auto* btnRow = btnRow_;
     btnRow->setSpacing(2);
 
     btnOpen_ = makeBtn(":/icons/open.svg",   "파일 열기 (Ctrl+O)");
@@ -120,9 +121,25 @@ ControlBar::ControlBar(QWidget* parent) : QWidget(parent) {
     btnRow->addWidget(btnMute_);
     btnRow->addWidget(volSlider_);
     btnRow->addWidget(volLabel_);
-    btnRow->addStretch();
+    btnRow->addStretch(1);  // 좌측 버튼과 중앙 TrackSelector 사이 공간
+    // 중앙 TrackSelector는 embedTrackSelector()에서 동적으로 삽입됨
+    btnRow->addStretch(1);  // 중앙 오른쪽 공간
+
+    // 설정 버튼 (우측 끝)
+    btnSettings_ = makeBtn(":/icons/settings.svg", "설정");
+    btnRow->addWidget(btnSettings_);
+    connect(btnSettings_, &QPushButton::clicked, this, &ControlBar::settingsClicked);
 
     mainLayout->addLayout(btnRow);
+}
+
+void ControlBar::embedTrackSelector(TrackSelector* selector) {
+    if (!selector || !btnRow_) return;
+    // 두 stretch 사이(인덱스: count-3)에 TrackSelector 삽입
+    // 레이아웃 순서: [버튼들] [stretch] [TrackSelector] [stretch] [설정버튼]
+    int insertPos = btnRow_->count() - 2;  // 우측 stretch 앞, 설정 버튼 앞
+    selector->setParent(this);
+    btnRow_->insertWidget(insertPos, selector, 2);  // stretch=2로 중앙 영역 확장
 }
 
 void ControlBar::setPlaying(bool playing) {
