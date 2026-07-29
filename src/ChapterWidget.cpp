@@ -1,4 +1,6 @@
-// ChapterWidget.cpp — 목업 v4_chapter_ui.png 픽셀 정밀 일치 구현
+// ChapterWidget.cpp
+// forward declaration
+static QString formatTimeStatic(double sec); — 목업 v4_chapter_ui.png 픽셀 정밀 일치 구현
 // 레이아웃: 영상 아래 타임라인 + 썸네일 스트립 / 우측 챕터 패널
 
 #include "ChapterWidget.h"
@@ -62,7 +64,7 @@ void ChapterTimeline::paintEvent(QPaintEvent*) {
             : (position_ >= ch.startSec);
 
         // 챕터 제목
-        QString title = ch.isBookmark ? formatTime(ch.startSec) : ch.title;
+        QString title = ch.isBookmark ? formatTimeStatic(ch.startSec) : ch.title;
         p.setPen(isCurrent ? QColor(0x00,0xc8,0xb4) : QColor(0x88,0x88,0x88));
         QRect tr(x-40, 2, 80, 14);
         p.drawText(tr, Qt::AlignCenter, title);
@@ -70,7 +72,7 @@ void ChapterTimeline::paintEvent(QPaintEvent*) {
         // 시간
         p.setPen(isCurrent ? QColor(0x00,0xc8,0xb4) : QColor(0x66,0x66,0x66));
         QRect timeR(x-30, 16, 60, 12);
-        p.drawText(timeR, Qt::AlignCenter, formatTime(ch.startSec));
+        p.drawText(timeR, Qt::AlignCenter, formatTimeStatic(ch.startSec));
     }
 
     // ── 타임라인 바 (진행 부분) ────────────────────────────
@@ -136,8 +138,8 @@ void ChapterTimeline::paintEvent(QPaintEvent*) {
         // 시간 + 제목
         p.setFont(QFont("Malgun Gothic", 9));
         p.setPen(QColor(0xcc,0xcc,0xcc));
-        p.drawText(QRect(popX+4, popY+66, popW-8, 20), Qt::AlignCenter,
-                   formatTime(ch.startSec) + "  " + ch.title);
+        p.drawText(popX+4, popY+66, popW-8, 20, Qt::AlignCenter,
+                   formatTimeStatic(ch.startSec) + "  " + ch.title);
 
         // 화살표
         QPolygon arrow;
@@ -168,7 +170,7 @@ void ChapterTimeline::leaveEvent(QEvent*) {
     hoverX_ = -1; hoverChapter_ = -1; update();
 }
 
-QString formatTimeStatic(double sec) {
+static QString formatTimeStatic(double sec) {
     int h=(int)sec/3600, m=((int)sec%3600)/60, s=(int)sec%60;
     if (h>0) return QString("%1:%2:%3").arg(h).arg(m,2,10,QChar('0')).arg(s,2,10,QChar('0'));
     return QString("%1:%2").arg(m,2,10,QChar('0')).arg(s,2,10,QChar('0'));
@@ -388,7 +390,7 @@ void ChapterWidget::loadChapters() {
 void ChapterWidget::addBookmark(double sec) {
     Chapter bm;
     bm.startSec   = sec;
-    bm.title      = "북마크 " + formatTime(sec);
+    bm.title      = "북마크 " + formatTimeStatic(sec);
     bm.isBookmark = true;
     chapters_.append(bm);
     std::sort(chapters_.begin(), chapters_.end(),
@@ -431,7 +433,7 @@ void ChapterWidget::refreshList() {
     lstChapters_->clear();
     for (const Chapter& ch : chapters_) {
         QString icon = ch.isBookmark ? "🔖" : "▶";
-        QString text = QString("%1  %2  %3").arg(icon).arg(formatTime(ch.startSec)).arg(ch.title);
+        QString text = QString("%1  %2  %3").arg(icon).arg(formatTimeStatic(ch.startSec)).arg(ch.title);
         auto* item = new QListWidgetItem(text);
         if (ch.isBookmark) item->setForeground(QColor("#f0c040"));
         lstChapters_->addItem(item);
