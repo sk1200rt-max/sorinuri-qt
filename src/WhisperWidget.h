@@ -59,6 +59,9 @@ private:
     // UI
     QLabel*       lblStatus_    = nullptr;
     QLabel*       lblGpu_       = nullptr;
+    QLabel*       lblGpuName_   = nullptr;
+    QProgressBar* barConf_      = nullptr;
+    QLabel*       lblConfPct_   = nullptr;
     QComboBox*    cmbLang_      = nullptr;
     QComboBox*    cmbModel_     = nullptr;
     QCheckBox*    chkTranslate_ = nullptr;

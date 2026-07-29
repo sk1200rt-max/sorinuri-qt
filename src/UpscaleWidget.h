@@ -41,8 +41,7 @@ private:
     QPushButton* btnAmd_      = nullptr;
     QPushButton* btnLanczos_  = nullptr;
     QSlider*     sldStrength_ = nullptr;
-    QLabel*      lblStrength_ = nullptr;
+    QLabel*      lblStrVal_   = nullptr;
     QPushButton* btnCompare_  = nullptr;
-    QLabel*      lblGpuInfo_  = nullptr;
     QLabel*      lblStatus_   = nullptr;
 };
