@@ -12,6 +12,7 @@
 #include <QStandardPaths>
 #include <QDir>
 #include <QFileInfo>
+#include <QCoreApplication>
 #include <QFont>
 
 static const char* STYLE_PANEL = R"(
