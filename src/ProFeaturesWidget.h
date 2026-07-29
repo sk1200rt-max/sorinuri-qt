@@ -7,6 +7,7 @@
 #include <QVBoxLayout>
 #include <QDoubleSpinBox>
 #include "MpvCore.h"
+#include <QTabWidget>
 
 /**
  * ProFeaturesWidget - 전문가 기능 패널
@@ -23,6 +24,7 @@ class ProFeaturesWidget : public QWidget {
     Q_OBJECT
 public:
     explicit ProFeaturesWidget(QWidget* parent = nullptr);
+    void addTab(QWidget* w, const QString& title);
     void connectMpv(MpvCore* core);
 
     // A-B 구간 반복

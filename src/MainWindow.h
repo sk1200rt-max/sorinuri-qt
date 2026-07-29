@@ -28,6 +28,11 @@
 #include "MusicWidget.h"
 #include "HiFiEngine.h"
 #include "MiniPlayerWidget.h"
+#include "WhisperWidget.h"
+#include "UpscaleWidget.h"
+#include "ChapterWidget.h"
+#include "MultiViewWidget.h"
+
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -76,6 +81,9 @@ private slots:
     void onMusicSeekRequested(double pos);
     void onMusicVolumeChanged(int vol);
     void toggleMiniPlayer();
+    void toggleWhisper(bool on);
+    void onChapterBookmark();
+    void toggleMultiView(MultiViewLayout l);
 
     // yt-dlp 관련
     void onYtdlpReady(const QString& path);
@@ -117,6 +125,10 @@ private:
     // HiFi 엔진
     HiFiEngine*        hifiEngine_      = nullptr;
     MiniPlayerWidget*  miniPlayer_      = nullptr;
+    WhisperWidget*     whisperWidget_   = nullptr;
+    UpscaleWidget*     upscaleWidget_   = nullptr;
+    ChapterWidget*     chapterWidget_   = nullptr;
+    MultiViewWidget*   multiViewWidget_ = nullptr;
 
     bool   isFullscreen_      = false;
     bool   isOttMode_         = false;

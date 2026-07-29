@@ -356,3 +356,8 @@ void ProFeaturesWidget::setAudioDelay(double ms) {
 void ProFeaturesWidget::setSubDelay(double ms) {
     subDelaySlider_->setValue(static_cast<int>(ms));
 }
+void ProFeaturesWidget::addTab(QWidget* w, const QString& title) {
+    // ProFeaturesWidget은 QTabWidget이 아니므로
+    // 새 탭을 추가할 수 없음 - 별도 패널로 처리
+    Q_UNUSED(w); Q_UNUSED(title);
+}

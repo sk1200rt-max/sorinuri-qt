@@ -119,6 +119,17 @@ void MainWindow::setupUI() {
     // HiFi 엔진 초기화
     hifiEngine_ = new HiFiEngine(mpvWidget_->core(), this);
     miniPlayer_ = new MiniPlayerWidget();  // 독립 창
+    // 혁신 기능 위젯 생성
+    whisperWidget_   = new WhisperWidget(this);
+    upscaleWidget_   = new UpscaleWidget(mpvWidget_->core(), this);
+    chapterWidget_   = new ChapterWidget(mpvWidget_->core(), this);
+    // ProFeaturesWidget에 탭으로 추가
+    if (proFeatures_) {
+        proFeatures_->addTab(whisperWidget_,  "AI 자막");
+        proFeatures_->addTab(upscaleWidget_,  "화질 개선");
+        proFeatures_->addTab(chapterWidget_,  "챕터/북마크");
+    }
+
 
     mainStack_->addWidget(playerPage_);  // index 0
 
@@ -233,6 +244,24 @@ void MainWindow::setupConnections() {
     });
     connect(core, &MpvCore::playbackStarted, miniPlayer_, [this]() { miniPlayer_->setPlaying(true); });
     connect(core, &MpvCore::playbackPaused,  miniPlayer_, [this]() { miniPlayer_->setPlaying(false); });
+    // AI 자막 연결
+    connect(whisperWidget_, &WhisperWidget::subtitleGenerated,
+            this, [this](const QString& text, double start, double end) {
+        Q_UNUSED(start); Q_UNUSED(end);
+        mpvWidget_->core()->setProperty("sub-text", text);
+    });
+    // 챕터 연결
+    connect(chapterWidget_, &ChapterWidget::seekRequested,
+            mpvWidget_->core(), [this](double s){ mpvWidget_->core()->seek(s); });
+    connect(core, &MpvCore::positionChanged, chapterWidget_, &ChapterWidget::onPositionChanged);
+    connect(core, &MpvCore::fileLoaded, chapterWidget_, [this](const QString& path){
+        Q_UNUSED(path);
+        chapterWidget_->loadChapters();
+    });
+    connect(core, &MpvCore::durationChanged, chapterWidget_, [this](double d){
+        chapterWidget_->setDuration(d);
+    });
+
 }
 
 void MainWindow::openFiles(const QStringList& paths) {
@@ -805,4 +834,23 @@ void MainWindow::toggleMiniPlayer() {
         miniPlayer_->show();
         miniPlayer_->raise();
     }
+}
+
+void MainWindow::toggleWhisper(bool on) {
+    if (whisperWidget_) {
+        whisperWidget_->setMediaFile(currentFilePath_);
+        whisperWidget_->setActive(on);
+    }
+}
+
+void MainWindow::onChapterBookmark() {
+    if (chapterWidget_ && mpvWidget_) {
+        double pos = mpvWidget_->core()->getProperty("time-pos").toDouble();
+        chapterWidget_->addBookmark(pos);
+    }
+}
+
+void MainWindow::toggleMultiView(MultiViewLayout l) {
+    Q_UNUSED(l);
+    // MultiViewWidget은 별도 창으로 구현 예정
 }
