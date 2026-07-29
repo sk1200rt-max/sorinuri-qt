@@ -227,7 +227,7 @@ void MainWindow::setupConnections() {
     connect(miniPlayer_, &MiniPlayerWidget::prevRequested, [core]() { core->command({"playlist-prev"}); });
     connect(miniPlayer_, &MiniPlayerWidget::nextRequested, [core]() { core->command({"playlist-next"}); });
     connect(miniPlayer_, &MiniPlayerWidget::expandRequested, this, &MainWindow::toggleMiniPlayer);
-    connect(miniPlayer_, &MiniPlayerWidget::seekRequested, core, &MpvCore::seek);
+    connect(miniPlayer_, &MiniPlayerWidget::seekRequested, core, [core](double s){ core->seek(s); });
     connect(core, &MpvCore::positionChanged, miniPlayer_, [this](double pos) {
         miniPlayer_->updatePosition(pos, totalDuration_);
     });

@@ -346,7 +346,7 @@ void MusicWidget::loadMeta(const MusicMeta& meta){
         .arg(rateBadge_->text()).arg(bitBadge_->text());
     if(meta.hasReplayGain) status+=QString("  ·  ReplayGain: %1dB").arg(meta.replayGain,0,'f',1);
     statusBar_->setText(status);
-    if(lyricsWidget_) lyricsWidget_->loadForTrack(meta.title,meta.artist,meta.album,"");
+    if(lyricsWidget_) lyricsWidget_->loadForTrack(meta.title,meta.artist,"");
     update();
 }
 
