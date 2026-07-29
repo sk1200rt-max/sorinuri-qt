@@ -69,7 +69,9 @@ set(SOURCES
     src/ShortcutOverlay.cpp
     src/ShortcutOverlay.h
     src/MusicWidget.cpp
+    src/MiniPlayerWidget.cpp
     src/MusicWidget.h
+    src/MiniPlayerWidget.h
     src/LyricsWidget.cpp
     src/LyricsWidget.h
     src/HiFiEngine.cpp

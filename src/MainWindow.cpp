@@ -118,6 +118,7 @@ void MainWindow::setupUI() {
     playerLayout->addWidget(playerStack_, 1);
     // HiFi 엔진 초기화
     hifiEngine_ = new HiFiEngine(mpvWidget_->core(), this);
+    miniPlayer_ = new MiniPlayerWidget();  // 독립 창
 
     mainStack_->addWidget(playerPage_);  // index 0
 
@@ -220,6 +221,18 @@ void MainWindow::setupConnections() {
     });
     connect(core, &MpvCore::playbackStarted, musicPage_, [this]() { musicPage_->setPlaying(true); });
     connect(core, &MpvCore::playbackPaused,  musicPage_, [this]() { musicPage_->setPlaying(false); });
+    // 미니 플레이어 연결
+    connect(musicPage_, &MusicWidget::miniModeRequested, this, &MainWindow::toggleMiniPlayer);
+    connect(miniPlayer_, &MiniPlayerWidget::playPauseRequested, core, &MpvCore::togglePlayPause);
+    connect(miniPlayer_, &MiniPlayerWidget::prevRequested, [core]() { core->command({"playlist-prev"}); });
+    connect(miniPlayer_, &MiniPlayerWidget::nextRequested, [core]() { core->command({"playlist-next"}); });
+    connect(miniPlayer_, &MiniPlayerWidget::expandRequested, this, &MainWindow::toggleMiniPlayer);
+    connect(miniPlayer_, &MiniPlayerWidget::seekRequested, core, &MpvCore::seek);
+    connect(core, &MpvCore::positionChanged, miniPlayer_, [this](double pos) {
+        miniPlayer_->updatePosition(pos, totalDuration_);
+    });
+    connect(core, &MpvCore::playbackStarted, miniPlayer_, [this]() { miniPlayer_->setPlaying(true); });
+    connect(core, &MpvCore::playbackPaused,  miniPlayer_, [this]() { miniPlayer_->setPlaying(false); });
 }
 
 void MainWindow::openFiles(const QStringList& paths) {
@@ -775,4 +788,21 @@ void MainWindow::updateWindowTitle(const QString& filename) {
     QString t = filename.isEmpty() ? "소리누리" : QString("소리누리 — %1").arg(filename);
     setWindowTitle(t);
     titleBar_->setTitle(t);
+}
+
+void MainWindow::toggleMiniPlayer() {
+    if (!miniPlayer_ || !isMusicMode_) return;
+    if (miniPlayer_->isVisible()) {
+        miniPlayer_->hide();
+        show();
+        activateWindow();
+    } else {
+        // 미니 플레이어에 현재 메타 정보 전달
+        if (musicPage_) {
+            // 미니 플레이어 업데이트는 loadMusicMeta에서 처리
+        }
+        hide();
+        miniPlayer_->show();
+        miniPlayer_->raise();
+    }
 }

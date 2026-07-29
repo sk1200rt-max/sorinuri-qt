@@ -7,9 +7,11 @@
 #include <QPushButton>
 #include <QHBoxLayout>
 #include <QVBoxLayout>
+#include <QStackedWidget>
 #include <QPropertyAnimation>
+#include <QListWidget>
+#include <QLineEdit>
 
-// 전방 선언
 class LyricsWidget;
 class MpvCore;
 
@@ -24,28 +26,56 @@ struct MusicMeta {
     int     sampleRate  = 0;
     int     bitDepth    = 0;
     int     channels    = 0;
-    QString codec;          // FLAC, MP3, AAC, ALAC, WAV, DSD...
+    QString codec;
     double  replayGain  = 0.0;
     bool    hasReplayGain = false;
     QPixmap albumArt;
 };
 
+// ── EQ 패널 ──────────────────────────────────────────────────────────
+class EqPanel : public QWidget {
+    Q_OBJECT
+public:
+    explicit EqPanel(QWidget* parent = nullptr);
+    void applyPreset(int idx);
+signals:
+    void eqChanged(const QVector<double>& gains);
+private:
+    void buildUI();
+    QVector<QSlider*> sliders_;
+    QVector<QLabel*>  gainLabels_;
+    static const QStringList kBands;
+    static const QVector<QVector<double>> kPresets;
+};
+
+// ── 재생목록 패널 ─────────────────────────────────────────────────────
+class PlaylistPanel : public QWidget {
+    Q_OBJECT
+public:
+    explicit PlaylistPanel(QWidget* parent = nullptr);
+    void setTracks(const QStringList& paths);
+    void setCurrentIndex(int idx);
+signals:
+    void trackSelected(int idx);
+private:
+    QLineEdit*   searchEdit_  = nullptr;
+    QListWidget* listWidget_  = nullptr;
+    QStringList  allPaths_;
+};
+
+// ── MusicWidget ───────────────────────────────────────────────────────
 class MusicWidget : public QWidget {
     Q_OBJECT
 public:
     explicit MusicWidget(MpvCore* core, QWidget* parent = nullptr);
 
-    // 파일 로드 시 메타데이터 업데이트
     void loadMeta(const MusicMeta& meta);
-
-    // 재생 위치 업데이트 (초 단위)
     void updatePosition(double pos, double duration);
-
-    // 재생/정지 상태 업데이트
     void setPlaying(bool playing);
-
-    // 스펙트럼 데이터 업데이트 (64개 빈)
     void updateSpectrum(const QVector<float>& bins);
+
+    bool isMiniMode() const { return miniMode_; }
+    void setMiniMode(bool mini);
 
 signals:
     void seekRequested(double pos);
@@ -57,16 +87,23 @@ signals:
     void volumeChanged(int vol);
     void eqRequested();
     void settingsRequested();
+    void miniModeRequested();
 
 protected:
     void paintEvent(QPaintEvent* e) override;
     void resizeEvent(QResizeEvent* e) override;
+
+private slots:
+    void onRotationTick();
+    void onRightPanelToggle(int panel); // 0=가사 1=EQ 2=재생목록
 
 private:
     void setupUI();
     void setupConnections();
     void updateAlbumArt(const QPixmap& art);
     void updateBlurBackground(const QPixmap& art);
+    void extractDominantColor(const QPixmap& art);
+    void drawAlbumArt(QPainter& p, const QRect& rect);
     void drawSpectrum(QPainter& p, const QRect& rect);
     QString formatTime(double secs) const;
 
@@ -74,9 +111,14 @@ private:
 
     // 배경
     QPixmap       blurBg_;
+    QColor        dominantColor_;
 
-    // 좌측 패널
-    QLabel*       albumArtLabel_  = nullptr;
+    // 앨범아트 회전
+    QPixmap       albumArtPixmap_;
+    qreal         rotationAngle_ = 0.0;
+    QTimer*       rotationTimer_ = nullptr;
+
+    // 좌측 패널 텍스트
     QLabel*       titleLabel_     = nullptr;
     QLabel*       artistLabel_    = nullptr;
     QLabel*       albumLabel_     = nullptr;
@@ -85,22 +127,30 @@ private:
     QLabel*       bitBadge_       = nullptr;
     QLabel*       rateBadge_      = nullptr;
     QLabel*       chBadge_        = nullptr;
-    QLabel*       bpBadge_        = nullptr;  // BIT-PERFECT 배지
+    QLabel*       bpBadge_        = nullptr;
 
     // 스펙트럼
     QVector<float> specBins_;
-    QVector<float> specPeak_;   // 피크 홀드
+    QVector<float> specPeak_;
     QTimer*        peakTimer_   = nullptr;
 
-    // 재생 컨트롤 (좌측)
+    // 재생 컨트롤
     QPushButton*  btnShuffle_   = nullptr;
     QPushButton*  btnPrev_      = nullptr;
     QPushButton*  btnPlay_      = nullptr;
     QPushButton*  btnNext_      = nullptr;
     QPushButton*  btnRepeat_    = nullptr;
 
-    // 우측 패널 - 가사
-    LyricsWidget* lyricsWidget_ = nullptr;
+    // 우측 패널 스택 (0=가사 1=EQ 2=재생목록)
+    QStackedWidget* rightStack_    = nullptr;
+    LyricsWidget*   lyricsWidget_  = nullptr;
+    EqPanel*        eqPanel_       = nullptr;
+    PlaylistPanel*  playlistPanel_ = nullptr;
+
+    // 우측 패널 전환 탭 버튼
+    QPushButton*  btnShowLyrics_   = nullptr;
+    QPushButton*  btnShowEq_       = nullptr;
+    QPushButton*  btnShowPlaylist_ = nullptr;
 
     // 하단 시크바
     QSlider*      seekSlider_   = nullptr;
@@ -108,10 +158,10 @@ private:
     QLabel*       timeDuration_ = nullptr;
 
     // 하단 컨트롤바
-    QPushButton*  btnEq_        = nullptr;
     QLabel*       speedLabel_   = nullptr;
     QPushButton*  btnVolume_    = nullptr;
     QSlider*      volSlider_    = nullptr;
+    QPushButton*  btnMini_      = nullptr;
     QPushButton*  btnSettings_  = nullptr;
 
     // 하단 상태바
@@ -121,6 +171,7 @@ private:
     bool          isPlaying_    = false;
     bool          isShuffle_    = false;
     bool          isRepeat_     = false;
+    bool          miniMode_     = false;
     double        duration_     = 0;
     MusicMeta     currentMeta_;
 };

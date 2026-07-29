@@ -27,6 +27,7 @@
 #include "ShortcutOverlay.h"
 #include "MusicWidget.h"
 #include "HiFiEngine.h"
+#include "MiniPlayerWidget.h"
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -74,6 +75,7 @@ private slots:
     // 음악 모드 관련
     void onMusicSeekRequested(double pos);
     void onMusicVolumeChanged(int vol);
+    void toggleMiniPlayer();
 
     // yt-dlp 관련
     void onYtdlpReady(const QString& path);
@@ -114,6 +116,7 @@ private:
 
     // HiFi 엔진
     HiFiEngine*        hifiEngine_      = nullptr;
+    MiniPlayerWidget*  miniPlayer_      = nullptr;
 
     bool   isFullscreen_      = false;
     bool   isOttMode_         = false;
