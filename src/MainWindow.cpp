@@ -260,14 +260,14 @@ void MainWindow::loadMusicMeta(const QString& path) {
     if (!musicPage_) return;
     auto* core = mpvWidget_->core();
     MusicMeta meta;
-    meta.codec      = core->getPropertyString("audio-codec-name");
-    meta.sampleRate = core->getPropertyInt("audio-params/samplerate");
+    meta.codec      = core->getProperty("audio-codec-name").toString();
+    meta.sampleRate = core->getProperty("audio-params/samplerate").toInt();
     meta.bitDepth   = 24;
-    meta.channels   = core->getPropertyInt("audio-params/channel-count");
-    meta.title      = core->getPropertyString("media-title");
-    meta.artist     = core->getPropertyString("metadata/by-key/artist");
-    meta.album      = core->getPropertyString("metadata/by-key/album");
-    meta.year       = core->getPropertyString("metadata/by-key/date");
+    meta.channels   = core->getProperty("audio-params/channel-count").toInt();
+    meta.title      = core->getProperty("media-title").toString();
+    meta.artist     = core->getProperty("metadata/by-key/artist").toString();
+    meta.album      = core->getProperty("metadata/by-key/album").toString();
+    meta.year       = core->getProperty("metadata/by-key/date").toString();
     // 폴더 내 커버 이미지 탐색
     QFileInfo fi(path);
     QDir dir = fi.dir();
