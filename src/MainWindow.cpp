@@ -344,10 +344,35 @@ void MainWindow::onFileLoaded(const QString& path) {
     }
 }
 
-void MainWindow::onPlaybackStarted()  { controlBar_->setPlaying(true); }
-void MainWindow::onPlaybackPaused()   { controlBar_->setPlaying(false); }
-void MainWindow::onPlaybackEnded()    { controlBar_->setPlaying(false); mpvWidget_->showLogo(true); }
-void MainWindow::onPlaybackStopped()  { controlBar_->setPlaying(false); updateWindowTitle(); mpvWidget_->showLogo(true); }
+void MainWindow::onPlaybackStarted() {
+    controlBar_->setPlaying(true);
+#ifdef Q_OS_WIN
+    // 영상/음악 재생 중 화면 켜짐 및 절전모드 진입 방지
+    SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED);
+#endif
+}
+void MainWindow::onPlaybackPaused() {
+    controlBar_->setPlaying(false);
+#ifdef Q_OS_WIN
+    // 일시정지 시 절전모드 방지 해제
+    SetThreadExecutionState(ES_CONTINUOUS);
+#endif
+}
+void MainWindow::onPlaybackEnded() {
+    controlBar_->setPlaying(false);
+    mpvWidget_->showLogo(true);
+#ifdef Q_OS_WIN
+    SetThreadExecutionState(ES_CONTINUOUS);
+#endif
+}
+void MainWindow::onPlaybackStopped() {
+    controlBar_->setPlaying(false);
+    updateWindowTitle();
+    mpvWidget_->showLogo(true);
+#ifdef Q_OS_WIN
+    SetThreadExecutionState(ES_CONTINUOUS);
+#endif
+}
 void MainWindow::onPositionChanged(double s) { controlBar_->setPosition(s, totalDuration_); }
 void MainWindow::onDurationChanged(double s) { totalDuration_ = s; controlBar_->setDuration(s); }
 void MainWindow::onVolumeChanged(int v)      { controlBar_->setVolume(v); }
@@ -404,14 +429,37 @@ void MainWindow::keyPressEvent(QKeyEvent* e) {
     auto* core = mpvWidget_->core();
     switch (e->key()) {
     case Qt::Key_Space:  core->togglePause(); break;
+    case Qt::Key_Return:
+    case Qt::Key_Enter:  core->togglePause(); break;  // Enter로 재생/일시정지
     case Qt::Key_F:
     case Qt::Key_F11:    toggleFullscreen(); break;
     case Qt::Key_Escape: if (isFullscreen_) toggleFullscreen(); break;
-    case Qt::Key_Left:   core->seek(-5, true); break;
-    case Qt::Key_Right:  core->seek(5, true); break;
+    // 이동: 일반 5초, Shift 60초, Ctrl 10초
+    case Qt::Key_Left:
+        if (e->modifiers() & Qt::ShiftModifier)  core->seek(-60, true);
+        else if (e->modifiers() & Qt::ControlModifier) core->seek(-10, true);
+        else core->seek(-5, true);
+        break;
+    case Qt::Key_Right:
+        if (e->modifiers() & Qt::ShiftModifier)  core->seek(60, true);
+        else if (e->modifiers() & Qt::ControlModifier) core->seek(10, true);
+        else core->seek(5, true);
+        break;
     case Qt::Key_Up:     core->setVolume(qMin(core->volume() + 5, 200)); break;
     case Qt::Key_Down:   core->setVolume(qMax(core->volume() - 5, 0)); break;
+    case Qt::Key_PageUp:   core->seek(-300, true); break;  // 5분 앞으로
+    case Qt::Key_PageDown: core->seek(300, true);  break;  // 5분 뒤로
+    case Qt::Key_Home:   core->seek(0); break;  // 첫 장면으로
+    case Qt::Key_End:    core->seek(100, false); break;  // 마지막으로
     case Qt::Key_M:      core->setMuted(!core->getProperty("mute").toBool()); break;
+    // 재생목록 이전/다음
+    case Qt::Key_N:      core->command({"playlist-next"}); break;
+    case Qt::Key_BracketLeft:   // [ 이전 챕터
+        core->command({"add", "chapter", "-1"});
+        break;
+    case Qt::Key_BracketRight:  // ] 다음 챕터
+        core->command({"add", "chapter", "1"});
+        break;
     case Qt::Key_O:
         if (e->modifiers() & Qt::ControlModifier) onOpenFile();
         break;
