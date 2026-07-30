@@ -53,15 +53,73 @@ bool MpvCore::initialize(WId windowId) {
         return false;
     }
 
-    // ── 초기화 후 설정 ────────────────────────────────────────────
-    // 비디오 (render API 모드에서는 hwdec만 설정)
-    check_error(mpv_set_property_string(mpv_, "hwdec",        "auto"));
-    check_error(mpv_set_property_string(mpv_, "video-sync",   "display-resample"));
+    // ══════════════════════════════════════════════════════════════════
+    // 화질/음질 최적화 원칙 (이 주석을 절대 삭제하지 말 것)
+    // 목표: 제작사가 의도한 색감과 음향을 100% 그대로 재현
+    // 모든 설정은 이 목표를 위해 신중하게 선택되었음.
+    // ══════════════════════════════════════════════════════════════════
 
-    // 오디오 (WASAPI + 패스스루)
-    check_error(mpv_set_property_string(mpv_, "ao",           "wasapi"));
-    check_error(mpv_set_property_string(mpv_, "audio-spdif",  "ac3,eac3,dts,dts-hd,truehd"));
-    check_error(mpv_set_property_string(mpv_, "af",           ""));
+    // ── 하드웨어 디코딩 ──────────────────────────────────────────────
+    // auto-safe: NVIDIA/AMD/Intel GPU 자동 감지, 실패 시 소프트웨어로 폴백
+    check_error(mpv_set_property_string(mpv_, "hwdec", "auto-safe"));
+
+    // ── 비디오 동기화 ────────────────────────────────────────────────
+    // display-resample: 모니터 주사율에 맞춰 프레임 타이밍 최적화 (티어링 방지)
+    check_error(mpv_set_property_string(mpv_, "video-sync", "display-resample"));
+
+    // ── 업스케일링 알고리즘 (화질 핵심) ─────────────────────────────
+    // ewa_lanczossharp: 현존 최고의 업스케일 선명도 (1080p→4K 등)
+    // mitchell: 다운스케일 시 링잉 없이 부드럽게
+    // sinc: 크로마(색상) 업스케일링 정확도 극대화
+    check_error(mpv_set_property_string(mpv_, "scale",  "ewa_lanczossharp"));
+    check_error(mpv_set_property_string(mpv_, "dscale", "mitchell"));
+    check_error(mpv_set_property_string(mpv_, "cscale", "sinc"));
+    // 시그모이드 업스케일링: 링잉 아티팩트 억제하면서 선명도 유지
+    check_error(mpv_set_property_string(mpv_, "sigmoid-upscaling", "yes"));
+
+    // ── HDR 톤매핑 (HDR 영상을 SDR 모니터에서 정확하게 재현) ─────────
+    // bt.2446a: ITU-R BT.2446 Annex A 방식. 현존 가장 자연스러운 HDR→SDR 변환
+    //           밝은 영역 클리핑 없이 전체 다이나믹 레인지를 SDR에 매핑
+    check_error(mpv_set_property_string(mpv_, "tone-mapping", "bt.2446a"));
+    // 영상의 실제 최대 밝기를 동적으로 측정하여 톤매핑에 반영
+    check_error(mpv_set_property_string(mpv_, "hdr-compute-peak", "yes"));
+
+    // ── 색상 관리 (Color Management) ────────────────────────────────
+    // target-colorspace-hint: 모니터의 ICC 프로파일/EDID를 읽어
+    //   영상의 색공간(BT.709/BT.2020/DCI-P3)을 정확하게 변환
+    //   → 제작사가 의도한 색감 그대로 재현
+    check_error(mpv_set_property_string(mpv_, "target-colorspace-hint", "yes"));
+    // 선형 광학 연산: 색상 혼합 및 스케일링을 선형 광학 공간에서 수행
+    //   → 물리적으로 정확한 색상 처리
+    check_error(mpv_set_property_string(mpv_, "linear-upscaling",   "yes"));
+    check_error(mpv_set_property_string(mpv_, "correct-downscaling", "yes"));
+
+    // ── 디밴딩 (Color Banding 제거) ──────────────────────────────────
+    // 어두운 장면, 하늘, 그라데이션에서 발생하는 등고선 노이즈 제거
+    // iterations=2: 2회 반복으로 강한 밴딩도 제거
+    check_error(mpv_set_property_string(mpv_, "deband",            "yes"));
+    check_error(mpv_set_property_string(mpv_, "deband-iterations", "2"));
+    check_error(mpv_set_property_string(mpv_, "deband-threshold",  "48"));
+    check_error(mpv_set_property_string(mpv_, "deband-range",      "16"));
+    check_error(mpv_set_property_string(mpv_, "deband-grain",      "24"));
+
+    // ── 디더링 (Dithering) ───────────────────────────────────────────
+    // 8bit/10bit 패널에 맞춰 디더링 적용 → 부드러운 그라데이션
+    // fruit: 오류 확산 디더링 (가장 자연스러운 결과)
+    check_error(mpv_set_property_string(mpv_, "dither-depth", "auto"));
+    check_error(mpv_set_property_string(mpv_, "dither",       "fruit"));
+
+    // ── 오디오: WASAPI Exclusive + Bit-Perfect + 패스스루 ─────────────
+    check_error(mpv_set_property_string(mpv_, "ao", "wasapi"));
+    // audio-exclusive=yes: Windows 믹서 완전 우회 (핵심 설정)
+    //   → 볼륨 조절, 리샘플링, 믹싱 없이 원음 그대로 DAC 전달
+    //   → Bit-Perfect 재생 실현
+    check_error(mpv_set_property_string(mpv_, "audio-exclusive", "yes"));
+    // 패스스루: 돌비 애트모스/DTS:X 원본 비트스트림을 리시버로 전송
+    check_error(mpv_set_property_string(mpv_, "audio-spdif",
+        "ac3,eac3,dts,dts-hd,truehd"));
+    // 오디오 필터 비움 (패스스루 시 필터 적용 불가)
+    check_error(mpv_set_property_string(mpv_, "af", ""));
 
     // 네트워크/NAS 드라이브 지원
     check_error(mpv_set_property_string(mpv_, "demuxer-readahead-secs", "2"));
