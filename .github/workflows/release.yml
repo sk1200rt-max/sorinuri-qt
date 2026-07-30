@@ -60,39 +60,84 @@ jobs:
           arch: win64_msvc2019_64
           cache: true
 
-      # ── libmpv 다운로드 ────────────────────────────────────────────
+      # ── libmpv 다운로드 (shinchiro → zhongfly 폴백) ──────────────
       - name: Download libmpv
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path deps/libmpv | Out-Null
-          $token = "${{ secrets.GITHUB_TOKEN }}"
-          # zhongfly/mpv-winbuild 최신 릴리스에서 dev 패키지 다운로드
-          $releases = Invoke-RestMethod -Uri "https://api.github.com/repos/zhongfly/mpv-winbuild/releases" `
-            -Headers @{ Authorization = "token $token" }
-          $asset = $releases[0].assets | Where-Object { $_.name -match "mpv-dev-x86_64" } | Select-Object -First 1
-          if (-not $asset) {
-            # fallback: shinchiro
-            $releases = Invoke-RestMethod -Uri "https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/releases/latest"
-            $asset = $releases.assets | Where-Object { $_.name -match "mpv-dev-x86_64" } | Select-Object -First 1
+          $downloaded = $false
+          # 소스 1: shinchiro
+          try {
+            $releases = Invoke-RestMethod "https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/releases?per_page=5" -TimeoutSec 30
+            $devAsset = $null
+            foreach ($rel in $releases) {
+              foreach ($asset in $rel.assets) {
+                if ($asset.name -match "mpv-dev-x86_64.*\.7z$") {
+                  $devAsset = $asset; break
+                }
+              }
+              if ($devAsset) { break }
+            }
+            if ($devAsset) {
+              Write-Host "소스 1 (shinchiro): $($devAsset.name)"
+              Invoke-WebRequest -Uri $devAsset.browser_download_url -OutFile "mpv-dev.7z" -TimeoutSec 180
+              $downloaded = $true
+            }
+          } catch {
+            Write-Host "소스 1 실패: $_"
           }
-          Invoke-WebRequest -Uri $asset.browser_download_url -OutFile "mpv-dev.7z"
-          7z x mpv-dev.7z -odeps/libmpv -y | Out-Null
-          Write-Host "libmpv 다운로드 완료: $($asset.name)"
+          # 소스 2: zhongfly (shinchiro 실패 시 대체)
+          if (-not $downloaded) {
+            try {
+              $releases = Invoke-RestMethod "https://api.github.com/repos/zhongfly/mpv-winbuild/releases?per_page=5" -TimeoutSec 30
+              $devAsset = $null
+              foreach ($rel in $releases) {
+                foreach ($asset in $rel.assets) {
+                  if ($asset.name -match "mpv-dev-x86_64.*\.7z$") {
+                    $devAsset = $asset; break
+                  }
+                }
+                if ($devAsset) { break }
+              }
+              if ($devAsset) {
+                Write-Host "소스 2 (zhongfly): $($devAsset.name)"
+                Invoke-WebRequest -Uri $devAsset.browser_download_url -OutFile "mpv-dev.7z" -TimeoutSec 180
+                $downloaded = $true
+              }
+            } catch {
+              Write-Host "소스 2 실패: $_"
+            }
+          }
+          if (-not $downloaded) {
+            Write-Error "libmpv dev 패키지를 다운로드할 수 없습니다"
+            exit 1
+          }
+          7z x mpv-dev.7z -o"mpv-dev" -y | Out-Null
+          Get-ChildItem -Recurse mpv-dev | Select-Object -ExpandProperty FullName
 
-      # ── libmpv 헤더/라이브러리 준비 ───────────────────────────────
+      # ── libmpv 헤더 및 라이브러리 준비 ────────────────────────────
       - name: Prepare libmpv deps
         shell: pwsh
         run: |
-          $devDir = Get-ChildItem deps/libmpv -Directory | Select-Object -First 1
-          if ($devDir) {
-            Copy-Item "$($devDir.FullName)/include" deps/libmpv/include -Recurse -Force
-            Copy-Item "$($devDir.FullName)/lib" deps/libmpv/lib -Recurse -Force
+          New-Item -ItemType Directory -Force deps/libmpv/include/mpv | Out-Null
+          New-Item -ItemType Directory -Force deps/libmpv/lib | Out-Null
+          $headers = Get-ChildItem -Recurse mpv-dev -Filter "*.h"
+          foreach ($h in $headers) { Copy-Item $h.FullName deps/libmpv/include/mpv/ }
+          $dll = Get-ChildItem -Recurse mpv-dev -Filter "libmpv-2.dll" | Select-Object -First 1
+          if (-not $dll) { $dll = Get-ChildItem -Recurse mpv-dev -Filter "mpv-2.dll" | Select-Object -First 1 }
+          if (-not $dll) { Write-Error "libmpv DLL 없음"; exit 1 }
+          Copy-Item $dll.FullName deps/libmpv/lib/libmpv-2.dll
+          $existingLib = Get-ChildItem -Recurse mpv-dev -Filter "*.lib" | Select-Object -First 1
+          if ($existingLib) {
+            Copy-Item $existingLib.FullName deps/libmpv/lib/mpv.lib
+          } else {
+            $dumpbinOutput = & dumpbin /exports deps/libmpv/lib/libmpv-2.dll 2>&1
+            $exports = $dumpbinOutput | Where-Object { $_ -match "^\s+\d+\s+[0-9A-F]+\s+[0-9A-F]+\s+(\S+)" } |
+              ForEach-Object { [regex]::Match($_, "^\s+\d+\s+[0-9A-F]+\s+[0-9A-F]+\s+(\S+)").Groups[1].Value }
+            $defContent = @("LIBRARY libmpv-2", "EXPORTS") + $exports
+            $defContent | Set-Content deps/libmpv/lib/libmpv-2.def -Encoding ASCII
+            lib /def:deps/libmpv/lib/libmpv-2.def /out:deps/libmpv/lib/mpv.lib /machine:x64
           }
-          # libmpv-2.dll 위치 확인
-          $dll = Get-ChildItem deps/libmpv -Filter "libmpv-2.dll" -Recurse | Select-Object -First 1
-          if ($dll) {
-            Copy-Item $dll.FullName deps/libmpv/lib/ -Force
-          }
+          Get-ChildItem -Recurse deps/libmpv | Select-Object FullName, Length
 
       # ── WebView2 SDK 다운로드 ──────────────────────────────────────
       - name: Download WebView2 SDK
