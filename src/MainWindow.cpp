@@ -226,35 +226,8 @@ void MainWindow::setupConnections() {
     connect(core, &MpvCore::playbackPaused,  musicPage_, [this]() { musicPage_->setPlaying(false); });
     // 미니 플레이어 연결
     connect(musicPage_, &MusicWidget::miniModeRequested, this, &MainWindow::toggleMiniPlayer);
-    // miniPlayer_ 연결은 toggleMiniPlayer에서 처리 (지연 초기화)
-    // miniPlayer_ 연결은 toggleMiniPlayer에서 처리 (지연 초기화)
-    // miniPlayer_ 연결은 toggleMiniPlayer에서 처리 (지연 초기화)
-    // miniPlayer_ 연결은 toggleMiniPlayer에서 처리 (지연 초기화)
-    // miniPlayer_ 연결은 toggleMiniPlayer에서 처리 (지연 초기화)
-    connect(core, &MpvCore::positionChanged, miniPlayer_, [this](double pos) {
-    });
-    // AI 자막 연결
-    // 지연 초기화 위젯 연결은 P 키 패널 열 때 처리
-            this, [this](const QString& text, double start, double end, int conf) {
-        Q_UNUSED(start); Q_UNUSED(end);
-        // AI 배지 포함 자막 텍스트 구성
-        QString badge = (conf >= 90) ? " [AI]" : (conf >= 80 ? " [AI?]" : " [AI!]");
-        mpvWidget_->core()->setProperty("sub-text", text + badge);
-    });
-    // 지연 초기화 위젯 연결은 P 키 패널 열 때 처리
-            mpvWidget_->core(), [this](double s){ mpvWidget_->core()->seek(s); });
-    // 챕터 연결
-    // 지연 초기화 위젯 연결은 P 키 패널 열 때 처리
-            mpvWidget_->core(), [this](double s){ mpvWidget_->core()->seek(s); });
-    // 지연 초기화 위젯 연결은 P 키 패널 열 때 처리
-    connect(core, &MpvCore::fileLoaded, chapterWidget_, [this](const QString& path){
-        Q_UNUSED(path);
-    // 지연 초기화 위젯 연결은 P 키 패널 열 때 처리
-    });
-    connect(core, &MpvCore::durationChanged, chapterWidget_, [this](double d){
-    // 지연 초기화 위젯 연결은 P 키 패널 열 때 처리
-    });
-
+    // miniPlayer_, whisperWidget_, chapterWidget_ 연결은 지연 초기화
+    // (toggleMiniPlayer, onProFeaturesRequested에서 처음 생성 시 연결)
 }
 
 void MainWindow::openFiles(const QStringList& paths) {
