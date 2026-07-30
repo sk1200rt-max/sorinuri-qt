@@ -177,22 +177,22 @@ jobs:
         shell: pwsh
         run: |
           $version = "${{ steps.version.outputs.version }}"
-          New-Item -ItemType Directory -Force -Path "dist/Sorinuri-Qt-Portable" | Out-Null
-          Copy-Item "build/Release/Sorinuri.exe" "dist/Sorinuri-Qt-Portable/" -Force
+          New-Item -ItemType Directory -Force -Path "dist/Sorinuri-Portable" | Out-Null
+          Copy-Item "build/Release/Sorinuri.exe" "dist/Sorinuri-Portable/" -Force
           $mpvDll = Get-ChildItem deps/libmpv -Filter "libmpv-2.dll" -Recurse | Select-Object -First 1
-          if ($mpvDll) { Copy-Item $mpvDll.FullName "dist/Sorinuri-Qt-Portable/" -Force }
+          if ($mpvDll) { Copy-Item $mpvDll.FullName "dist/Sorinuri-Portable/" -Force }
           $wv2Dll = Get-ChildItem deps/webview2 -Filter "WebView2Loader.dll" -Recurse | Select-Object -First 1
-          if ($wv2Dll) { Copy-Item $wv2Dll.FullName "dist/Sorinuri-Qt-Portable/" -Force }
+          if ($wv2Dll) { Copy-Item $wv2Dll.FullName "dist/Sorinuri-Portable/" -Force }
           # yt-dlp 다운로드
           Invoke-WebRequest -Uri "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe" `
-            -OutFile "dist/Sorinuri-Qt-Portable/yt-dlp.exe" -TimeoutSec 120
+            -OutFile "dist/Sorinuri-Portable/yt-dlp.exe" -TimeoutSec 120
           # Qt DLL 배포
           $windeployqt = "$env:QT_ROOT_DIR/bin/windeployqt.exe"
           & $windeployqt `
             --no-translations --no-system-d3d-compiler `
-            "dist/Sorinuri-Qt-Portable/Sorinuri.exe"
+            "dist/Sorinuri-Portable/Sorinuri.exe"
           # ZIP 압축
-          Compress-Archive -Path "dist/Sorinuri-Qt-Portable/*" `
+          Compress-Archive -Path "dist/Sorinuri-Portable/*" `
             -DestinationPath "dist/Sorinuri-Qt-$version-Portable.zip" -Force
           Write-Host "포터블 패키지: Sorinuri-Qt-$version-Portable.zip"
 
