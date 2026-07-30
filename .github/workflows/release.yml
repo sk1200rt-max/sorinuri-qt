@@ -1,0 +1,195 @@
+name: Release (태그 push 시 GitHub Release 자동 생성)
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'   # v4.2.0, v4.3.0 등 태그 push 시 트리거
+
+jobs:
+  release:
+    runs-on: windows-2022
+    timeout-minutes: 60
+    permissions:
+      contents: write   # GitHub Release 생성 권한
+
+    steps:
+      # ── 소스 체크아웃 ──────────────────────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── 버전 추출 ─────────────────────────────────────────────────
+      - name: Extract version
+        id: version
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG#v}"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "릴리스 버전: $VERSION"
+
+      # ── CHANGELOG에서 이번 버전 릴리스 노트 추출 ─────────────────
+      - name: Extract release notes
+        id: notes
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          # CHANGELOG.md에서 해당 버전 섹션 추출
+          NOTES=$(awk "/^## \[v${VERSION}\]/{found=1; next} found && /^## \[v/{exit} found{print}" CHANGELOG.md)
+          if [ -z "$NOTES" ]; then
+            NOTES="소리누리 v${VERSION} 릴리스"
+          fi
+          # 멀티라인 output 처리
+          {
+            echo "notes<<EOF"
+            echo "$NOTES"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
+      # ── Visual Studio 환경 설정 ────────────────────────────────────
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      # ── Qt6 설치 ───────────────────────────────────────────────────
+      - name: Install Qt6
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.7.3'
+          arch: win64_msvc2019_64
+          cache: true
+
+      # ── libmpv 다운로드 ────────────────────────────────────────────
+      - name: Download libmpv
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path deps/libmpv | Out-Null
+          $token = "${{ secrets.GITHUB_TOKEN }}"
+          # zhongfly/mpv-winbuild 최신 릴리스에서 dev 패키지 다운로드
+          $releases = Invoke-RestMethod -Uri "https://api.github.com/repos/zhongfly/mpv-winbuild/releases" `
+            -Headers @{ Authorization = "token $token" }
+          $asset = $releases[0].assets | Where-Object { $_.name -match "mpv-dev-x86_64" } | Select-Object -First 1
+          if (-not $asset) {
+            # fallback: shinchiro
+            $releases = Invoke-RestMethod -Uri "https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/releases/latest"
+            $asset = $releases.assets | Where-Object { $_.name -match "mpv-dev-x86_64" } | Select-Object -First 1
+          }
+          Invoke-WebRequest -Uri $asset.browser_download_url -OutFile "mpv-dev.7z"
+          7z x mpv-dev.7z -odeps/libmpv -y | Out-Null
+          Write-Host "libmpv 다운로드 완료: $($asset.name)"
+
+      # ── libmpv 헤더/라이브러리 준비 ───────────────────────────────
+      - name: Prepare libmpv deps
+        shell: pwsh
+        run: |
+          $devDir = Get-ChildItem deps/libmpv -Directory | Select-Object -First 1
+          if ($devDir) {
+            Copy-Item "$($devDir.FullName)/include" deps/libmpv/include -Recurse -Force
+            Copy-Item "$($devDir.FullName)/lib" deps/libmpv/lib -Recurse -Force
+          }
+          # libmpv-2.dll 위치 확인
+          $dll = Get-ChildItem deps/libmpv -Filter "libmpv-2.dll" -Recurse | Select-Object -First 1
+          if ($dll) {
+            Copy-Item $dll.FullName deps/libmpv/lib/ -Force
+          }
+
+      # ── WebView2 SDK 다운로드 ──────────────────────────────────────
+      - name: Download WebView2 SDK
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path deps/webview2 | Out-Null
+          nuget install Microsoft.Web.WebView2 -OutputDirectory deps/nuget -NonInteractive -Version 1.0.2849.39
+          $wv2 = Get-ChildItem deps/nuget -Filter "Microsoft.Web.WebView2*" -Directory | Select-Object -First 1
+          if ($wv2) {
+            Copy-Item "$($wv2.FullName)/build/native/include" deps/webview2/include -Recurse -Force
+            Copy-Item "$($wv2.FullName)/build/native/x64" deps/webview2/lib -Recurse -Force
+          }
+
+      # ── CMake 빌드 ────────────────────────────────────────────────
+      - name: Configure CMake
+        shell: pwsh
+        run: |
+          cmake -B build -S . `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DMPV_INCLUDE_DIR="$PWD/deps/libmpv/include" `
+            -DMPV_LIB_DIR="$PWD/deps/libmpv/lib" `
+            -DWEBVIEW2_SDK_DIR="$PWD/deps/webview2"
+
+      - name: Build
+        shell: pwsh
+        run: cmake --build build --config Release --parallel
+
+      # ── 포터블 패키지 생성 ────────────────────────────────────────
+      - name: Package Portable
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          New-Item -ItemType Directory -Force -Path "dist/Sorinuri-Qt-Portable" | Out-Null
+          Copy-Item "build/Release/Sorinuri.exe" "dist/Sorinuri-Qt-Portable/" -Force
+          $mpvDll = Get-ChildItem deps/libmpv -Filter "libmpv-2.dll" -Recurse | Select-Object -First 1
+          if ($mpvDll) { Copy-Item $mpvDll.FullName "dist/Sorinuri-Qt-Portable/" -Force }
+          $wv2Dll = Get-ChildItem deps/webview2 -Filter "WebView2Loader.dll" -Recurse | Select-Object -First 1
+          if ($wv2Dll) { Copy-Item $wv2Dll.FullName "dist/Sorinuri-Qt-Portable/" -Force }
+          # yt-dlp 다운로드
+          Invoke-WebRequest -Uri "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe" `
+            -OutFile "dist/Sorinuri-Qt-Portable/yt-dlp.exe" -TimeoutSec 120
+          # Qt DLL 배포
+          & "$env:Qt6_DIR/../../../bin/windeployqt.exe" `
+            --no-translations --no-system-d3d-compiler `
+            "dist/Sorinuri-Qt-Portable/Sorinuri.exe"
+          # ZIP 압축
+          Compress-Archive -Path "dist/Sorinuri-Qt-Portable/*" `
+            -DestinationPath "dist/Sorinuri-Qt-$version-Portable.zip" -Force
+          Write-Host "포터블 패키지: Sorinuri-Qt-$version-Portable.zip"
+
+      # ── 설치파일 생성 ─────────────────────────────────────────────
+      - name: Build Installer
+        shell: pwsh
+        run: |
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            Invoke-WebRequest -Uri "https://files.jrsoftware.org/is/6/innosetup-6.3.3.exe" `
+              -OutFile "innosetup.exe" -TimeoutSec 120
+            Start-Process -FilePath "innosetup.exe" -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART" -Wait
+          }
+          $koreanIsl = "C:\Program Files (x86)\Inno Setup 6\Languages\Korean.isl"
+          if (-not (Test-Path $koreanIsl)) {
+            $issContent = Get-Content installer/sorinuri-setup.iss -Raw
+            $issContent = $issContent -replace 'Name: "korean";.*\n', ''
+            $issContent | Set-Content installer/sorinuri-setup-en.iss -Encoding UTF8
+            & $iscc installer/sorinuri-setup-en.iss
+          } else {
+            & $iscc installer/sorinuri-setup.iss
+          }
+
+      # ── GitHub Release 생성 ───────────────────────────────────────
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: "소리누리 ${{ steps.version.outputs.tag }}"
+          body: |
+            ## 소리누리 ${{ steps.version.outputs.tag }}
+
+            ${{ steps.notes.outputs.notes }}
+
+            ---
+
+            ### 다운로드
+            | 파일 | 설명 |
+            |------|------|
+            | `Sorinuri-Qt-${{ steps.version.outputs.version }}-Portable.zip` | 압축 해제 후 바로 실행 (설치 불필요) |
+            | `Sorinuri-Setup-${{ steps.version.outputs.version }}.exe` | 설치 마법사 (파일 연결, 시작 메뉴 등록) |
+
+            ### 시스템 요구사항
+            - Windows 10 / 11 (64-bit)
+            - Microsoft Edge (WebView2 런타임, Windows 기본 설치)
+            - Dolby Atmos 출력: HDMI/광출력 연결 + Dolby Access 앱 (Microsoft Store 무료)
+          files: |
+            dist/Sorinuri-Qt-${{ steps.version.outputs.version }}-Portable.zip
+            dist/Sorinuri-Setup-${{ steps.version.outputs.version }}.exe
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -62,7 +62,7 @@ int main(int argc, char* argv[]) {
     QApplication app(argc, argv);
     app.setApplicationName("Sorinuri");
     app.setApplicationDisplayName("소리누리");
-    app.setApplicationVersion("1.0.0");
+    app.setApplicationVersion("4.2.0");
     app.setOrganizationName("Sorinuri");
     app.setWindowIcon(QIcon(":/sorinuri-app.png"));
 
