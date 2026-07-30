@@ -143,12 +143,19 @@ jobs:
       - name: Download WebView2 SDK
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path deps/webview2 | Out-Null
-          nuget install Microsoft.Web.WebView2 -OutputDirectory deps/nuget -NonInteractive -Version 1.0.2849.39
-          $wv2 = Get-ChildItem deps/nuget -Filter "Microsoft.Web.WebView2*" -Directory | Select-Object -First 1
-          if ($wv2) {
-            Copy-Item "$($wv2.FullName)/build/native/include" deps/webview2/include -Recurse -Force
-            Copy-Item "$($wv2.FullName)/build/native/x64" deps/webview2/lib -Recurse -Force
+          try {
+            $nupkgUrl = "https://www.nuget.org/api/v2/package/Microsoft.Web.WebView2/1.0.2792.45"
+            Invoke-WebRequest -Uri $nupkgUrl -OutFile "webview2.nupkg" -TimeoutSec 120
+            Rename-Item webview2.nupkg webview2.zip
+            Expand-Archive webview2.zip -DestinationPath webview2-sdk -Force
+            New-Item -ItemType Directory -Force deps/webview2/include | Out-Null
+            New-Item -ItemType Directory -Force deps/webview2/lib/x64  | Out-Null
+            Copy-Item webview2-sdk/build/native/include/*.h deps/webview2/include/
+            Copy-Item webview2-sdk/build/native/x64/WebView2Loader.dll.lib deps/webview2/lib/x64/
+            Copy-Item webview2-sdk/build/native/x64/WebView2Loader.dll     deps/webview2/lib/x64/
+            Write-Host "WebView2 SDK 준비 완료"
+          } catch {
+            Write-Host "WebView2 SDK 다운로드 실패 (OTT 기능 비활성화): $_"
           }
 
       # ── CMake 빌드 ────────────────────────────────────────────────
