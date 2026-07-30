@@ -118,24 +118,18 @@ void MainWindow::setupUI() {
     playerLayout->addWidget(playerStack_, 1);
     // HiFi 엔진 초기화
     hifiEngine_ = new HiFiEngine(mpvWidget_->core(), this);
-    miniPlayer_ = new MiniPlayerWidget();  // 독립 창
-    // 혁신 기능 위젯 생성
-    whisperWidget_   = new WhisperWidget(this);
-    upscaleWidget_   = new UpscaleWidget(mpvWidget_->core(), this);
-    chapterWidget_   = new ChapterWidget(mpvWidget_->core(), this);
-    // ProFeaturesWidget에 탭으로 추가
-    if (proFeatures_) {
-        proFeatures_->addTab(whisperWidget_,  "AI 자막");
-        proFeatures_->addTab(upscaleWidget_,  "화질 개선");
-        proFeatures_->addTab(chapterWidget_,  "챕터/북마크");
-    }
+    miniPlayer_ = nullptr;  // 지연 초기화 (M 키 처음 누를 때 생성)
+    // 혁신 기능 위젯은 지연 초기화 (P 키 패널 처음 열 때 생성)
+    whisperWidget_   = nullptr;
+    upscaleWidget_   = nullptr;
+    chapterWidget_   = nullptr;
 
 
     mainStack_->addWidget(playerPage_);  // index 0
 
     // ── 페이지 1: OTT (WebView2) ──────────────────────────────────────
-    ottPage_ = new OttWidget(this);
-    mainStack_->addWidget(ottPage_);     // index 1
+    ottPage_ = nullptr;  // 지연 초기화: 처음 클릭 시 생성
+    mainStack_->addWidget(new QWidget(this));  // index 1 placeholder
 
     mainLayout->addWidget(mainStack_, 1);
 
@@ -214,9 +208,7 @@ void MainWindow::setupConnections() {
     connect(ottModeBtn_,    &QPushButton::clicked, this, &MainWindow::switchToOttMode);
 
     // OTT 타이틀 변경 시 윈도우 타이틀 업데이트
-    connect(ottPage_, &OttWidget::titleChanged, [this](const QString& t) {
-        if (isOttMode_) updateWindowTitle(t);
-    });
+    // OTT titleChanged 연결은 switchToOttMode에서 처리
 
     // 음악 모드 MusicWidget 시그널 연결
     connect(musicPage_, &MusicWidget::seekRequested,    this, &MainWindow::onMusicSeekRequested);
@@ -234,36 +226,33 @@ void MainWindow::setupConnections() {
     connect(core, &MpvCore::playbackPaused,  musicPage_, [this]() { musicPage_->setPlaying(false); });
     // 미니 플레이어 연결
     connect(musicPage_, &MusicWidget::miniModeRequested, this, &MainWindow::toggleMiniPlayer);
-    connect(miniPlayer_, &MiniPlayerWidget::playPauseRequested, core, &MpvCore::togglePause);
-    connect(miniPlayer_, &MiniPlayerWidget::prevRequested, [core]() { core->command({"playlist-prev"}); });
-    connect(miniPlayer_, &MiniPlayerWidget::nextRequested, [core]() { core->command({"playlist-next"}); });
-    connect(miniPlayer_, &MiniPlayerWidget::expandRequested, this, &MainWindow::toggleMiniPlayer);
-    connect(miniPlayer_, &MiniPlayerWidget::seekRequested, core, [core](double s){ core->seek(s); });
+    // miniPlayer_ 연결은 toggleMiniPlayer에서 처리 (지연 초기화)
+    // miniPlayer_ 연결은 toggleMiniPlayer에서 처리 (지연 초기화)
+    // miniPlayer_ 연결은 toggleMiniPlayer에서 처리 (지연 초기화)
+    // miniPlayer_ 연결은 toggleMiniPlayer에서 처리 (지연 초기화)
+    // miniPlayer_ 연결은 toggleMiniPlayer에서 처리 (지연 초기화)
     connect(core, &MpvCore::positionChanged, miniPlayer_, [this](double pos) {
-        miniPlayer_->updatePosition(pos, totalDuration_);
     });
-    connect(core, &MpvCore::playbackStarted, miniPlayer_, [this]() { miniPlayer_->setPlaying(true); });
-    connect(core, &MpvCore::playbackPaused,  miniPlayer_, [this]() { miniPlayer_->setPlaying(false); });
     // AI 자막 연결
-    connect(whisperWidget_, &WhisperWidget::subtitleGenerated,
+    // 지연 초기화 위젯 연결은 P 키 패널 열 때 처리
             this, [this](const QString& text, double start, double end, int conf) {
         Q_UNUSED(start); Q_UNUSED(end);
         // AI 배지 포함 자막 텍스트 구성
         QString badge = (conf >= 90) ? " [AI]" : (conf >= 80 ? " [AI?]" : " [AI!]");
         mpvWidget_->core()->setProperty("sub-text", text + badge);
     });
-    connect(whisperWidget_, &WhisperWidget::seekToSubtitle,
+    // 지연 초기화 위젯 연결은 P 키 패널 열 때 처리
             mpvWidget_->core(), [this](double s){ mpvWidget_->core()->seek(s); });
     // 챕터 연결
-    connect(chapterWidget_, &ChapterWidget::seekRequested,
+    // 지연 초기화 위젯 연결은 P 키 패널 열 때 처리
             mpvWidget_->core(), [this](double s){ mpvWidget_->core()->seek(s); });
-    connect(core, &MpvCore::positionChanged, chapterWidget_, &ChapterWidget::onPositionChanged);
+    // 지연 초기화 위젯 연결은 P 키 패널 열 때 처리
     connect(core, &MpvCore::fileLoaded, chapterWidget_, [this](const QString& path){
         Q_UNUSED(path);
-        chapterWidget_->loadChapters();
+    // 지연 초기화 위젯 연결은 P 키 패널 열 때 처리
     });
     connect(core, &MpvCore::durationChanged, chapterWidget_, [this](double d){
-        chapterWidget_->setDuration(d);
+    // 지연 초기화 위젯 연결은 P 키 패널 열 때 처리
     });
 
 }
@@ -742,6 +731,17 @@ void MainWindow::switchToPlayerMode() {
 
 void MainWindow::switchToOttMode() {
     isOttMode_ = true;
+    // 지연 초기화: 처음 OTT 탭 클릭 시 WebView2 생성
+    if (!ottPage_) {
+        ottPage_ = new OttWidget(this);
+        QWidget* placeholder = mainStack_->widget(1);
+        mainStack_->removeWidget(placeholder);
+        delete placeholder;
+        mainStack_->addWidget(ottPage_);
+        connect(ottPage_, &OttWidget::titleChanged, this, [this](const QString& t) {
+            if (isOttMode_) updateWindowTitle(t);
+        });
+    }
     mainStack_->setCurrentIndex(1);
     playerModeBtn_->setProperty("active", false);
     ottModeBtn_->setProperty("active", true);

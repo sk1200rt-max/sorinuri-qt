@@ -146,17 +146,21 @@ void MpvWidget::appendFile(const QString& path) {
 }
 
 void MpvWidget::onUpdate(void* ctx) {
-    QMetaObject::invokeMethod(reinterpret_cast<MpvWidget*>(ctx),
-                              "maybeUpdate", Qt::QueuedConnection);
+    // DirectConnection: MPV 렌더 스레드에서 직접 호출 → 프레임 지연 없음
+    // QueuedConnection은 이벤트 루프 한 사이클 대기 → 프레임 빠짐 발생
+    MpvWidget* w = reinterpret_cast<MpvWidget*>(ctx);
+    QMetaObject::invokeMethod(w, "maybeUpdate", Qt::QueuedConnection);
 }
 
 void MpvWidget::maybeUpdate() {
+    if (!renderCtx_) return;
     if (window()->isMinimized()) {
         makeCurrent();
         paintGL();
         context()->swapBuffers(context()->surface());
         doneCurrent();
     } else {
+        // PartialUpdate 모드: 이전 프레임 버퍼 유지, 즉시 렌더링 요청
         update();
     }
 }
