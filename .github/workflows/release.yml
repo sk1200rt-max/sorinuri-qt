@@ -187,7 +187,8 @@ jobs:
           Invoke-WebRequest -Uri "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe" `
             -OutFile "dist/Sorinuri-Qt-Portable/yt-dlp.exe" -TimeoutSec 120
           # Qt DLL 배포
-          & "$env:Qt6_DIR/../../../bin/windeployqt.exe" `
+          $windeployqt = "$env:QT_ROOT_DIR/bin/windeployqt.exe"
+          & $windeployqt `
             --no-translations --no-system-d3d-compiler `
             "dist/Sorinuri-Qt-Portable/Sorinuri.exe"
           # ZIP 압축
