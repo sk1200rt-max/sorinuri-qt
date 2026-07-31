@@ -240,6 +240,9 @@ void MainWindow::openFiles(const QStringList& paths) {
             } else {
                 switchToVideoMode();
             }
+            // switchToVideoMode에서 QOpenGLWidget 컨텍스트가 재배치될 수 있으므로
+            // 이벤트 루프를 한 번 실행하여 컨텍스트 복구 후 loadFile 호출
+            QApplication::processEvents();
             mpvWidget_->loadFile(path);
             first = false;
         } else {
