@@ -367,17 +367,10 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
 
-          # 서버 아파치 설정 확인 및 sorinuri downloads 경로 허용
+          # 서버 아파치 설정 확인
           echo "=== 서버 아파치 설정 확인 ==="
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
-            "${DEPLOY_USER}@${DEPLOY_HOST}" bash << 'SSHEOF'
-            echo "=== sites-enabled 목록 ==="
-            ls /etc/apache2/sites-enabled/
-            echo "=== sorinuri 설정 ==="
-            cat /etc/apache2/sites-enabled/sorinuri* 2>/dev/null || cat /etc/apache2/sites-enabled/*sorinuri* 2>/dev/null || echo "sorinuri 설정 없음"
-            echo "=== downloads 폴더 ==="
-            ls -la /var/www/html/downloads/ 2>/dev/null
-SSHEOF
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            "echo '=== sites-enabled ===' && ls /etc/apache2/sites-enabled/ && echo '=== sorinuri conf ===' && (cat /etc/apache2/sites-enabled/*sorinuri* 2>/dev/null || echo 'sorinuri conf 없음') && echo '=== downloads ===' && ls -la /var/www/html/downloads/ 2>/dev/null" || true
 
           echo "포터블 배포 중..."
           scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
