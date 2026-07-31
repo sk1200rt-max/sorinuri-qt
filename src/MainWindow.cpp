@@ -852,30 +852,45 @@ void MainWindow::onYtdlpDownloadFailed(const QString& error) {
 }
 
 void MainWindow::loadSettings() {
-    // 초기 창 크기: 저장된 값이 없으면 화면의 60%로 설정
-    QSize defaultSize;
-    {
-        QScreen* scr = QGuiApplication::primaryScreen();
-        if (scr) {
-            QSize avail = scr->availableSize();
-            defaultSize = QSize(avail.width() * 6 / 10, avail.height() * 6 / 10);
-        } else {
-            defaultSize = QSize(1280, 760);
-        }
+    QScreen* scr = QGuiApplication::primaryScreen();
+    QRect availGeom = scr ? scr->availableGeometry() : QRect(0, 0, 1920, 1080);
+    QSize availSize = availGeom.size();
+
+    // 화면 크기의 60%를 기본 크기로 설정
+    QSize defaultSize(availSize.width() * 6 / 10, availSize.height() * 6 / 10);
+
+    // 저장된 창 크기 로드 - 단, 화면보다 크거나 화면 밖에 있으면 자동 재설정
+    QSize savedSize = settings_.value("window/size", QSize()).toSize();
+    QPoint savedPos  = settings_.value("window/pos",  QPoint(-1,-1)).toPoint();
+
+    bool needReset = false;
+    if (!savedSize.isValid() || savedSize.isEmpty()) {
+        needReset = true;  // 저장된 값 없음
+    } else if (savedSize.width()  > availSize.width() ||
+               savedSize.height() > availSize.height()) {
+        needReset = true;  // 화면보다 큼서 하단바 접근 불가
+    } else if (savedPos.x() >= 0) {
+        // 저장된 위치가 화면 밖에 있으면 재설정
+        QRect windowRect(savedPos, savedSize);
+        if (!availGeom.intersects(windowRect))
+            needReset = true;
     }
-    QSize sz = settings_.value("window/size", defaultSize).toSize();
-    resize(sz);
-    // 저장된 위치가 없으면 화면 중앙에 배치
-    QPoint p = settings_.value("window/pos", QPoint(-1,-1)).toPoint();
-    if (p.x() >= 0) {
-        move(p);
+
+    QSize sz;
+    QPoint pos;
+    if (needReset) {
+        sz  = defaultSize;
+        pos = availGeom.center() - QPoint(sz.width()/2, sz.height()/2);
+        // 다음 실행을 위해 저장
+        settings_.setValue("window/size", sz);
+        settings_.setValue("window/pos",  pos);
     } else {
-        QScreen* scr = QGuiApplication::primaryScreen();
-        if (scr) {
-            QRect avail = scr->availableGeometry();
-            move(avail.center() - QPoint(sz.width()/2, sz.height()/2));
-        }
+        sz  = savedSize;
+        pos = (savedPos.x() >= 0) ? savedPos
+              : availGeom.center() - QPoint(sz.width()/2, sz.height()/2);
     }
+    resize(sz);
+    move(pos);
 
     // 항상 위에 고정 상태 복원
     bool alwaysOnTop = settings_.value("window/alwaysOnTop", false).toBool();
