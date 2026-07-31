@@ -6,6 +6,8 @@
 #include "UpscaleWidget.h"
 #include "ChapterWidget.h"
 #include "MiniPlayerWidget.h"
+#include "UpdateChecker.h"
+#include "UpdateDialog.h"
 #include <QApplication>
 #include <QMessageBox>
 #include <QProgressDialog>
@@ -50,6 +52,16 @@ MainWindow::MainWindow(QWidget* parent)
     setupUI();
     setupConnections();
     loadSettings();
+
+    // 자동 업데이트 체크 (앱 시작 3초 후)
+    auto* updater = new UpdateChecker(this);
+    connect(updater, &UpdateChecker::updateAvailable,
+            this, [this](const QString& ver, const QString& notes, const QString& url) {
+        auto* dlg = new UpdateDialog(ver, notes, url, this);
+        dlg->setAttribute(Qt::WA_DeleteOnClose);
+        dlg->exec();
+    });
+    updater->checkForUpdates();
 }
 
 MainWindow::~MainWindow() { saveSettings(); }

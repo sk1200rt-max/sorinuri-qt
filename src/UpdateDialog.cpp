@@ -1,0 +1,167 @@
+#include "UpdateDialog.h"
+#include "UpdateChecker.h"
+#include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QTextEdit>
+#include <QDir>
+#include <QStandardPaths>
+#include <QProcess>
+#include <QMessageBox>
+#include <QApplication>
+#include <QDebug>
+
+UpdateDialog::UpdateDialog(const QString& newVersion,
+                           const QString& releaseNotes,
+                           const QString& installerUrl,
+                           QWidget* parent)
+    : QDialog(parent)
+    , installerUrl_(installerUrl)
+    , nam_(new QNetworkAccessManager(this))
+{
+    setWindowTitle("소리누리 업데이트");
+    setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
+    setFixedWidth(480);
+    setupUI(newVersion, releaseNotes);
+
+    connect(nam_, &QNetworkAccessManager::finished,
+            this, &UpdateDialog::onDownloadFinished);
+}
+
+void UpdateDialog::setupUI(const QString& newVersion, const QString& releaseNotes) {
+    auto* layout = new QVBoxLayout(this);
+    layout->setSpacing(12);
+    layout->setContentsMargins(20, 20, 20, 20);
+
+    // 제목
+    auto* titleLabel = new QLabel(
+        QString("<b>새 버전 %1이 출시됐습니다</b>").arg(newVersion), this);
+    titleLabel->setStyleSheet("font-size: 14px; color: #4fc3f7;");
+    layout->addWidget(titleLabel);
+
+    // 현재 버전 표시
+    auto* versionLabel = new QLabel(
+        QString("현재 버전: %1  →  새 버전: %2")
+            .arg(UpdateChecker::currentVersion(), newVersion), this);
+    versionLabel->setStyleSheet("color: #aaa; font-size: 11px;");
+    layout->addWidget(versionLabel);
+
+    // 릴리스 노트
+    if (!releaseNotes.isEmpty()) {
+        auto* notesLabel = new QLabel("업데이트 내용:", this);
+        notesLabel->setStyleSheet("font-weight: bold; margin-top: 8px;");
+        layout->addWidget(notesLabel);
+
+        auto* notes = new QTextEdit(this);
+        notes->setPlainText(releaseNotes);
+        notes->setReadOnly(true);
+        notes->setMaximumHeight(120);
+        notes->setStyleSheet(
+            "background: #1e1e1e; color: #ccc; border: 1px solid #444; border-radius: 4px;");
+        layout->addWidget(notes);
+    }
+
+    // 진행 상태
+    statusLabel_ = new QLabel("업데이트를 다운로드하고 설치합니다.", this);
+    statusLabel_->setStyleSheet("color: #aaa; font-size: 11px;");
+    layout->addWidget(statusLabel_);
+
+    progressBar_ = new QProgressBar(this);
+    progressBar_->setRange(0, 100);
+    progressBar_->setValue(0);
+    progressBar_->setVisible(false);
+    progressBar_->setStyleSheet(
+        "QProgressBar { border: 1px solid #444; border-radius: 4px; "
+        "background: #1e1e1e; height: 16px; text-align: center; }"
+        "QProgressBar::chunk { background: #4fc3f7; border-radius: 3px; }");
+    layout->addWidget(progressBar_);
+
+    // 버튼
+    auto* btnLayout = new QHBoxLayout();
+    btnLayout->addStretch();
+
+    skipBtn_ = new QPushButton("나중에", this);
+    skipBtn_->setStyleSheet(
+        "QPushButton { background: #333; color: #aaa; border: 1px solid #555; "
+        "border-radius: 4px; padding: 6px 16px; }"
+        "QPushButton:hover { background: #444; }");
+    connect(skipBtn_, &QPushButton::clicked, this, &QDialog::reject);
+    btnLayout->addWidget(skipBtn_);
+
+    updateBtn_ = new QPushButton("지금 업데이트", this);
+    updateBtn_->setStyleSheet(
+        "QPushButton { background: #4fc3f7; color: #000; border: none; "
+        "border-radius: 4px; padding: 6px 20px; font-weight: bold; }"
+        "QPushButton:hover { background: #81d4fa; }"
+        "QPushButton:disabled { background: #555; color: #888; }");
+    connect(updateBtn_, &QPushButton::clicked, this, &UpdateDialog::onUpdateClicked);
+    btnLayout->addWidget(updateBtn_);
+
+    layout->addLayout(btnLayout);
+}
+
+void UpdateDialog::onUpdateClicked() {
+    if (downloading_) return;
+    downloading_ = true;
+    updateBtn_->setEnabled(false);
+    skipBtn_->setEnabled(false);
+    progressBar_->setVisible(true);
+    statusLabel_->setText("다운로드 중...");
+    startDownload();
+}
+
+void UpdateDialog::startDownload() {
+    // 임시 폴더에 설치파일 저장
+    QString tempDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
+    localInstallerPath_ = tempDir + "/Sorinuri-Setup-latest.exe";
+
+    QNetworkRequest req(QUrl(installerUrl_));
+    req.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
+                     QNetworkRequest::NoLessSafeRedirectPolicy);
+    QNetworkReply* reply = nam_->get(req);
+
+    connect(reply, &QNetworkReply::downloadProgress,
+            this, &UpdateDialog::onDownloadProgress);
+}
+
+void UpdateDialog::onDownloadProgress(qint64 received, qint64 total) {
+    if (total > 0) {
+        int pct = static_cast<int>(received * 100 / total);
+        progressBar_->setValue(pct);
+        statusLabel_->setText(QString("다운로드 중... %1 MB / %2 MB")
+            .arg(received / 1024 / 1024)
+            .arg(total / 1024 / 1024));
+    }
+}
+
+void UpdateDialog::onDownloadFinished(QNetworkReply* reply) {
+    reply->deleteLater();
+
+    if (reply->error() != QNetworkReply::NoError) {
+        QMessageBox::warning(this, "다운로드 실패",
+            QString("업데이트 다운로드에 실패했습니다.\n%1").arg(reply->errorString()));
+        downloading_ = false;
+        updateBtn_->setEnabled(true);
+        skipBtn_->setEnabled(true);
+        progressBar_->setVisible(false);
+        statusLabel_->setText("다운로드 실패. 다시 시도해 주세요.");
+        return;
+    }
+
+    // 파일 저장
+    QFile file(localInstallerPath_);
+    if (file.open(QIODevice::WriteOnly)) {
+        file.write(reply->readAll());
+        file.close();
+    }
+
+    statusLabel_->setText("설치 중...");
+    progressBar_->setValue(100);
+
+    // 설치파일 실행 후 앱 종료
+    qDebug() << "[UpdateDialog] 설치 시작:" << localInstallerPath_;
+    QProcess::startDetached(localInstallerPath_, QStringList());
+
+    // 잠시 후 앱 종료
+    QTimer::singleShot(500, qApp, &QApplication::quit);
+    accept();
+}

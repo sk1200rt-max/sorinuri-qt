@@ -84,6 +84,10 @@ set(SOURCES
     src/LyricsWidget.h
     src/HiFiEngine.cpp
     src/HiFiEngine.h
+    src/UpdateChecker.cpp
+    src/UpdateChecker.h
+    src/UpdateDialog.cpp
+    src/UpdateDialog.h
     resources/resources.qrc
 )
 

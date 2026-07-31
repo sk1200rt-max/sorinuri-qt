@@ -345,11 +345,20 @@ jobs:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/master'
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
           name: deploy-files
           path: dist/
+
+      - name: Generate version.json
+        env:
+          APP_VERSION: "4.2.1"
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: python3 scripts/make_version_json.py "$APP_VERSION" "$DEPLOY_HOST"
 
       - name: Deploy to Server
         env:
@@ -357,6 +366,7 @@ jobs:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          APP_VERSION: "4.2.1"
         run: |
           if [ -z "$SSH_KEY" ] || [ -z "$DEPLOY_HOST" ]; then
             echo "배포 Secrets 미설정 - 건너뜀"
@@ -377,15 +387,20 @@ jobs:
           echo "포터블 배포 중..."
           scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
             dist/Sorinuri-Qt-Portable.zip \
-            "${DEPLOY_USER}@${DEPLOY_HOST}:${REAL_PATH}/Sorinuri-Qt-4.2.1.zip"
+            "${DEPLOY_USER}@${DEPLOY_HOST}:${REAL_PATH}/Sorinuri-Qt-${APP_VERSION}.zip"
 
           echo "설치파일 배포 중..."
           INSTALLER=$(ls dist/Sorinuri-Setup-*.exe 2>/dev/null | head -1)
           if [ -n "$INSTALLER" ]; then
             scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
               "$INSTALLER" \
-              "${DEPLOY_USER}@${DEPLOY_HOST}:${REAL_PATH}/Sorinuri-Setup-4.2.1.exe"
+              "${DEPLOY_USER}@${DEPLOY_HOST}:${REAL_PATH}/Sorinuri-Setup-${APP_VERSION}.exe"
           fi
+
+          # version.json 생성 및 배포 (자동 업데이트용)
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            /tmp/version.json \
+            "${DEPLOY_USER}@${DEPLOY_HOST}:${REAL_PATH}/version.json"
 
           # 배포 확인
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no "${DEPLOY_USER}@${DEPLOY_HOST}" \
