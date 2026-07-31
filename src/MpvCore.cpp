@@ -8,8 +8,14 @@
 #include <cstring>
 #include <stdexcept>
 
-// 진단용 앱 로그 파일 저장
+// 진단용 앱 로그 (기본 비활성화 - 사용자 PC에 파일을 남기지 않음)
+// 문제 진단 시에만 SORINURI_DEBUG 환경변수를 설정하면 활성화됨
+static bool debugLogEnabled() {
+    static const bool enabled = qEnvironmentVariableIsSet("SORINURI_DEBUG");
+    return enabled;
+}
 static void appLog(const QString& msg) {
+    if (!debugLogEnabled()) return;
     static QFile f("C:/Users/Public/sorinuri_app.log");
     if (!f.isOpen()) f.open(QIODevice::Append | QIODevice::Text);
     QTextStream ts(&f);
@@ -55,9 +61,13 @@ bool MpvCore::initialize(WId windowId) {
         check_error(mpv_set_option_string(mpv_, "vo", "libmpv"));
     }
 
-    // ── 진단용 MPV 내부 로그 파일 저장 ────────────────────────────────
-    check_error(mpv_set_option_string(mpv_, "log-file", "C:/Users/Public/sorinuri_mpv.log"));
+    // ── 진단용 MPV 내부 로그 파일: 기본 비활성화 ──────────────────
+    // SORINURI_DEBUG 환경변수 설정 시에만 로그 파일 생성 (문제 진단용)
+    if (qEnvironmentVariableIsSet("SORINURI_DEBUG")) {
+        check_error(mpv_set_option_string(mpv_, "log-file", "C:/Users/Public/sorinuri_mpv.log"));
+    }
     // error 레벨 이상을 이벤트로 수신 → AO 실패 감지에 사용 (필수, 삭제 금지)
+    // 이는 메모리 내 이벤트 수신이며 파일을 생성하지 않음
     mpv_request_log_messages(mpv_, "error");
 
     check_error(mpv_set_option_string(mpv_, "osc",        "no"));
