@@ -186,10 +186,45 @@ void MpvCore::handleEvent(mpv_event* event) {
         QString path = rawPath ? QString::fromUtf8(rawPath) : QString();
         mpv_free(rawPath);
         qInfo() << "[MPV] FILE_LOADED:" << path;
-        // pause 해제 - command 방식으로
+        // pause 해제
         const char* pauseArgs[] = { "set", "pause", "no", nullptr };
         mpv_command_async(mpv_, 0, pauseArgs);
         emit fileLoaded(path);
+        // 파일 로드 후 200ms 뒤 주요 속성 강제 갱신
+        // (observe 이벤트가 누락될 수 있으므로 직접 조회)
+        QTimer::singleShot(300, this, [this, path]() {
+            if (!mpv_ || !initialized_) return;
+            // duration
+            double dur = 0;
+            if (mpv_get_property(mpv_, "duration", MPV_FORMAT_DOUBLE, &dur) == 0 && dur > 0)
+                emit durationChanged(dur);
+            // 오디오 포맷
+            char* codec    = mpv_get_property_string(mpv_, "audio-codec-name");
+            char* channels = mpv_get_property_string(mpv_, "audio-channels");
+            int64_t sr = 0;
+            mpv_get_property(mpv_, "audio-samplerate", MPV_FORMAT_INT64, &sr);
+            if (codec) {
+                QString codecStr   = QString::fromUtf8(codec);
+                QString channelStr = channels ? QString::fromUtf8(channels) : "";
+                mpv_free(codec); mpv_free(channels);
+                int ch = 0;
+                if (channelStr == "mono") ch = 1;
+                else if (channelStr == "stereo") ch = 2;
+                else if (channelStr.contains("5.1")) ch = 6;
+                else if (channelStr.contains("7.1")) ch = 8;
+                else if (channelStr.contains("6.1")) ch = 7;
+                else { bool ok; int n = channelStr.toInt(&ok); if (ok) ch = n; }
+                char* aoFmt = mpv_get_property_string(mpv_, "audio-out-params/format");
+                QString outStr = aoFmt ? QString::fromUtf8(aoFmt) : "";
+                mpv_free(aoFmt);
+                emit audioFormatChanged(codecStr, ch, static_cast<int>(sr), outStr);
+            } else {
+                mpv_free(channels);
+            }
+            // 트랙 목록
+            emit tracksChanged();
+            qInfo() << "[MPV] 속성 강제 갱신 완료 - duration:" << dur;
+        });
         break;
     }
 

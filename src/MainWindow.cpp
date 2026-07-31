@@ -9,6 +9,8 @@
 #include "UpdateChecker.h"
 #include "UpdateDialog.h"
 #include <QApplication>
+#include <QGuiApplication>
+#include <QScreen>
 #include <QMessageBox>
 #include <QProgressDialog>
 #include <QFileDialog>
@@ -850,9 +852,30 @@ void MainWindow::onYtdlpDownloadFailed(const QString& error) {
 }
 
 void MainWindow::loadSettings() {
-    resize(settings_.value("window/size", QSize(1280, 760)).toSize());
+    // 초기 창 크기: 저장된 값이 없으면 화면의 60%로 설정
+    QSize defaultSize;
+    {
+        QScreen* scr = QGuiApplication::primaryScreen();
+        if (scr) {
+            QSize avail = scr->availableSize();
+            defaultSize = QSize(avail.width() * 6 / 10, avail.height() * 6 / 10);
+        } else {
+            defaultSize = QSize(1280, 760);
+        }
+    }
+    QSize sz = settings_.value("window/size", defaultSize).toSize();
+    resize(sz);
+    // 저장된 위치가 없으면 화면 중앙에 배치
     QPoint p = settings_.value("window/pos", QPoint(-1,-1)).toPoint();
-    if (p.x() >= 0) move(p);
+    if (p.x() >= 0) {
+        move(p);
+    } else {
+        QScreen* scr = QGuiApplication::primaryScreen();
+        if (scr) {
+            QRect avail = scr->availableGeometry();
+            move(avail.center() - QPoint(sz.width()/2, sz.height()/2));
+        }
+    }
 
     // 항상 위에 고정 상태 복원
     bool alwaysOnTop = settings_.value("window/alwaysOnTop", false).toBool();
