@@ -39,6 +39,9 @@ UninstallDisplayName={#MyAppName}
 WizardStyle=modern
 WizardResizable=no
 RestartIfNeededByRun=no
+; 설치 마법사 이미지 (소리누리 브랜드)
+WizardImageFile=wizard-banner.bmp
+WizardSmallImageFile=wizard-small.bmp
 ; 기존 버전 자동 제거 후 재설치 (업데이트 설치 지원)
 CloseApplications=yes
 CloseApplicationsFilter=*.exe
@@ -179,19 +182,32 @@ function InitializeSetup(): Boolean;
 var
   UninstallString: String;
   ResultCode: Integer;
+  Found: Boolean;
 begin
   Result := True;
 
   // 1단계: 실행 중인 소리누리 프로세스 강제 종료
-  Exec('taskkill.exe', '/F /IM Sorinuri.exe /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-  Sleep(1000);  // 프로세스 종료 대기
+  Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM Sorinuri.exe /T', '',
+       SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Sleep(2000);  // 프로세스 완전 종료 대기
 
-  // 2단계: 레지스트리에서 기존 버전 제거 문자열 확인 후 자동 제거
-  if RegQueryStringValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{8A3F2C1D-9E4B-4F7A-B2D6-1C5E8F3A9B2E}_is1',
-                         'UninstallString', UninstallString) then begin
+  // 2단계: HKCU 또는 HKLM에서 기존 버전 제거 문자열 확인
+  Found := RegQueryStringValue(HKCU,
+    'Software\Microsoft\Windows\CurrentVersion\Uninstall\{8A3F2C1D-9E4B-4F7A-B2D6-1C5E8F3A9B2E}_is1',
+    'UninstallString', UninstallString);
+  if not Found then
+    Found := RegQueryStringValue(HKLM,
+      'Software\Microsoft\Windows\CurrentVersion\Uninstall\{8A3F2C1D-9E4B-4F7A-B2D6-1C5E8F3A9B2E}_is1',
+      'UninstallString', UninstallString);
+  if not Found then
+    Found := RegQueryStringValue(HKLM,
+      'Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\{8A3F2C1D-9E4B-4F7A-B2D6-1C5E8F3A9B2E}_is1',
+      'UninstallString', UninstallString);
+
+  if Found then begin
     Exec(RemoveQuotes(UninstallString), '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART', '',
          SW_HIDE, ewWaitUntilTerminated, ResultCode);
-    Sleep(1000);  // 제거 완료 대기
+    Sleep(2000);  // 제거 완료 대기
   end;
 end;
 
