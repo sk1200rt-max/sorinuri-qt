@@ -181,12 +181,17 @@ var
   ResultCode: Integer;
 begin
   Result := True;
-  // 레지스트리에서 기존 버전 제거 문자열 확인
+
+  // 1단계: 실행 중인 소리누리 프로세스 강제 종료
+  Exec('taskkill.exe', '/F /IM Sorinuri.exe /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Sleep(1000);  // 프로세스 종료 대기
+
+  // 2단계: 레지스트리에서 기존 버전 제거 문자열 확인 후 자동 제거
   if RegQueryStringValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{8A3F2C1D-9E4B-4F7A-B2D6-1C5E8F3A9B2E}_is1',
                          'UninstallString', UninstallString) then begin
-    // 기존 버전 자동 제거 (사용자 확인 없이)
     Exec(RemoveQuotes(UninstallString), '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART', '',
          SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    Sleep(1000);  // 제거 완료 대기
   end;
 end;
 
