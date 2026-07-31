@@ -42,9 +42,13 @@ bool MpvCore::initialize(WId windowId) {
         check_error(mpv_set_option_string(mpv_, "vo", "libmpv"));
     }
 
-    check_error(mpv_set_option_string(mpv_, "osc",       "no"));
-    check_error(mpv_set_option_string(mpv_, "idle",      "yes"));
-    check_error(mpv_set_option_string(mpv_, "keep-open", "yes"));
+    check_error(mpv_set_option_string(mpv_, "osc",        "no"));
+    check_error(mpv_set_option_string(mpv_, "idle",       "yes"));
+    check_error(mpv_set_option_string(mpv_, "keep-open",  "always"));
+    // 파일 로드 시 자동 재생: pause 초기값을 no로 설정
+    // keep-open=always는 재생 완료 후 마지막 프레임에서 멈춰지만
+    // 새 파일 로드 시 pause 상태를 유지하지 않음
+    check_error(mpv_set_option_string(mpv_, "pause",      "no"));
 
     // ── mpv_initialize ────────────────────────────────────────────
     int ret = mpv_initialize(mpv_);
