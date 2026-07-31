@@ -115,15 +115,28 @@ SettingsDialog::SettingsDialog(MpvCore* mpv, QWidget* parent)
 
     mainLayout->addWidget(tabs, 1);
 
-    // 버튼
+    // 버튼 영역
     QWidget* btnWidget = new QWidget(this);
-    btnWidget->setStyleSheet("background: #141414; border-top: 1px solid #2a2a2a;");
+    // 버튼 영역 최소 높이 보장: 위아래 여백 10px + 버튼 32px = 52px
+    btnWidget->setMinimumHeight(52);
+    btnWidget->setStyleSheet(
+        "QWidget { background: #141414; border-top: 1px solid #2a2a2a; }"
+        // 버튼은 btnWidget 자식으로 설정하여 스타일시트 상속이 정상 적용됨
+        "QPushButton { background: #252525; border: 1px solid #333; border-radius: 3px;"
+        "  padding: 6px 16px; color: #e0e0e0; min-height: 28px; }"
+        "QPushButton:hover { background: #2a2a2a; }"
+        "QPushButton#btnApply, QPushButton#btnOk {"
+        "  background: #1a3a5c; border-color: #4fc3f7; color: #4fc3f7; }"
+        "QPushButton#btnApply:hover, QPushButton#btnOk:hover { background: #1e4a6e; }");
     QHBoxLayout* btnLayout = new QHBoxLayout(btnWidget);
-    btnLayout->setContentsMargins(12, 8, 12, 8);
+    // 위아래 여백 10px으로 버튼 외경선이 잠히지 않도록
+    btnLayout->setContentsMargins(12, 10, 12, 10);
+    btnLayout->setSpacing(8);
 
-    QPushButton* btnApply = new QPushButton("적용", this);
-    QPushButton* btnOk    = new QPushButton("확인", this);
-    QPushButton* btnCancel= new QPushButton("취소", this);
+    // 버튼 parent를 btnWidget으로 설정하여 스타일시트 상속 정상 동작
+    QPushButton* btnApply = new QPushButton("적용", btnWidget);
+    QPushButton* btnOk    = new QPushButton("확인", btnWidget);
+    QPushButton* btnCancel= new QPushButton("취소", btnWidget);
     btnApply->setObjectName("btnApply");
     btnOk->setObjectName("btnOk");
 

@@ -181,6 +181,9 @@ void MainWindow::setupConnections() {
 
     // 전문 기능 패널 연결
     proFeatures_->connectMpv(core);
+    // 패널 내부 닫기 버튼 → toggleProFeatures (앱 종료 아님)
+    connect(proFeatures_, &ProFeaturesWidget::closeRequested,
+            this, &MainWindow::toggleProFeatures);
 
     connect(titleBar_, &TitleBar::minimizeClicked,   this, &QMainWindow::showMinimized);
     connect(titleBar_, &TitleBar::maximizeClicked,   [this]() { isMaximized() ? showNormal() : showMaximized(); });

@@ -42,10 +42,12 @@ QPushButton* ControlBar::makeModeBtn(const QString& text, const QString& tip) {
 
 ControlBar::ControlBar(QWidget* parent) : QWidget(parent) {
     setFixedHeight(62);
-    setStyleSheet("background: #0d0d0d; border-top: 1px solid #1a1a1a;");
+    // border-top 제거: 영상과 컨트롤바 사이에 불필요한 업스라인이 보이는 문제 해결
+    setStyleSheet("background: #0d0d0d;");
 
     auto* mainLayout = new QVBoxLayout(this);
-    mainLayout->setContentsMargins(8, 4, 8, 4);
+    // 상단 여백 5px: 타임라인 슬라이더 핸들이 영상 영역에 겹치지 않도록
+    mainLayout->setContentsMargins(8, 5, 8, 4);
     mainLayout->setSpacing(2);
 
     // 시크 바 행

@@ -51,6 +51,7 @@ public:
     double currentSpeed() const { return currentSpeed_; }
 
 signals:
+    void closeRequested();  // 패널 닫기 요청 (앱 종료 아님)
     void speedChanged(double speed);
     void audioDelayChanged(double ms);
     void subDelayChanged(double ms);

@@ -54,6 +54,18 @@ ProFeaturesWidget::ProFeaturesWidget(QWidget* parent) : QWidget(parent) {
         "QTabBar::tab:hover { color: #ccc; }");
     tabWidget_->setDocumentMode(true);
 
+    // ── 패널 닫기 버튼 (탭바 오른쪽 코너) ────────────────────────
+    // 앱 종료가 아니라 패널만 닫힘 → MainWindow::toggleProFeatures() 호출
+    auto* closeBtn = new QPushButton("✕", this);
+    closeBtn->setFixedSize(22, 22);
+    closeBtn->setToolTip("전문 기능 패널 닫기 (P 키)");
+    closeBtn->setStyleSheet(
+        "QPushButton { background: transparent; color: #555; border: none;"
+        "  font-size: 12px; font-weight: bold; border-radius: 3px; }"
+        "QPushButton:hover { background: #c42b1c; color: #fff; }");
+    connect(closeBtn, &QPushButton::clicked, this, &ProFeaturesWidget::closeRequested);
+    tabWidget_->setCornerWidget(closeBtn, Qt::TopRightCorner);
+
     auto* outerLayout = new QVBoxLayout(this);
     outerLayout->setContentsMargins(0, 0, 0, 0);
     outerLayout->setSpacing(0);
