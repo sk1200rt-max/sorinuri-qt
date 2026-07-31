@@ -529,7 +529,13 @@ bool MainWindow::nativeEvent(const QByteArray& type, void* msg, qintptr* result)
     if (type == "windows_generic_MSG") {
         MSG* m = static_cast<MSG*>(msg);
         if (m->message == WM_NCHITTEST) {
-            QPoint pos = mapFromGlobal(QPoint(GET_X_LPARAM(m->lParam), GET_Y_LPARAM(m->lParam)));
+            // WM_NCHITTEST lParam은 물리 픽셀(스크린 좌표)이므로
+            // DPI 스케일로 나눠서 논리 픽셀으로 변환
+            const double dpr = devicePixelRatio();
+            int screenX = GET_X_LPARAM(m->lParam);
+            int screenY = GET_Y_LPARAM(m->lParam);
+            QPoint logicalGlobal(qRound(screenX / dpr), qRound(screenY / dpr));
+            QPoint pos = mapFromGlobal(logicalGlobal);
             int edge = getResizeEdge(pos);
             if (edge > 0) {
                 static const LRESULT edges[] = {0,HTLEFT,HTRIGHT,HTTOP,HTBOTTOM,
