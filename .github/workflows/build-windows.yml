@@ -367,20 +367,27 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
 
-          # 서버 아파치 설정 확인
-          echo "=== 서버 아파치 설정 확인 ==="
+          # sorinuri.com DocumentRoot: /var/www/sorinuri
+          REAL_PATH="/var/www/sorinuri/downloads"
+
+          # downloads 폴더 생성
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no "${DEPLOY_USER}@${DEPLOY_HOST}" \
-            "echo '=== sites-enabled ===' && ls /etc/apache2/sites-enabled/ && echo '=== sorinuri conf ===' && (cat /etc/apache2/sites-enabled/*sorinuri* 2>/dev/null || echo 'sorinuri conf 없음') && echo '=== downloads ===' && ls -la /var/www/html/downloads/ 2>/dev/null" || true
+            "mkdir -p $REAL_PATH && chmod 755 $REAL_PATH"
 
           echo "포터블 배포 중..."
           scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
             dist/Sorinuri-Qt-Portable.zip \
-            "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/Sorinuri-Qt-4.2.1.zip"
+            "${DEPLOY_USER}@${DEPLOY_HOST}:${REAL_PATH}/Sorinuri-Qt-4.2.1.zip"
+
           echo "설치파일 배포 중..."
           INSTALLER=$(ls dist/Sorinuri-Setup-*.exe 2>/dev/null | head -1)
           if [ -n "$INSTALLER" ]; then
             scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
               "$INSTALLER" \
-              "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/Sorinuri-Setup-4.2.1.exe"
+              "${DEPLOY_USER}@${DEPLOY_HOST}:${REAL_PATH}/Sorinuri-Setup-4.2.1.exe"
           fi
+
+          # 배포 확인
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            "ls -lh $REAL_PATH/"
           echo "배포 완료"
