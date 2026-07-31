@@ -115,7 +115,9 @@ void UpdateDialog::startDownload() {
     QString tempDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
     localInstallerPath_ = tempDir + "/Sorinuri-Setup-latest.exe";
 
-    QNetworkRequest req(QUrl(installerUrl_));
+    QUrl dlUrl(installerUrl_);
+    QNetworkRequest req;
+    req.setUrl(dlUrl);
     QNetworkReply* reply = nam_->get(req);
 
     connect(reply, &QNetworkReply::downloadProgress,
