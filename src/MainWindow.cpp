@@ -967,9 +967,11 @@ void MainWindow::loadSettings() {
     int vol = settings_.value("audio/volume", 100).toInt();
     mpvWidget_->core()->setVolume(vol);
     controlBar_->setVolume(vol);
-    if (settings_.value("audio/exclusive", true).toBool())
+    // audio-exclusive 및 passthrough는 사용자가 설정에서 명시적으로 활성화한 경우만 적용
+    // 기본값 false: 일반 재생 보장 (오디오 초기화 실패 방지)
+    if (settings_.value("audio/exclusive", false).toBool())
         mpvWidget_->core()->setAudioExclusive(true);
-    if (settings_.value("audio/passthrough", true).toBool()) {
+    if (settings_.value("audio/passthrough", false).toBool()) {
         QStringList codecs;
         if (settings_.value("audio/pt_ac3",    true).toBool()) codecs << "ac3";
         if (settings_.value("audio/pt_eac3",   true).toBool()) codecs << "eac3";

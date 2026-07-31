@@ -110,16 +110,13 @@ bool MpvCore::initialize(WId windowId) {
     check_error(mpv_set_property_string(mpv_, "dither-depth", "auto"));
     check_error(mpv_set_property_string(mpv_, "dither",       "fruit"));
 
-    // ── 오디오: WASAPI Exclusive + Bit-Perfect + 패스스루 ─────────────
+    // ── 오디오: WASAPI (기본 공유 모드, 설정에서 Exclusive 전환 가능) ──────
+    // wasapi: Windows 오디오 드라이버 (공유 모드 기본)
+    // audio-exclusive는 설정 다이얼로그에서 사용자가 활성화
+    // 기본값 no: 일반 재생 보장, 오디오 초기화 실패 방지
     check_error(mpv_set_property_string(mpv_, "ao", "wasapi"));
-    // audio-exclusive=yes: Windows 믹서 완전 우회 (핵심 설정)
-    //   → 볼륨 조절, 리샘플링, 믹싱 없이 원음 그대로 DAC 전달
-    //   → Bit-Perfect 재생 실현
-    check_error(mpv_set_property_string(mpv_, "audio-exclusive", "yes"));
-    // 패스스루: 돌비 애트모스/DTS:X 원본 비트스트림을 리시버로 전송
-    check_error(mpv_set_property_string(mpv_, "audio-spdif",
-        "ac3,eac3,dts,dts-hd,truehd"));
-    // 오디오 필터 비움 (패스스루 시 필터 적용 불가)
+    check_error(mpv_set_property_string(mpv_, "audio-exclusive", "no"));
+    // 오디오 필터 초기화
     check_error(mpv_set_property_string(mpv_, "af", ""));
 
     // 네트워크/NAS 드라이브 지원
