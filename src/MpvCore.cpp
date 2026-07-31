@@ -188,9 +188,11 @@ void MpvCore::handleEvent(mpv_event* event) {
         QString path = rawPath ? QString::fromUtf8(rawPath) : QString();
         mpv_free(rawPath);
         qInfo() << "[MPV] FILE_LOADED:" << path;
-        // pause 해제
+        // pause 해제: 동기 + 비동기 두 번 실행으로 확실히 재생 시작
+        int pauseFlag = 0;
+        mpv_set_property(mpv_, "pause", MPV_FORMAT_FLAG, &pauseFlag);  // 동기
         const char* pauseArgs[] = { "set", "pause", "no", nullptr };
-        mpv_command_async(mpv_, 0, pauseArgs);
+        mpv_command_async(mpv_, 0, pauseArgs);  // 비동기 백업
         emit fileLoaded(path);
         // 파일 로드 후 200ms 뒤 주요 속성 강제 갱신
         // (observe 이벤트가 누락될 수 있으므로 직접 조회)
