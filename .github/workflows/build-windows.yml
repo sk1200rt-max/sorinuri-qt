@@ -367,11 +367,17 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
 
-          # 서버 아파치 DocumentRoot 확인
+          # 서버 아파치 설정 확인 및 sorinuri downloads 경로 허용
           echo "=== 서버 아파치 설정 확인 ==="
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
-            "${DEPLOY_USER}@${DEPLOY_HOST}" \
-            "grep -r 'DocumentRoot' /etc/apache2/sites-enabled/ 2>/dev/null; ls -la /var/www/html/downloads/ 2>/dev/null; ls -la ~/downloads/ 2>/dev/null; ls -la /home/amoross/downloads/ 2>/dev/null"
+            "${DEPLOY_USER}@${DEPLOY_HOST}" bash << 'SSHEOF'
+            echo "=== sites-enabled 목록 ==="
+            ls /etc/apache2/sites-enabled/
+            echo "=== sorinuri 설정 ==="
+            cat /etc/apache2/sites-enabled/sorinuri* 2>/dev/null || cat /etc/apache2/sites-enabled/*sorinuri* 2>/dev/null || echo "sorinuri 설정 없음"
+            echo "=== downloads 폴더 ==="
+            ls -la /var/www/html/downloads/ 2>/dev/null
+SSHEOF
 
           echo "포터블 배포 중..."
           scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
