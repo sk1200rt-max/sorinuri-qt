@@ -66,7 +66,7 @@ bool MpvCore::initialize(WId windowId) {
     // ── 비디오 동기화 ────────────────────────────────────────────────
     // audio: 오디오 타이밍 기준으로 동기화 → OpenGL 렌더 컨텍스트와 충돌 없음
     // display-resample은 모니터 주사율 재샘플링으로 끊김 발생 가능
-    check_error(mpv_set_property_string(mpv_, "video-sync", "audio"));
+    check_error(mpv_set_property_string(mpv_, "video-sync", "display-resample"));
 
     // ── 업스케일링 알고리즘 (화질 핵심) ─────────────────────────────
     // ewa_lanczossharp: 현존 최고의 업스케일 선명도 (1080p→4K 등)
@@ -237,10 +237,37 @@ void MpvCore::handleEvent(mpv_event* event) {
 
     case MPV_EVENT_END_FILE: {
         auto* ef = reinterpret_cast<mpv_event_end_file*>(event->data);
-        if (ef->reason == MPV_END_FILE_REASON_EOF)
+        if (ef->reason == MPV_END_FILE_REASON_EOF) {
             emit playbackEnded();
-        else if (ef->reason == MPV_END_FILE_REASON_ERROR)
-            emit errorOccurred(QString::fromUtf8(mpv_error_string(ef->error)));
+        } else if (ef->reason == MPV_END_FILE_REASON_ERROR) {
+            QString errMsg = QString::fromUtf8(mpv_error_string(ef->error));
+            qWarning() << "[MPV] END_FILE error:" << errMsg;
+            // WASAPI Exclusive 실패 시 자동 폴백: Exclusive 해제 후 현재 파일 재로드
+            char* aoVal = mpv_get_property_string(mpv_, "audio-exclusive");
+            bool wasExclusive = aoVal && QString::fromUtf8(aoVal) == "yes";
+            mpv_free(aoVal);
+            if (wasExclusive) {
+                qWarning() << "[MPV] WASAPI Exclusive 실패 → 공유 모드로 자동 전환";
+                mpv_set_property_string(mpv_, "audio-exclusive", "no");
+                // 현재 파일 경로 저장 후 재로드
+                char* currentPath = mpv_get_property_string(mpv_, "path");
+                if (currentPath) {
+                    QString path = QString::fromUtf8(currentPath);
+                    mpv_free(currentPath);
+                    QTimer::singleShot(100, this, [this, path]() {
+                        if (!initialized_) return;
+                        const QByteArray pathBytes = path.toUtf8();
+                        const char* args[] = { "loadfile", pathBytes.constData(), nullptr };
+                        mpv_command_async(mpv_, 0, args);
+                    });
+                    emit errorOccurred("WASAPI Exclusive 실패 - 공유 모드로 자동 전환");
+                } else {
+                    emit errorOccurred(errMsg);
+                }
+            } else {
+                emit errorOccurred(errMsg);
+            }
+        }
         break;
     }
 

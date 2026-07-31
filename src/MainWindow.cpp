@@ -466,6 +466,40 @@ void MainWindow::keyPressEvent(QKeyEvent* e) {
     case Qt::Key_O:
         if (e->modifiers() & Qt::ControlModifier) onOpenFile();
         break;
+    case Qt::Key_I:  // 재생 정보 토글 (stats-overlay)
+        core->command({"script-message", "osd-overlay", "0"});
+        core->command({"show-progress"});
+        break;
+    case Qt::Key_T:  // 항상 위에 토글
+        {
+            bool top = windowFlags() & Qt::WindowStaysOnTopHint;
+            if (top) setWindowFlags(windowFlags() & ~Qt::WindowStaysOnTopHint);
+            else     setWindowFlags(windowFlags() | Qt::WindowStaysOnTopHint);
+            show();
+        }
+        break;
+    case Qt::Key_W:  // 자막 폰트 크기 증가
+        core->command({"add", "sub-scale", "0.1"});
+        break;
+    case Qt::Key_E:  // 자막 폰트 크기 감소
+        core->command({"add", "sub-scale", "-0.1"});
+        break;
+    case Qt::Key_Plus:   // 재생 속도 증가
+    case Qt::Key_Equal:
+        core->command({"add", "speed", "0.1"});
+        break;
+    case Qt::Key_Minus:  // 재생 속도 감소
+        core->command({"add", "speed", "-0.1"});
+        break;
+    case Qt::Key_0:      // 재생 속도 원래대로
+        core->command({"set", "speed", "1.0"});
+        break;
+    case Qt::Key_J:  // 자막 다음
+        core->command({"sub-step", "1"});
+        break;
+    case Qt::Key_K:  // 자막 이전
+        core->command({"sub-step", "-1"});
+        break;
     // ── 전문 기능 단축키 ────────────────────────────────────────────
     case Qt::Key_A:
         if (e->modifiers() & Qt::ControlModifier)
