@@ -545,13 +545,18 @@ void MainWindow::mousePressEvent(QMouseEvent* e) {
 
 void MainWindow::mouseMoveEvent(QMouseEvent* e) {
     if (!resizing_) {
-        static const Qt::CursorShape cs[] = {
-            Qt::ArrowCursor, Qt::SizeHorCursor, Qt::SizeHorCursor,
-            Qt::SizeVerCursor, Qt::SizeVerCursor,
-            Qt::SizeFDiagCursor, Qt::SizeBDiagCursor,
-            Qt::SizeBDiagCursor, Qt::SizeFDiagCursor
-        };
-        setCursor(cs[getResizeEdge(e->pos())]);
+        int edge = getResizeEdge(e->pos());
+        if (edge == 0) {
+            unsetCursor();  // 리사이즈 마진 밖: 기본 커서로 복원
+        } else {
+            static const Qt::CursorShape cs[] = {
+                Qt::ArrowCursor, Qt::SizeHorCursor, Qt::SizeHorCursor,
+                Qt::SizeVerCursor, Qt::SizeVerCursor,
+                Qt::SizeFDiagCursor, Qt::SizeBDiagCursor,
+                Qt::SizeBDiagCursor, Qt::SizeFDiagCursor
+            };
+            setCursor(cs[edge]);
+        }
     } else {
         QPoint d = e->globalPosition().toPoint() - resizeStart_;
         QSize ns = resizeStartSize_;
