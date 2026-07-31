@@ -101,6 +101,14 @@ private:
     void showUI();
     void hideUI();
 
+    // 이어보기 (재생 위치 저장/복원)
+    void saveResumePosition();
+    void clearResumePosition(const QString& path);
+    void tryResumePosition(const QString& path);
+    // 최근 파일 목록
+    void addToRecentFiles(const QString& path);
+    void showRecentFilesMenu();
+
     // ── 메인 스택 (플레이어 / OTT 모드) ──────────────
     QStackedWidget* mainStack_   = nullptr;
     QWidget*        playerPage_  = nullptr;
@@ -135,6 +143,7 @@ private:
     bool   uiVisible_         = true;
     QTimer* uiHideTimer_      = nullptr;
     double totalDuration_     = 0;
+    double lastPosition_      = 0;   // 이어보기용 현재 재생 위치
     QString currentFilePath_;
     QSettings settings_;
 

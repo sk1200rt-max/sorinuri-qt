@@ -30,6 +30,7 @@ struct MusicMeta {
     double  replayGain  = 0.0;
     bool    hasReplayGain = false;
     QPixmap albumArt;
+    QString filePath;   // 원본 파일 경로 (LRC 가사 탐색용)
 };
 
 // ── EQ 패널 ──────────────────────────────────────────────────────────
@@ -73,6 +74,8 @@ public:
     void updatePosition(double pos, double duration);
     void setPlaying(bool playing);
     void updateSpectrum(const QVector<float>& bins);
+    // 비트퍼펙트 상태 실시간 표시: 실제 출력 경로(AO 샘플레이트/포맷/Exclusive)
+    void setOutputInfo(int outSampleRate, const QString& outFormat, bool exclusive);
 
     bool isMiniMode() const { return miniMode_; }
     void setMiniMode(bool mini);

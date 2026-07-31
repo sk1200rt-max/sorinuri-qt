@@ -451,6 +451,61 @@ void MpvCore::handlePropertyChange(mpv_event_property* prop) {
 }
 
 // ─── 재생 제어 ────────────────────────────────────────────────────
+QVariantList MpvCore::audioDeviceList() const {
+    QVariantList result;
+    if (!initialized_) return result;
+    QVariant list = getProperty("audio-device-list");
+    for (const QVariant& item : list.toList()) {
+        QVariantMap m = item.toMap();
+        if (!m.isEmpty()) result << m;  // {name, description}
+    }
+    return result;
+}
+
+// 현재 장치가 패스스루(비트스트림)를 지원할 가능성 판단 (사전 감지)
+// HDMI/SPDIF/리시버 계열이면 패스스루 유지, USB DAC/스피커 등은 해제
+bool MpvCore::deviceLikelySupportsPassthrough() const {
+    if (!initialized_) return true;  // 불확실하면 기존 동작 유지 (실패 시 자동복구 있음)
+    QString selected;
+    {
+        char* dev = mpv_get_property_string(mpv_, "audio-device");
+        selected = dev ? QString::fromUtf8(dev) : QStringLiteral("auto");
+        mpv_free(dev);
+    }
+    QString desc;
+    const QVariantList devices = audioDeviceList();
+    if (selected != "auto") {
+        for (const QVariant& item : devices) {
+            QVariantMap m = item.toMap();
+            if (m.value("name").toString() == selected) {
+                desc = m.value("description").toString();
+                break;
+            }
+        }
+    }
+    // auto이거나 못 찾으면 첫 번째 wasapi 장치(기본 출력)의 description 사용
+    if (desc.isEmpty()) {
+        for (const QVariant& item : devices) {
+            QVariantMap m = item.toMap();
+            if (m.value("name").toString().startsWith("wasapi/")) {
+                desc = m.value("description").toString();
+                break;
+            }
+        }
+    }
+    if (desc.isEmpty()) return true;  // 판단 불가 → 기존 동작
+    const QString d = desc.toLower();
+    static const QStringList ptHints = {
+        "hdmi", "digital", "spdif", "s/pdif", "optical", "receiver",
+        "avr", "denon", "yamaha", "onkyo", "marantz", "pioneer",
+        "nvidia high definition", "amd high definition", "intel display"
+    };
+    for (const QString& h : ptHints)
+        if (d.contains(h)) return true;
+    qInfo() << "[MPV] 패스스루 미지원 추정 장치:" << desc;
+    return false;
+}
+
 void MpvCore::loadFile(const QString& path, bool append) {
     if (!initialized_) {
         qWarning() << "[MPV] loadFile 호출되었지만 초기화 안됨!";
@@ -458,6 +513,19 @@ void MpvCore::loadFile(const QString& path, bool append) {
     }
     qInfo() << "[MPV] loadFile:" << path << "| mode:" << (append ? "append" : "replace");
     appLog(QString("loadFile: %1 mode=%2").arg(path, append ? "append" : "replace"));
+    // ── 오디오 장치 사전 감지 ────────────────────────────────────────
+    // 패스스루 미지원 장치면 미리 spdif 해제 → 실패-복구 사이클 없이
+    // 처음부터 올바른 모드로 시작 (첫 소리까지 시간 단축).
+    // 패스스루 지원 장치(HDMI/리시버)는 spdif 유지 → 비트스트림 그대로.
+    // 판단 실패 시에도 AO 실패 자동복구(ao-reload)가 백업으로 동작.
+    if (!append) {
+        if (deviceLikelySupportsPassthrough()) {
+            if (passthroughEnabled_)
+                mpv_set_property_string(mpv_, "audio-spdif", spdifCodecs_.toUtf8().constData());
+        } else {
+            mpv_set_property_string(mpv_, "audio-spdif", "");
+        }
+    }
     // loadfile 전에 pause=no 먼저 설정 → keep-open=yes 환경에서
     // 새 파일 로드 시 이전 pause 상태를 유지하지 않고 즐시 재생
     int pauseFlag = 0;
@@ -540,19 +608,21 @@ void MpvCore::setAudioExclusive(bool exclusive) {
 }
 
 void MpvCore::setAudioPassthrough(bool passthrough) {
+    passthroughEnabled_ = passthrough;
     if (!initialized_) return;
     if (passthrough) {
         mpv_set_property_string(mpv_, "audio-spdif",
-            "ac3,eac3,dts,dts-hd,truehd");
+            spdifCodecs_.toUtf8().constData());
     } else {
         mpv_set_property_string(mpv_, "audio-spdif", "");
     }
 }
 
 void MpvCore::setSpdifCodecs(const QStringList& codecs) {
+    spdifCodecs_ = codecs.join(',');
     if (!initialized_) return;
     mpv_set_property_string(mpv_, "audio-spdif",
-        codecs.join(',').toUtf8().constData());
+        spdifCodecs_.toUtf8().constData());
 }
 
 void MpvCore::setHwdec(const QString& method) {

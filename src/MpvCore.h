@@ -46,6 +46,8 @@ public:
     void setAudioExclusive(bool exclusive);
     void setAudioPassthrough(bool passthrough);
     void setSpdifCodecs(const QStringList& codecs);
+    QVariantList audioDeviceList() const;             // {name, description} 목록
+    bool deviceLikelySupportsPassthrough() const;      // 패스스루 지원 사전 감지
 
     // 비디오 설정
     void setHwdec(const QString& method);
@@ -97,4 +99,7 @@ private:
     mpv_handle* mpv_ = nullptr;
     QTimer*     eventTimer_ = nullptr;
     bool        initialized_ = false;
+    // 사용자 패스스루 설정 상태 (장치 사전 감지 시 복원용)
+    bool    passthroughEnabled_ = true;
+    QString spdifCodecs_ = QStringLiteral("ac3,eac3,dts,dts-hd,truehd");
 };

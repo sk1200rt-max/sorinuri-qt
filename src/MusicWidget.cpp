@@ -340,14 +340,37 @@ void MusicWidget::loadMeta(const MusicMeta& meta){
     chBadge_->setText(meta.channels==1?"Mono":meta.channels>2?QString("%1ch").arg(meta.channels):"Stereo");
     if(!meta.albumArt.isNull()) updateAlbumArt(meta.albumArt);
     else { albumArtPixmap_=QPixmap(); updateBlurBackground(QPixmap()); dominantColor_=kTeal; }
-    QString status=QString("%1  ·  DECODE  ·  %2  ·  %3  ·  %4  ·  BIT-PERFECT")
+    QString status=QString("%1  ·  DECODE  ·  %2  ·  %3  ·  %4")
         .arg(meta.codec.toUpper())
         .arg(meta.channels==2?"2.0":QString("%1ch").arg(meta.channels))
         .arg(rateBadge_->text()).arg(bitBadge_->text());
     if(meta.hasReplayGain) status+=QString("  ·  ReplayGain: %1dB").arg(meta.replayGain,0,'f',1);
     statusBar_->setText(status);
-    if(lyricsWidget_) lyricsWidget_->loadForTrack(meta.title,meta.artist,"");
+    if(lyricsWidget_) lyricsWidget_->loadForTrack(meta.title,meta.artist,meta.filePath);
     update();
+}
+
+// 비트퍼펙트 상태 실시간 표시: 실제 AO 출력 경로와 소스 비교
+void MusicWidget::setOutputInfo(int outSampleRate,const QString& outFormat,bool exclusive){
+    if(!statusBar_) return;
+    QString outRate=outSampleRate>=1000
+        ?(outSampleRate%1000==0?QString("%1kHz").arg(outSampleRate/1000)
+                               :QString("%1kHz").arg(outSampleRate/1000.0,0,'f',1))
+        :QString("%1Hz").arg(outSampleRate);
+    // 비트퍼펙트 판정: 소스 샘플레이트 == 출력 샘플레이트 && Exclusive 모드
+    const bool bitPerfect = exclusive && currentMeta_.sampleRate>0
+                            && currentMeta_.sampleRate==outSampleRate;
+    QString status=QString("%1  ·  DECODE  ·  %2  ·  OUT: %3 %4 %5")
+        .arg(currentMeta_.codec.toUpper())
+        .arg(currentMeta_.channels==2?"2.0":QString("%1ch").arg(currentMeta_.channels))
+        .arg(outRate)
+        .arg(outFormat.toUpper())
+        .arg(exclusive?"EXCLUSIVE":"SHARED");
+    status += bitPerfect ? "  ·  BIT-PERFECT" : "";
+    statusBar_->setText(status);
+    statusBar_->setStyleSheet(bitPerfect
+        ?"font-size:10px;color:#4dd0a6;font-family:'Consolas';background:#0a0a0a;padding:4px 0;"
+        :"font-size:10px;color:#555;font-family:'Consolas';background:#0a0a0a;padding:4px 0;");
 }
 
 void MusicWidget::updateAlbumArt(const QPixmap& art){

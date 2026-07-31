@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(Sorinuri VERSION 4.3.10 LANGUAGES CXX)
+project(Sorinuri VERSION 4.4.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -88,6 +88,8 @@ set(SOURCES
     src/UpdateChecker.h
     src/UpdateDialog.cpp
     src/UpdateDialog.h
+    src/AlbumArtExtractor.cpp
+    src/AlbumArtExtractor.h
     resources/resources.qrc
 )
 

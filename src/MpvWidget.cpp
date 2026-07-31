@@ -99,9 +99,12 @@ void MpvWidget::paintGL() {
     const int physW = static_cast<int>(width()  * dpr);
     const int physH = static_cast<int>(height() * dpr);
 
+    // internal_format을 GL_RGBA8로 명시 → MPV가 FBO 포맷을 추측하며
+    // rgba16f 등을 시도하다 INVALID_ENUM 오류를 반복하던 문제 해결
     mpv_opengl_fbo fbo = {
         static_cast<int>(defaultFramebufferObject()),
-        physW, physH, 0
+        physW, physH,
+        0x8058 /* GL_RGBA8 */
     };
     int flipY = 1;
     mpv_render_param params[] = {

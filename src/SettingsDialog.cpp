@@ -391,12 +391,21 @@ void SettingsDialog::refreshAudioDevices() {
 
     if (!mpv_) return;
 
-    // MPV audio-device-list 속성으로 장치 목록 가져오기
-    QVariant deviceList = mpv_->getProperty("audio-device-list");
-    // 파싱은 복잡하므로 일반적인 WASAPI 장치 이름 추가
-    // 실제 구현에서는 mpv_node 파싱 필요
-    audioDeviceCombo_->addItem("WASAPI: 기본 출력", "wasapi/default");
-    audioDeviceCombo_->addItem("WASAPI: HDMI 출력", "wasapi/hdmi");
+    // MPV audio-device-list 실제 파싱 (MPV_FORMAT_NODE → QVariantList)
+    const QVariantList devices = mpv_->audioDeviceList();
+    for (const QVariant& item : devices) {
+        const QVariantMap m = item.toMap();
+        const QString name = m.value("name").toString();
+        const QString desc = m.value("description").toString();
+        if (name.isEmpty() || name == "auto") continue;
+        if (!name.startsWith("wasapi")) continue;  // WASAPI 장치만 (Exclusive/패스스루 대상)
+        audioDeviceCombo_->addItem(
+            QString("WASAPI: %1").arg(desc.isEmpty() ? name : desc), name);
+    }
+    // 저장된 장치 선택 복원
+    const QString saved = settings_.value("audio/device", "auto").toString();
+    int idx = audioDeviceCombo_->findData(saved);
+    if (idx >= 0) audioDeviceCombo_->setCurrentIndex(idx);
 }
 
 void SettingsDialog::loadSettings() {
@@ -425,6 +434,9 @@ void SettingsDialog::applyToMpv() {
     if (!mpv_) return;
 
     // 오디오 설정
+    // 출력 장치 적용
+    const QString devName = audioDeviceCombo_->currentData().toString();
+    mpv_->setAudioDevice(devName.isEmpty() ? QStringLiteral("auto") : devName);
     mpv_->setAudioExclusive(exclusiveModeCheck_->isChecked());
 
     if (passthroughCheck_->isChecked()) {
@@ -435,8 +447,9 @@ void SettingsDialog::applyToMpv() {
         if (ptDTSHD_->isChecked())  codecs << "dts-hd";
         if (ptTrueHD_->isChecked()) codecs << "truehd";
         mpv_->setSpdifCodecs(codecs);
+        mpv_->setAudioPassthrough(true);
     } else {
-        mpv_->setSpdifCodecs({});
+        mpv_->setAudioPassthrough(false);
     }
 
     mpv_->setVolume(volumeSlider_->value());
@@ -473,6 +486,7 @@ void SettingsDialog::applyToMpv() {
 
 void SettingsDialog::onApply() {
     // 설정 저장
+    settings_.setValue("audio/device",      audioDeviceCombo_->currentData().toString());
     settings_.setValue("audio/exclusive",   exclusiveModeCheck_->isChecked());
     settings_.setValue("audio/passthrough", passthroughCheck_->isChecked());
     settings_.setValue("audio/pt_ac3",      ptAC3_->isChecked());

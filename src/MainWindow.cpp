@@ -8,6 +8,7 @@
 #include "MiniPlayerWidget.h"
 #include "UpdateChecker.h"
 #include "UpdateDialog.h"
+#include "AlbumArtExtractor.h"
 #include <QApplication>
 #include <QGuiApplication>
 #include <QScreen>
@@ -220,6 +221,16 @@ void MainWindow::setupConnections() {
     });
     connect(core, &MpvCore::playbackStarted, musicPage_, [this]() { musicPage_->setPlaying(true); });
     connect(core, &MpvCore::playbackPaused,  musicPage_, [this]() { musicPage_->setPlaying(false); });
+    // 비트퍼펙트 상태 실시간 표시: 실제 AO 출력 경로 조회 후 음악 화면에 반영
+    connect(core, &MpvCore::audioFormatChanged, musicPage_,
+            [this, core](const QString&, int, int, const QString&) {
+        if (!isMusicMode_) return;
+        const int outRate = core->getProperty("audio-out-params/samplerate").toInt();
+        const QString outFmt = core->getProperty("audio-out-params/format").toString();
+        const bool exclusive = core->getProperty("audio-exclusive").toBool();
+        if (outRate > 0)
+            musicPage_->setOutputInfo(outRate, outFmt, exclusive);
+    });
     // 미니 플레이어 연결
     connect(musicPage_, &MusicWidget::miniModeRequested, this, &MainWindow::toggleMiniPlayer);
     // miniPlayer_, whisperWidget_, chapterWidget_ 연결은 지연 초기화
@@ -255,13 +266,13 @@ void MainWindow::switchToMusicMode() {
     isMusicMode_ = true;
     playerStack_->setCurrentIndex(1);
     controlBar_->hide();
-    controlBar_->hide();
+    // 음악 모드: 갭리스 재생 항상 활성화 (앨범 연속 재생 시 공백 제거)
+    mpvWidget_->core()->setProperty("gapless-audio", QString("yes"));
 }
 
 void MainWindow::switchToVideoMode() {
     isMusicMode_ = false;
     playerStack_->setCurrentIndex(0);
-    controlBar_->show();
     controlBar_->show();
 }
 
@@ -271,17 +282,30 @@ void MainWindow::loadMusicMeta(const QString& path) {
     MusicMeta meta;
     meta.codec      = core->getProperty("audio-codec-name").toString();
     meta.sampleRate = core->getProperty("audio-params/samplerate").toInt();
-    meta.bitDepth   = 24;
+    // 비트낮이 실측: 샘플 포맷 문자열에서 추출 (s16=16bit, s32=32bit, float=32bit)
+    {
+        const QString fmt = core->getProperty("audio-params/format").toString();
+        if (fmt.contains("16"))                              meta.bitDepth = 16;
+        else if (fmt.contains("24"))                         meta.bitDepth = 24;
+        else if (fmt.contains("32") || fmt.contains("float")) meta.bitDepth = 32;
+        else                                                 meta.bitDepth = 16;
+    }
     meta.channels   = core->getProperty("audio-params/channel-count").toInt();
     meta.title      = core->getProperty("media-title").toString();
     meta.artist     = core->getProperty("metadata/by-key/artist").toString();
     meta.album      = core->getProperty("metadata/by-key/album").toString();
     meta.year       = core->getProperty("metadata/by-key/date").toString();
-    // 폴더 내 커버 이미지 탐색
-    QFileInfo fi(path);
-    QDir dir = fi.dir();
-    for (const QString& name : {"cover.jpg", "cover.png", "folder.jpg", "albumart.jpg"}) {
-        if (dir.exists(name)) { meta.albumArt = QPixmap(dir.filePath(name)); break; }
+    meta.filePath   = path;  // LRC 가사 탐색용
+    // 1) 파일 내장 앨범 아트 추출 (ID3v2 APIC / FLAC PICTURE / MP4 covr)
+    meta.albumArt = AlbumArtExtractor::extract(path);
+    // 2) 없으면 폴더 내 커버 이미지 탐색
+    if (meta.albumArt.isNull()) {
+        QFileInfo fi(path);
+        QDir dir = fi.dir();
+        for (const QString& name : {"cover.jpg", "cover.png", "folder.jpg",
+                                     "albumart.jpg", "front.jpg"}) {
+            if (dir.exists(name)) { meta.albumArt = QPixmap(dir.filePath(name)); break; }
+        }
     }
     musicPage_->loadMeta(meta);
 }
@@ -295,8 +319,14 @@ void MainWindow::onMusicVolumeChanged(int vol) {
 }
 
 void MainWindow::onFileLoaded(const QString& path) {
+    // 이전 파일의 재생 위치 저장 (파일 전환 시)
+    if (!currentFilePath_.isEmpty() && currentFilePath_ != path)
+        saveResumePosition();
     currentFilePath_ = path;
+    lastPosition_ = 0.0;
     updateWindowTitle(QFileInfo(path).fileName());
+    addToRecentFiles(path);
+    tryResumePosition(path);
     if (isMusicMode_) {
         // 음악 모드: 메타데이터 로드 (파일 로드 후 MPV가 태그를 읽은 시점)
         QTimer::singleShot(200, this, [this, path]() { loadMusicMeta(path); });
@@ -360,6 +390,8 @@ void MainWindow::onPlaybackPaused() {
 }
 void MainWindow::onPlaybackEnded() {
     isPlaying_ = false;
+    // 끝까지 재생 완료 → 저장된 이어보기 위치 삭제
+    clearResumePosition(currentFilePath_);
     if (uiHideTimer_) uiHideTimer_->stop();
     showUI();
     controlBar_->setPlaying(false);
@@ -379,7 +411,56 @@ void MainWindow::onPlaybackStopped() {
     SetThreadExecutionState(ES_CONTINUOUS);
 #endif
 }
-void MainWindow::onPositionChanged(double s) { controlBar_->setPosition(s, totalDuration_); }
+void MainWindow::onPositionChanged(double s) {
+    controlBar_->setPosition(s, totalDuration_);
+    lastPosition_ = s;  // 이어보기용 현재 위치 추적
+}
+
+// ─── 이어보기 (재생 위치 저장/복원) ──────────────────────────────
+static QString resumeKeyFor(const QString& path) {
+    // 파일 경로 해시로 키 생성 (경로에 특수문자 있어도 안전)
+    return QStringLiteral("resume/%1").arg(
+        QString::number(qHash(path), 16));
+}
+
+void MainWindow::saveResumePosition() {
+    if (currentFilePath_.isEmpty() || lastPosition_ < 5.0) return;
+    if (currentFilePath_.startsWith("http")) return;  // 스트리밍 제외
+    if (!settings_.value("general/remember_pos", true).toBool()) return;
+    // 95% 이상 재생했으면 다 본 것으로 간주 → 저장 안 함
+    if (totalDuration_ > 0 && lastPosition_ / totalDuration_ > 0.95) {
+        clearResumePosition(currentFilePath_);
+        return;
+    }
+    settings_.setValue(resumeKeyFor(currentFilePath_), lastPosition_);
+}
+
+void MainWindow::clearResumePosition(const QString& path) {
+    if (path.isEmpty()) return;
+    settings_.remove(resumeKeyFor(path));
+}
+
+void MainWindow::tryResumePosition(const QString& path) {
+    if (!settings_.value("general/remember_pos", true).toBool()) return;
+    const double saved = settings_.value(resumeKeyFor(path), 0.0).toDouble();
+    if (saved > 5.0) {
+        mpvWidget_->core()->seek(saved);
+        // OSD로 이어보기 안내 (팝업 없이)
+        const int m = int(saved) / 60, s = int(saved) % 60;
+        mpvWidget_->core()->command({"show-text",
+            QString("이어보기: %1:%2부터 재생").arg(m).arg(s, 2, 10, QChar('0')), "3000"});
+    }
+}
+
+// ─── 최근 파일 목록 ──────────────────────────────────────────────
+void MainWindow::addToRecentFiles(const QString& path) {
+    if (path.startsWith("http")) return;
+    QStringList recent = settings_.value("recent/files").toStringList();
+    recent.removeAll(path);
+    recent.prepend(path);
+    while (recent.size() > 10) recent.removeLast();
+    settings_.setValue("recent/files", recent);
+}
 void MainWindow::onDurationChanged(double s) { totalDuration_ = s; controlBar_->setDuration(s); }
 void MainWindow::onVolumeChanged(int v)      { controlBar_->setVolume(v); }
 
@@ -397,6 +478,34 @@ void MainWindow::onOpenFile() {
         "*.m4v *.webm *.mp3 *.flac *.aac *.wav *.dts *.ac3 *.truehd);;"
         "모든 파일 (*.*)");
     if (!paths.isEmpty()) openFiles(paths);
+}
+
+// 최근 파일 메뉴 표시 (컨트롤바 파일 열기 버튼 우클릭 또는 단축키)
+void MainWindow::showRecentFilesMenu() {
+    const QStringList recent = settings_.value("recent/files").toStringList();
+    QMenu menu(this);
+    menu.setStyleSheet(
+        "QMenu { background:#1a1a1a; color:#e0e0e0; border:1px solid #333; }"
+        "QMenu::item { padding:6px 24px; }"
+        "QMenu::item:selected { background:#1a3a5c; color:#4fc3f7; }");
+    if (recent.isEmpty()) {
+        menu.addAction("최근 파일 없음")->setEnabled(false);
+    } else {
+        for (const QString& p : recent) {
+            QFileInfo fi(p);
+            QAction* act = menu.addAction(fi.fileName());
+            act->setToolTip(p);
+            connect(act, &QAction::triggered, this, [this, p]() {
+                if (QFileInfo::exists(p)) openFiles({p});
+            });
+        }
+        menu.addSeparator();
+        QAction* clearAct = menu.addAction("목록 지우기");
+        connect(clearAct, &QAction::triggered, this, [this]() {
+            settings_.remove("recent/files");
+        });
+    }
+    menu.exec(QCursor::pos());
 }
 
 void MainWindow::onSettingsRequested() {
@@ -418,7 +527,11 @@ void MainWindow::toggleFullscreen() {
     }
 }
 
-void MainWindow::closeEvent(QCloseEvent* e)  { saveSettings(); e->accept(); }
+void MainWindow::closeEvent(QCloseEvent* e)  {
+    saveResumePosition();  // 이어보기: 종료 시 현재 위치 저장
+    saveSettings();
+    e->accept();
+}
 
 void MainWindow::dragEnterEvent(QDragEnterEvent* e) {
     if (e->mimeData()->hasUrls()) e->acceptProposedAction();
@@ -732,11 +845,31 @@ void MainWindow::showContextMenu(const QPoint& globalPos) {
     actOpen->setShortcut(QKeySequence("Ctrl+O"));
     connect(actOpen, &QAction::triggered, this, &MainWindow::onOpenFile);
 
-    // URL 열기 (유튜브, 트위치 등)
+        // URL 열기 (유튜브, 트위치 등)
     QAction* actUrl = menu.addAction("▶  URL 열기... (YouTube/스트리밍)");
     actUrl->setShortcut(QKeySequence("Ctrl+U"));
     connect(actUrl, &QAction::triggered, this, &MainWindow::onOpenUrl);
-
+    // 최근 파일 서브메뉴
+    QMenu* recentMenu = menu.addMenu("최근 파일");
+    {
+        const QStringList recent = settings_.value("recent/files").toStringList();
+        if (recent.isEmpty()) {
+            recentMenu->addAction("최근 파일 없음")->setEnabled(false);
+        } else {
+            for (const QString& p : recent) {
+                QAction* act = recentMenu->addAction(QFileInfo(p).fileName());
+                act->setToolTip(p);
+                connect(act, &QAction::triggered, this, [this, p]() {
+                    if (QFileInfo::exists(p)) openFiles({p});
+                });
+            }
+            recentMenu->addSeparator();
+            QAction* clearAct = recentMenu->addAction("목록 지우기");
+            connect(clearAct, &QAction::triggered, this, [this]() {
+                settings_.remove("recent/files");
+            });
+        }
+    }
     menu.addSeparator();
 
     // 재생 제어
