@@ -336,7 +336,7 @@ jobs:
       #   DEPLOY_USER       : amoross
       #   DEPLOY_PATH       : /var/www/html/downloads
       - name: Deploy to Server
-        if: github.ref == 'refs/heads/master' && secrets.DEPLOY_SSH_KEY != ''
+        if: github.ref == 'refs/heads/master'
         shell: bash
         env:
           SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
@@ -344,9 +344,15 @@ jobs:
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
+          # Secrets 미설정 시 건너뜀
+          if [ -z "$SSH_KEY" ] || [ -z "$DEPLOY_HOST" ]; then
+            echo "배포 Secrets 미설정 - 건너뜀"
+            exit 0
+          fi
+
           # SSH 키 설정
           mkdir -p ~/.ssh
-          echo "$SSH_KEY" > ~/.ssh/deploy_key
+          printf '%s' "$SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
 
@@ -354,13 +360,15 @@ jobs:
           echo "포터블 배포 중..."
           scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
             dist/Sorinuri-Qt-Portable.zip \
-            "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/Sorinuri-Qt-4.2.0.zip"
+            "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/Sorinuri-Qt-4.2.0.zip"
 
           # 설치파일 EXE 배포
           echo "설치파일 배포 중..."
-          INSTALLER=$(ls dist/Sorinuri-Setup-*.exe | head -1)
-          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
-            "$INSTALLER" \
-            "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/Sorinuri-Setup-4.2.0.exe"
+          INSTALLER=$(ls dist/Sorinuri-Setup-*.exe 2>/dev/null | head -1)
+          if [ -n "$INSTALLER" ]; then
+            scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+              "$INSTALLER" \
+              "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/Sorinuri-Setup-4.2.0.exe"
+          fi
 
           echo "배포 완료"
