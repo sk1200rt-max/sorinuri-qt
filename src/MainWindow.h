@@ -50,6 +50,7 @@ protected:
     void mouseMoveEvent(QMouseEvent* e) override;
     void mouseReleaseEvent(QMouseEvent* e) override;
     void resizeEvent(QResizeEvent* e) override;
+    bool eventFilter(QObject* obj, QEvent* event) override;
 
 private slots:
     void onFileLoaded(const QString& path);

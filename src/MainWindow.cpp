@@ -11,6 +11,7 @@
 #include <QApplication>
 #include <QGuiApplication>
 #include <QScreen>
+#include <QEvent>
 #include <QMessageBox>
 #include <QProgressDialog>
 #include <QFileDialog>
@@ -146,6 +147,10 @@ void MainWindow::setupUI() {
 }
 
 void MainWindow::setupConnections() {
+    // MpvWidget의 마우스 이벤트를 MainWindow가 가로체 → UI 자동 숨김/표시 동작
+    mpvWidget_->setMouseTracking(true);
+    mpvWidget_->installEventFilter(this);
+    setMouseTracking(true);
     auto* core = mpvWidget_->core();
 
     connect(core, &MpvCore::fileLoaded,         this, &MainWindow::onFileLoaded);
@@ -612,6 +617,14 @@ void MainWindow::mousePressEvent(QMouseEvent* e) {
         }
     }
     QMainWindow::mousePressEvent(e);
+}
+
+bool MainWindow::eventFilter(QObject* obj, QEvent* event) {
+    // MpvWidget 위에서 마우스 움직임 시 UI 표시
+    if (obj == mpvWidget_ && event->type() == QEvent::MouseMove) {
+        showUI();
+    }
+    return QMainWindow::eventFilter(obj, event);
 }
 
 void MainWindow::mouseMoveEvent(QMouseEvent* e) {
