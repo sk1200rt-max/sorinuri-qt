@@ -13,7 +13,7 @@ public:
     explicit UpdateChecker(QObject* parent = nullptr);
 
     // 현재 앱 버전 (빌드 시 자동 업데이트)
-    static QString currentVersion() { return "4.4.0"; }
+    static QString currentVersion() { return "4.5.0"; }
 
     // 버전 체크 시작 (비동기, 앱 시작 후 3초 지연)
     void checkForUpdates();

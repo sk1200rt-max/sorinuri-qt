@@ -513,6 +513,19 @@ void MainWindow::onSettingsRequested() {
     dlg.exec();
 }
 
+void MainWindow::onSubtitleSearch() {
+    if (currentFilePath_.isEmpty() || currentFilePath_.startsWith("http")) return;
+    SubtitleSearchDialog dlg(currentFilePath_, this);
+    if (dlg.exec() == QDialog::Accepted && !dlg.downloadedPath().isEmpty()) {
+        // 다운로드된 자막을 MPV에 로드
+        mpvWidget_->core()->command({"sub-add", dlg.downloadedPath(), "select"});
+        // OSD로 안내
+        mpvWidget_->core()->command({"show-text",
+            QString("자막 로드: %1").arg(QFileInfo(dlg.downloadedPath()).fileName()),
+            "3000"});
+    }
+}
+
 void MainWindow::toggleFullscreen() {
     if (isFullscreen_) {
         showNormal();
@@ -908,6 +921,11 @@ void MainWindow::showContextMenu(const QPoint& globalPos) {
 
     // 자막 서브메뉴
     QMenu* subMenu = menu.addMenu("자막");
+    // OpenSubtitles 자막 검색
+    QAction* actSubSearch = subMenu->addAction("U0001f50d  자막 자동 검색 (OpenSubtitles)");
+    actSubSearch->setEnabled(!currentFilePath_.isEmpty() && !currentFilePath_.startsWith("http"));
+    connect(actSubSearch, &QAction::triggered, this, &MainWindow::onSubtitleSearch);
+    subMenu->addSeparator();
     QAction* actSubOff = subMenu->addAction("자막 끄기");
     connect(actSubOff, &QAction::triggered, [core]() { core->setSubtitleTrack(0); });
     subMenu->addSeparator();

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(Sorinuri VERSION 4.4.0 LANGUAGES CXX)
+project(Sorinuri VERSION 4.5.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -90,6 +90,10 @@ set(SOURCES
     src/UpdateDialog.h
     src/AlbumArtExtractor.cpp
     src/AlbumArtExtractor.h
+    src/SubtitleDownloader.cpp
+    src/SubtitleDownloader.h
+    src/SubtitleSearchDialog.cpp
+    src/SubtitleSearchDialog.h
     resources/resources.qrc
 )
 

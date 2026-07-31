@@ -288,6 +288,14 @@ void SettingsDialog::setupVideoTab(QTabWidget* tabs) {
     debandStrengthCombo_->setCurrentIndex(1);
     qualityForm->addRow("디밴딩 강도:", debandStrengthCombo_);
 
+    // 모션 스무딩 (프레임 보간) - 기존 코드에 영향 없는 신규 추가
+    motionSmoothingCheck_ = new QCheckBox("모션 스무딩 (프레임 보간, 24fps→매끄러운 재생)", page);
+    motionSmoothingCheck_->setChecked(false);
+    QLabel* smoothHint = new QLabel("주의: 일부 영상에서 아티팩트가 생길 수 있습니다.", page);
+    smoothHint->setStyleSheet("color: #666; font-size: 11px;");
+    qualityForm->addRow("", motionSmoothingCheck_);
+    qualityForm->addRow("", smoothHint);
+
     layout->addWidget(qualityGroup);
     layout->addStretch();
 
@@ -343,6 +351,44 @@ void SettingsDialog::setupSubtitleTab(QTabWidget* tabs) {
     autoSubForm->addRow("", autoLoadSubCheck_);
 
     layout->addWidget(autoSubGroup);
+
+    // OpenSubtitles API 키 입력 섹션
+    QGroupBox* apiGroup = new QGroupBox("OpenSubtitles 자막 자동 다운로드", page);
+    QVBoxLayout* apiLay = new QVBoxLayout(apiGroup);
+    apiLay->setSpacing(6);
+
+    auto* apiDesc = new QLabel(
+        "<a href='https://www.opensubtitles.com/consumers' style='color:#4fc3f7;'>"
+        "OpenSubtitles.com</a>에서 API 키를 발급받아 입력하세요."
+        "<br><small style='color:#666;'>로그인 → 프로필 → API 섹션 → Consumer Key</small>",
+        page);
+    apiDesc->setOpenExternalLinks(true);
+    apiDesc->setWordWrap(true);
+    apiDesc->setStyleSheet("color:#aaa; font-size:11px; background:transparent;");
+    apiLay->addWidget(apiDesc);
+
+    auto* apiRow = new QHBoxLayout();
+    auto* apiLabel = new QLabel("API Key:", page);
+    apiLabel->setFixedWidth(60);
+    subApiKeyEdit_ = new QLineEdit(page);
+    subApiKeyEdit_->setPlaceholderText("여기에 API 키를 입력하세요...");
+    subApiKeyEdit_->setEchoMode(QLineEdit::Password);
+    subApiKeyEdit_->setStyleSheet(
+        "QLineEdit { background:#252525; color:#ddd; border:1px solid #333;"
+        "border-radius:3px; padding:4px 8px; }"
+        "QLineEdit:focus { border-color:#4fc3f7; }");
+    auto* showKeyBtn = new QPushButton("표시", page);
+    showKeyBtn->setFixedWidth(44);
+    showKeyBtn->setCheckable(true);
+    connect(showKeyBtn, &QPushButton::toggled, [this](bool on) {
+        subApiKeyEdit_->setEchoMode(on ? QLineEdit::Normal : QLineEdit::Password);
+    });
+    apiRow->addWidget(apiLabel);
+    apiRow->addWidget(subApiKeyEdit_, 1);
+    apiRow->addWidget(showKeyBtn);
+    apiLay->addLayout(apiRow);
+
+    layout->addWidget(apiGroup);
     layout->addStretch();
 
     tabs->addTab(page, "자막");
@@ -425,9 +471,13 @@ void SettingsDialog::loadSettings() {
     if (scalingIdx >= 0) scalingCombo_->setCurrentIndex(scalingIdx);
 
     debandCheck_->setChecked(settings_.value("video/deband", false).toBool());
+    if (motionSmoothingCheck_)
+        motionSmoothingCheck_->setChecked(settings_.value("video/motion_smoothing", false).toBool());
     rememberPosCheck_->setChecked(settings_.value("general/remember_pos", true).toBool());
     resumeCheck_->setChecked(settings_.value("general/resume", false).toBool());
     autoLoadSubCheck_->setChecked(settings_.value("subtitle/auto_load", true).toBool());
+    if (subApiKeyEdit_)
+        subApiKeyEdit_->setText(settings_.value("subtitle/opensubtitles_apikey").toString());
 }
 
 void SettingsDialog::applyToMpv() {
@@ -475,6 +525,9 @@ void SettingsDialog::applyToMpv() {
 
     // 디밴딩
     mpv_->setProperty("deband", debandCheck_->isChecked() ? 1 : 0);
+    // 모션 스무딩 (프레임 보간) - 기존 코드에 영향 없는 신규 적용
+    if (motionSmoothingCheck_)
+        mpv_->setMotionSmoothing(motionSmoothingCheck_->isChecked());
 
     // 자막
     mpv_->setProperty("sub-font", subFontCombo_->currentText());
@@ -498,9 +551,13 @@ void SettingsDialog::onApply() {
     settings_.setValue("video/hwdec",       hwdecCombo_->currentText());
     settings_.setValue("video/scaling",     scalingCombo_->currentText());
     settings_.setValue("video/deband",      debandCheck_->isChecked());
+    if (motionSmoothingCheck_)
+        settings_.setValue("video/motion_smoothing", motionSmoothingCheck_->isChecked());
     settings_.setValue("general/remember_pos", rememberPosCheck_->isChecked());
     settings_.setValue("general/resume",    resumeCheck_->isChecked());
     settings_.setValue("subtitle/auto_load",autoLoadSubCheck_->isChecked());
+    if (subApiKeyEdit_)
+        settings_.setValue("subtitle/opensubtitles_apikey", subApiKeyEdit_->text().trimmed());
 
     applyToMpv();
     emit settingsApplied();

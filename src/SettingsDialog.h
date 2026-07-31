@@ -67,8 +67,10 @@ private:
     QComboBox*  hdrCombo_           = nullptr;
     QCheckBox*  debandCheck_        = nullptr;
     QComboBox*  debandStrengthCombo_= nullptr;
+    QCheckBox*  motionSmoothingCheck_ = nullptr;  // 모션 스무딩 (프레임 보간)
 
     // 자막 탭
+    QLineEdit*  subApiKeyEdit_      = nullptr;  // OpenSubtitles API 키
     QComboBox*  subFontCombo_       = nullptr;
     QSlider*    subSizeSlider_      = nullptr;
     QLabel*     subSizeLabel_       = nullptr;

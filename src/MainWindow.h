@@ -31,6 +31,7 @@
 #include "UpscaleWidget.h"
 #include "ChapterWidget.h"
 #include "MultiViewWidget.h"
+#include "SubtitleSearchDialog.h"
 
 
 class MainWindow : public QMainWindow {
@@ -67,6 +68,7 @@ private slots:
     void onOpenFile();
     void onOpenUrl();
     void onSettingsRequested();
+    void onSubtitleSearch();
     void toggleFullscreen();
     void showContextMenu(const QPoint& pos);
     void toggleProFeatures();

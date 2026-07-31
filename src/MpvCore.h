@@ -52,6 +52,7 @@ public:
     // 비디오 설정
     void setHwdec(const QString& method);
     void setVideoOutput(const QString& vo);
+    void setMotionSmoothing(bool enabled);  // 모션 스무딩 (프레임 보간)
 
     // 상태 조회
     double duration() const;

@@ -781,3 +781,19 @@ QVariantList MpvCore::subtitleTracks() const {
     QVariantList result;
     return result;
 }
+
+void MpvCore::setMotionSmoothing(bool enabled) {
+    if (!initialized_) return;
+    if (enabled) {
+        // 프레임 보간 활성화: oversample 방식 (가장 안정적, 아티팩트 없음)
+        // video-sync=display-resample 이 필요하지만 audio sync를 깨뜨리지 않도록
+        // interpolation만 켜고 tscale은 oversample(부드러운 보간) 사용
+        mpv_set_property_string(mpv_, "interpolation", "yes");
+        mpv_set_property_string(mpv_, "tscale", "oversample");
+        mpv_set_property_string(mpv_, "video-sync", "display-resample");
+    } else {
+        // 모션 스무딩 비활성화: 원래 audio sync 모드로 복원
+        mpv_set_property_string(mpv_, "interpolation", "no");
+        mpv_set_property_string(mpv_, "video-sync", "audio");
+    }
+}
