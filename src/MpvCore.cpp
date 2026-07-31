@@ -5,6 +5,7 @@
 #include <QDateTime>
 #include <QTextStream>
 #include <locale.h>
+#include <cstring>
 #include <stdexcept>
 
 // 진단용 앱 로그 파일 저장
@@ -56,7 +57,8 @@ bool MpvCore::initialize(WId windowId) {
 
     // ── 진단용 MPV 내부 로그 파일 저장 ────────────────────────────────
     check_error(mpv_set_option_string(mpv_, "log-file", "C:/Users/Public/sorinuri_mpv.log"));
-    mpv_request_log_messages(mpv_, "v");
+    // error 레벨 이상을 이벤트로 수신 → AO 실패 감지에 사용 (필수, 삭제 금지)
+    mpv_request_log_messages(mpv_, "error");
 
     check_error(mpv_set_option_string(mpv_, "osc",        "no"));
     check_error(mpv_set_option_string(mpv_, "idle",       "yes"));
@@ -251,6 +253,30 @@ void MpvCore::handleEvent(mpv_event* event) {
             emit tracksChanged();
             qInfo() << "[MPV] 속성 강제 갱신 완료 - duration:" << dur;
         });
+        // ── 재생 워치독 (추가 안전장치) ────────────────────────────
+        // 파일 로드 2초 후에도 time-pos가 진행되지 않으면 (pause=no임에도)
+        // AO 멈춤 상태로 판단하고 spdif 해제 + ao-reload로 강제 복구.
+        QTimer::singleShot(2000, this, [this]() {
+            if (!mpv_ || !initialized_) return;
+            int paused = 1;
+            mpv_get_property(mpv_, "pause", MPV_FORMAT_FLAG, &paused);
+            double pos = -1;
+            mpv_get_property(mpv_, "time-pos", MPV_FORMAT_DOUBLE, &pos);
+            int coreIdle = 0;
+            mpv_get_property(mpv_, "core-idle", MPV_FORMAT_FLAG, &coreIdle);
+            appLog(QString("워치독: pause=%1 time-pos=%2 core-idle=%3")
+                       .arg(paused).arg(pos).arg(coreIdle));
+            // pause 아닌데 재생이 멈춤(core-idle) + 위치 0 부근 → AO 멈춤
+            if (!paused && coreIdle && pos < 0.5) {
+                appLog("워치독: 재생 멈춤 감지 → spdif 해제 + ao-reload 강제 복구");
+                qWarning() << "[MPV] 워치독: 재생 멈춤 → ao-reload 복구";
+                mpv_set_property_string(mpv_, "audio-spdif", "");
+                const char* reloadArgs[] = { "ao-reload", nullptr };
+                mpv_command_async(mpv_, 0, reloadArgs);
+                int pf = 0;
+                mpv_set_property_async(mpv_, 0, "pause", MPV_FORMAT_FLAG, &pf);
+            }
+        });
         break;
     }
 
@@ -304,6 +330,29 @@ void MpvCore::handleEvent(mpv_event* event) {
         auto* msg = reinterpret_cast<mpv_event_log_message*>(event->data);
         if (msg->log_level <= MPV_LOG_LEVEL_WARN)
             qWarning() << "[MPV]" << msg->prefix << msg->text;
+
+        // ── 근본 수정: 오디오 드라이버 초기화 실패 자동 복구 ──────────
+        // 패스스루(spdif) 미지원 장치(USB DAC 등)에서 WASAPI Exclusive
+        // + spdif 조합이 실패하면 MPV가 "Falling back to PCM output"만
+        // 선언하고 AO 재초기화를 하지 않고 멈춤 (video-sync=audio일 때
+        // 오디오 클럭이 없어 영상도 첫 프레임에서 정지 = 자동재생 안됨 버그).
+        // → AO 실패 로그 감지 시 spdif 해제 후 ao-reload로 즉시 복구.
+        //   패스스루 지원 장치(AV리시버)는 이 경로를 타지 않으므로
+        //   비트스트림 패스스루/음질에 영향 없음.
+        if (msg->log_level <= MPV_LOG_LEVEL_ERROR &&
+            strstr(msg->text, "Failed to initialize audio driver")) {
+            appLog("AO 초기화 실패 감지 → 자동 복구 시작");
+            qWarning() << "[MPV] AO 실패 감지 → spdif 해제 후 ao-reload";
+            // 1) 패스스루 해제 (현재 장치가 미지원이므로 PCM 디코딩으로 전환)
+            mpv_set_property_string(mpv_, "audio-spdif", "");
+            // 2) Exclusive 실패 가능성 대비: 재시도는 Exclusive 유지,
+            //    ao-reload로 AO 재초기화 (장치가 Exclusive PCM은 지원)
+            const char* reloadArgs[] = { "ao-reload", nullptr };
+            mpv_command_async(mpv_, 0, reloadArgs);
+            // 3) 재생 상태 보장
+            int pf = 0;
+            mpv_set_property_async(mpv_, 0, "pause", MPV_FORMAT_FLAG, &pf);
+        }
         break;
     }
 
