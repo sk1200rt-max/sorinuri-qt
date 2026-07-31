@@ -1,8 +1,20 @@
 #include "MpvCore.h"
 #include <QDebug>
 #include <QMetaObject>
+#include <QFile>
+#include <QDateTime>
+#include <QTextStream>
 #include <locale.h>
 #include <stdexcept>
+
+// 진단용 앱 로그 파일 저장
+static void appLog(const QString& msg) {
+    static QFile f("C:/Users/Public/sorinuri_app.log");
+    if (!f.isOpen()) f.open(QIODevice::Append | QIODevice::Text);
+    QTextStream ts(&f);
+    ts << QDateTime::currentDateTime().toString("HH:mm:ss.zzz") << " " << msg << "\n";
+    ts.flush();
+}
 
 // ─── 헬퍼 함수 ──────────────────────────────────────────────────────
 static void check_error(int status) {
@@ -41,6 +53,10 @@ bool MpvCore::initialize(WId windowId) {
         // vo=libmpv: MPV가 자체 윈도우 생성 안 함
         check_error(mpv_set_option_string(mpv_, "vo", "libmpv"));
     }
+
+    // ── 진단용 MPV 내부 로그 파일 저장 ────────────────────────────────
+    check_error(mpv_set_option_string(mpv_, "log-file", "C:/Users/Public/sorinuri_mpv.log"));
+    mpv_request_log_messages(mpv_, "v");
 
     check_error(mpv_set_option_string(mpv_, "osc",        "no"));
     check_error(mpv_set_option_string(mpv_, "idle",       "yes"));
@@ -185,6 +201,7 @@ void MpvCore::onMpvEvents() {
 void MpvCore::handleEvent(mpv_event* event) {
     switch (event->event_id) {
     case MPV_EVENT_START_FILE:
+        appLog("EVENT START_FILE");
         break;
 
     case MPV_EVENT_FILE_LOADED: {
@@ -192,6 +209,7 @@ void MpvCore::handleEvent(mpv_event* event) {
         QString path = rawPath ? QString::fromUtf8(rawPath) : QString();
         mpv_free(rawPath);
         qInfo() << "[MPV] FILE_LOADED:" << path;
+        appLog(QString("EVENT FILE_LOADED: %1").arg(path));
         // pause 해제: 동기 + 비동기 두 번 실행으로 확실히 재생 시작
         int pauseFlag = 0;
         mpv_set_property(mpv_, "pause", MPV_FORMAT_FLAG, &pauseFlag);  // 동기
@@ -238,6 +256,7 @@ void MpvCore::handleEvent(mpv_event* event) {
 
     case MPV_EVENT_PLAYBACK_RESTART:
         qInfo() << "[MPV] PLAYBACK_RESTART - 재생 시작";
+        appLog("EVENT PLAYBACK_RESTART");
         emit playbackStarted();
         break;
 
@@ -297,6 +316,8 @@ void MpvCore::handlePropertyChange(mpv_event_property* prop) {
     QString name = QString::fromUtf8(prop->name);
 
     if (name == "time-pos" && prop->format == MPV_FORMAT_DOUBLE) {
+        static int tpLogCount = 0;
+        if (tpLogCount < 5) { appLog(QString("PROP time-pos=%1").arg(*reinterpret_cast<double*>(prop->data))); tpLogCount++; }
         emit positionChanged(*reinterpret_cast<double*>(prop->data));
     }
     else if (name == "duration" && prop->format == MPV_FORMAT_DOUBLE) {
@@ -304,6 +325,7 @@ void MpvCore::handlePropertyChange(mpv_event_property* prop) {
     }
     else if (name == "pause" && prop->format == MPV_FORMAT_FLAG) {
         bool paused = *reinterpret_cast<int*>(prop->data);
+        appLog(QString("PROP pause=%1").arg(paused ? "yes" : "no"));
         if (paused) emit playbackPaused();
         else        emit playbackStarted();
     }
@@ -376,6 +398,7 @@ void MpvCore::loadFile(const QString& path, bool append) {
         return;
     }
     qInfo() << "[MPV] loadFile:" << path << "| mode:" << (append ? "append" : "replace");
+    appLog(QString("loadFile: %1 mode=%2").arg(path, append ? "append" : "replace"));
     // loadfile 전에 pause=no 먼저 설정 → keep-open=yes 환경에서
     // 새 파일 로드 시 이전 pause 상태를 유지하지 않고 즐시 재생
     int pauseFlag = 0;
