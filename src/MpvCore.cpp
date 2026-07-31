@@ -110,12 +110,16 @@ bool MpvCore::initialize(WId windowId) {
     check_error(mpv_set_property_string(mpv_, "dither-depth", "auto"));
     check_error(mpv_set_property_string(mpv_, "dither",       "fruit"));
 
-    // ── 오디오: WASAPI (기본 공유 모드, 설정에서 Exclusive 전환 가능) ──────
-    // wasapi: Windows 오디오 드라이버 (공유 모드 기본)
-    // audio-exclusive는 설정 다이얼로그에서 사용자가 활성화
-    // 기본값 no: 일반 재생 보장, 오디오 초기화 실패 방지
+    // ── 오디오: WASAPI Exclusive (기본) ──────────────────────────────
+    // Exclusive: Windows 믹서 완전 우회 → Bit-Perfect, 패스스루 가능
     check_error(mpv_set_property_string(mpv_, "ao", "wasapi"));
-    check_error(mpv_set_property_string(mpv_, "audio-exclusive", "no"));
+    check_error(mpv_set_property_string(mpv_, "audio-exclusive", "yes"));
+    // 패스스루: 돌비 애트모스/DTS:X 원본 비트스트림 리시버로 전송
+    check_error(mpv_set_property_string(mpv_, "audio-spdif",
+        "ac3,eac3,dts,dts-hd,truehd"));
+    // 오디오 초기화 실패 시 영상은 계속 재생 (null 오디오 폴백)
+    // → Exclusive 실패해도 영상/타임라인/트랙 정보 모두 정상 동작
+    check_error(mpv_set_property_string(mpv_, "audio-fallback-to-null", "yes"));
     // 오디오 필터 초기화
     check_error(mpv_set_property_string(mpv_, "af", ""));
 
@@ -514,12 +518,49 @@ void MpvCore::setProperty(const QString& name, const QVariant& value) {
     }
 }
 
+// MPV_NODE를 QVariant로 재귀 변환
+static QVariant nodeToVariant(const mpv_node& node) {
+    switch (node.format) {
+    case MPV_FORMAT_STRING:
+        return QString::fromUtf8(node.u.string);
+    case MPV_FORMAT_FLAG:
+        return (bool)node.u.flag;
+    case MPV_FORMAT_INT64:
+        return (qlonglong)node.u.int64;
+    case MPV_FORMAT_DOUBLE:
+        return node.u.double_;
+    case MPV_FORMAT_NODE_ARRAY: {
+        QVariantList list;
+        for (int i = 0; i < node.u.list->num; ++i)
+            list << nodeToVariant(node.u.list->values[i]);
+        return list;
+    }
+    case MPV_FORMAT_NODE_MAP: {
+        QVariantMap map;
+        for (int i = 0; i < node.u.list->num; ++i)
+            map[QString::fromUtf8(node.u.list->keys[i])] =
+                nodeToVariant(node.u.list->values[i]);
+        return map;
+    }
+    default:
+        return {};
+    }
+}
+
 QVariant MpvCore::getProperty(const QString& name) const {
     if (!initialized_) return {};
-    char* val = mpv_get_property_string(mpv_, name.toUtf8().constData());
-    if (!val) return {};
-    QVariant result = QString::fromUtf8(val);
-    mpv_free(val);
+    mpv_node node;
+    int err = mpv_get_property(mpv_, name.toUtf8().constData(), MPV_FORMAT_NODE, &node);
+    if (err < 0) {
+        // NODE 실패 시 문자열로 폴백
+        char* val = mpv_get_property_string(mpv_, name.toUtf8().constData());
+        if (!val) return {};
+        QVariant result = QString::fromUtf8(val);
+        mpv_free(val);
+        return result;
+    }
+    QVariant result = nodeToVariant(node);
+    mpv_free_node_contents(&node);
     return result;
 }
 
