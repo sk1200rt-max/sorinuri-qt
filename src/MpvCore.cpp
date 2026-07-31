@@ -372,12 +372,15 @@ void MpvCore::loadFile(const QString& path, bool append) {
         return;
     }
     qInfo() << "[MPV] loadFile:" << path << "| mode:" << (append ? "append" : "replace");
+    // loadfile 전에 pause=no 먼저 설정 → keep-open=yes 환경에서
+    // 새 파일 로드 시 이전 pause 상태를 유지하지 않고 즐시 재생
+    int pauseFlag = 0;
+    mpv_set_property(mpv_, "pause", MPV_FORMAT_FLAG, &pauseFlag);
     const char* mode = append ? "append-play" : "replace";
     QByteArray pathBytes = path.toUtf8();
     const char* args[] = { "loadfile", pathBytes.constData(), mode, nullptr };
     int ret = mpv_command_async(mpv_, 0, args);
     qInfo() << "[MPV] mpv_command_async result:" << ret;
-    // pause 해제는 MPV_EVENT_FILE_LOADED 이벤트에서 처리
 }
 
 void MpvCore::play() {

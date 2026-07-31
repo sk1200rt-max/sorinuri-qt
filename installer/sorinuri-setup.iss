@@ -3,7 +3,7 @@
 
 #define MyAppName "소리누리"
 #define MyAppNameEn "Sorinuri"
-#define MyAppVersion "4.3.4"
+#define MyAppVersion "4.3.5"
 #define MyAppPublisher "Sorinuri"
 #define MyAppURL "https://sorinuri.com"
 #define MyAppExeName "Sorinuri.exe"
