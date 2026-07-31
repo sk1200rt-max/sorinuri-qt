@@ -330,39 +330,46 @@ jobs:
           retention-days: 30
 
       # ── 서버 직접 배포 (GitHub Actions → sorinuri.com) ──────────
-      # GitHub Secrets 필요:
-      #   DEPLOY_SSH_KEY    : SSH 비밀키 (ed25519)
-      #   DEPLOY_HOST       : sorinuri.com
-      #   DEPLOY_USER       : amoross
-      #   DEPLOY_PATH       : /var/www/html/downloads
-      - name: Deploy to Server
+      - name: Upload artifacts for deploy
         if: github.ref == 'refs/heads/master'
-        shell: bash
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-files
+          path: |
+            dist/Sorinuri-Qt-Portable.zip
+            dist/Sorinuri-Setup-*.exe
+          retention-days: 1
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master'
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: deploy-files
+          path: dist/
+
+      - name: Deploy to Server
         env:
           SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
-          # Secrets 미설정 시 건너뜀
           if [ -z "$SSH_KEY" ] || [ -z "$DEPLOY_HOST" ]; then
             echo "배포 Secrets 미설정 - 건너뜀"
             exit 0
           fi
-
-          # SSH 키 설정
           mkdir -p ~/.ssh
           printf '%s' "$SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
-
-          # 포터블 ZIP 배포
           echo "포터블 배포 중..."
           scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
             dist/Sorinuri-Qt-Portable.zip \
             "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/Sorinuri-Qt-4.2.1.zip"
-
-          # 설치파일 EXE 배포
           echo "설치파일 배포 중..."
           INSTALLER=$(ls dist/Sorinuri-Setup-*.exe 2>/dev/null | head -1)
           if [ -n "$INSTALLER" ]; then
@@ -370,5 +377,4 @@ jobs:
               "$INSTALLER" \
               "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/Sorinuri-Setup-4.2.1.exe"
           fi
-
           echo "배포 완료"
