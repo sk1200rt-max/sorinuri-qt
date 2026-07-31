@@ -1,6 +1,7 @@
 #include "UpdateDialog.h"
 #include "UpdateChecker.h"
 #include <QVBoxLayout>
+#include <QTimer>
 #include <QHBoxLayout>
 #include <QTextEdit>
 #include <QDir>
@@ -115,8 +116,6 @@ void UpdateDialog::startDownload() {
     localInstallerPath_ = tempDir + "/Sorinuri-Setup-latest.exe";
 
     QNetworkRequest req(QUrl(installerUrl_));
-    req.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
-                     QNetworkRequest::NoLessSafeRedirectPolicy);
     QNetworkReply* reply = nam_->get(req);
 
     connect(reply, &QNetworkReply::downloadProgress,
@@ -160,8 +159,6 @@ void UpdateDialog::onDownloadFinished(QNetworkReply* reply) {
     // 설치파일 실행 후 앱 종료
     qDebug() << "[UpdateDialog] 설치 시작:" << localInstallerPath_;
     QProcess::startDetached(localInstallerPath_, QStringList());
-
-    // 잠시 후 앱 종료
-    QTimer::singleShot(500, qApp, &QApplication::quit);
     accept();
+    QApplication::quit();
 }

@@ -19,11 +19,8 @@ UpdateChecker::UpdateChecker(QObject* parent)
 void UpdateChecker::checkForUpdates() {
     // 앱 시작 후 3초 뒤에 체크 (UI 로딩 완료 후)
     QTimer::singleShot(3000, this, [this]() {
-        QNetworkRequest req(QUrl(VERSION_URL));
-        req.setHeader(QNetworkRequest::UserAgentHeader,
-                      QString("Sorinuri/%1").arg(currentVersion()));
-        req.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
-                         QNetworkRequest::NoLessSafeRedirectPolicy);
+        QUrl url(VERSION_URL);
+        QNetworkRequest req(url);
         nam_->get(req);
         qDebug() << "[UpdateChecker] 버전 확인 중...";
     });
