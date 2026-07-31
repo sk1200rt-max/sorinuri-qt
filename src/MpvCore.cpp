@@ -64,8 +64,9 @@ bool MpvCore::initialize(WId windowId) {
     check_error(mpv_set_property_string(mpv_, "hwdec", "auto-safe"));
 
     // ── 비디오 동기화 ────────────────────────────────────────────────
-    // display-resample: 모니터 주사율에 맞춰 프레임 타이밍 최적화 (티어링 방지)
-    check_error(mpv_set_property_string(mpv_, "video-sync", "display-resample"));
+    // audio: 오디오 타이밍 기준으로 동기화 → OpenGL 렌더 컨텍스트와 충돌 없음
+    // display-resample은 모니터 주사율 재샘플링으로 끊김 발생 가능
+    check_error(mpv_set_property_string(mpv_, "video-sync", "audio"));
 
     // ── 업스케일링 알고리즘 (화질 핵심) ─────────────────────────────
     // ewa_lanczossharp: 현존 최고의 업스케일 선명도 (1080p→4K 등)

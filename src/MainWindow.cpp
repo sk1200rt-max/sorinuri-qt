@@ -310,7 +310,8 @@ void MainWindow::showUI() {
         controlBar_->show();
         uiVisible_ = true;
     }
-    // 재생 중이면 3초 후 다시 숨김
+    // 재생 중 마우스 움직임이 있으면 3초 후 숨김 타이머 재시작
+    // (재생 중이 아니면 타이머 시작 안 함 - UI 항상 표시)
     if (isPlaying_ && uiHideTimer_) {
         uiHideTimer_->start(3000);
     }
@@ -325,15 +326,16 @@ void MainWindow::hideUI() {
 }
 
 void MainWindow::onPlaybackStarted() {
-    isPlaying_ = true;
     controlBar_->setPlaying(true);
-    // UI 자동 숨김 타이머 초기화
+    // UI 자동 숨김 타이머 설정
     if (!uiHideTimer_) {
         uiHideTimer_ = new QTimer(this);
         uiHideTimer_->setSingleShot(true);
         connect(uiHideTimer_, &QTimer::timeout, this, &MainWindow::hideUI);
     }
-    uiHideTimer_->start(3000);  // 3초 후 UI 숨김
+    // isPlaying_ 설정 전에 showUI 호용 → 타이머 시작 안 됨
+    showUI();
+    isPlaying_ = true;  // showUI 후에 설정 → 마우스 움직임 시에만 타이머 시작
 #ifdef Q_OS_WIN
     SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED);
 #endif
