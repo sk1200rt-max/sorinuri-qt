@@ -39,6 +39,10 @@ UninstallDisplayName={#MyAppName}
 WizardStyle=modern
 WizardResizable=no
 RestartIfNeededByRun=no
+; 기존 버전 자동 제거 후 재설치 (업데이트 설치 지원)
+CloseApplications=yes
+CloseApplicationsFilter=*.exe
+RestartApplications=no
 
 [Languages]
 Name: "korean"; MessagesFile: "compiler:Languages\Korean.isl"
@@ -168,6 +172,22 @@ begin
   DolbyLinkLabel.Font.Style := [fsUnderline];
   DolbyLinkLabel.Cursor := crHand;
   DolbyLinkLabel.OnClick := @DolbyLinkClick;
+end;
+
+// 기존 버전 자동 제거 함수
+function InitializeSetup(): Boolean;
+var
+  UninstallString: String;
+  ResultCode: Integer;
+begin
+  Result := True;
+  // 레지스트리에서 기존 버전 제거 문자열 확인
+  if RegQueryStringValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{8A3F2C1D-9E4B-4F7A-B2D6-1C5E8F3A9B2E}_is1',
+                         'UninstallString', UninstallString) then begin
+    // 기존 버전 자동 제거 (사용자 확인 없이)
+    Exec(RemoveQuotes(UninstallString), '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART', '',
+         SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  end;
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
