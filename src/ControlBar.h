@@ -6,6 +6,7 @@
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include "TrackSelector.h"
+#include "MpvCore.h"
 
 class ControlBar : public QWidget {
     Q_OBJECT
@@ -18,6 +19,11 @@ public:
     void setVolume(int vol);
     void setMuted(bool muted);
     void embedTrackSelector(TrackSelector* selector);
+    void connectMpv(MpvCore* core);
+
+    // 모드 버튼 접근자
+    QPushButton* playerModeBtn() const { return btnPlayerMode_; }
+    QPushButton* ottModeBtn()    const { return btnOttMode_; }
 
 signals:
     void playPauseClicked();
@@ -29,6 +35,15 @@ signals:
     void prevClicked();
     void nextClicked();
     void settingsClicked();
+    void playerModeClicked();
+    void ottModeClicked();
+
+public slots:
+    // AudioInfoBar 대체 - 인라인 오디오 정보 업데이트
+    void onAudioFormatChanged(const QString& codec, int channels,
+                              int sampleRate, const QString& output);
+    void onVideoInfoChanged(int width, int height, double fps, const QString& codec);
+    void onPlaybackStopped();
 
 private slots:
     void onSeekMoved(int value);
@@ -36,7 +51,10 @@ private slots:
 
 private:
     static QPushButton* makeBtn(const QString& svg, const QString& tip, int size = 30);
+    static QPushButton* makeModeBtn(const QString& text, const QString& tip);
     QString formatTime(double s) const;
+    QString getDisplayCodec(const QString& codec) const;
+    QString formatChannels(int ch) const;
 
     QSlider*     seekSlider_ = nullptr;
     QLabel*      timeLabel_  = nullptr;
@@ -48,8 +66,15 @@ private:
     QPushButton* btnMute_    = nullptr;
     QSlider*     volSlider_  = nullptr;
     QLabel*      volLabel_   = nullptr;
-    QPushButton* btnSettings_ = nullptr;
-    QHBoxLayout* btnRow_     = nullptr;  // 중앙 TrackSelector 삽입용
+    QPushButton* btnSettings_    = nullptr;
+    QHBoxLayout* btnRow_         = nullptr;  // 중앙 TrackSelector 삽입용
+
+    // 모드 버튼 (파일 플레이어 / OTT)
+    QPushButton* btnPlayerMode_  = nullptr;
+    QPushButton* btnOttMode_     = nullptr;
+
+    // 인라인 오디오/비디오 정보 (AudioInfoBar 대체)
+    QLabel*      audioInfoLabel_ = nullptr;
 
     double totalDuration_ = 0;
     bool   seeking_       = false;

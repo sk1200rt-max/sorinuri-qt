@@ -18,7 +18,6 @@
 #include "MpvWidget.h"
 #include "ControlBar.h"
 #include "TitleBar.h"
-#include "AudioInfoBar.h"
 #include "SettingsDialog.h"
 #include "TrackSelector.h"
 #include "YtdlpManager.h"
@@ -104,10 +103,6 @@ private:
     QWidget*        playerPage_  = nullptr;
     OttWidget*      ottPage_     = nullptr;
 
-    // 모드 전환 버튼
-    QPushButton* playerModeBtn_ = nullptr;
-    QPushButton* ottModeBtn_    = nullptr;
-
     // ── 플레이어 페이지 내부 스택 (영상 / 음악) ───────────
     QStackedWidget* playerStack_  = nullptr;
     QWidget*        videoPage_    = nullptr;
@@ -118,7 +113,6 @@ private:
     MpvWidget*         mpvWidget_       = nullptr;
     TrackSelector*     trackSelector_   = nullptr;
     ControlBar*        controlBar_      = nullptr;
-    AudioInfoBar*      audioInfoBar_    = nullptr;
     ProFeaturesWidget* proFeatures_     = nullptr;
     ShortcutOverlay*   shortcutOverlay_ = nullptr;
 

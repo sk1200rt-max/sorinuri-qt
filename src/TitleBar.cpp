@@ -1,5 +1,6 @@
 #include "TitleBar.h"
 #include <QIcon>
+#include <QPixmap>
 
 QPushButton* TitleBar::makeIconBtn(const QString& svgPath, const QString& tooltip,
                                     const QString& hoverBg, int w) {
@@ -24,13 +25,17 @@ TitleBar::TitleBar(QWidget* parent) : QWidget(parent) {
     layout->setContentsMargins(10, 0, 0, 0);
     layout->setSpacing(0);
 
-    // 소리누리 로고 텍스트
-    auto* logo = new QLabel("소리누리", this);
-    logo->setStyleSheet(
-        "color: #ffffff; font-size: 12px; font-weight: 600;"
-        "font-family: 'Malgun Gothic', 'Segoe UI', sans-serif;"
-        "letter-spacing: 1px; background: transparent; border: none; padding-right: 10px;");
-    layout->addWidget(logo);
+    // ── 소리누리 로고 아이콘 ──────────────────────────────────────
+    auto* logoIcon = new QLabel(this);
+    logoIcon->setFixedSize(26, 26);
+    logoIcon->setStyleSheet("background: transparent; border: none;");
+    QPixmap logoPixmap(":/sorinuri-app.png");
+    if (!logoPixmap.isNull()) {
+        logoIcon->setPixmap(logoPixmap.scaled(26, 26,
+            Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    }
+    layout->addWidget(logoIcon);
+    layout->addSpacing(4);
 
     // 오디오 포맷 배지
     badgeLabel_ = new QLabel(this);

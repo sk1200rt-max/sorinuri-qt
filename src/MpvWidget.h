@@ -25,6 +25,7 @@ public:
 protected:
     void initializeGL() override;
     void paintGL() override;
+    void resizeGL(int w, int h) override;  // HiDPI: DPI 변경 시 FBO 재생성
     void resizeEvent(QResizeEvent* event) override;
     void showEvent(QShowEvent* event) override;
 

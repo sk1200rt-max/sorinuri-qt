@@ -171,6 +171,13 @@ void MpvWidget::paintGL() {
     }
 }
 
+void MpvWidget::resizeGL(int /*w*/, int /*h*/) {
+    // HiDPI: 윈도우 크기 또는 DPI가 변경될 때 Qt가 자동 호출
+    // FBO는 Qt가 자동 재생성하므로 paintGL에서 devicePixelRatio로
+    // 물리 픽셀 크기를 재계산하면 충분함
+    if (renderCtx_) update();
+}
+
 void MpvWidget::resizeEvent(QResizeEvent* event) {
     QOpenGLWidget::resizeEvent(event);
     updateLogoPos();

@@ -67,32 +67,7 @@ void MainWindow::setupUI() {
     titleBar_ = new TitleBar(this);
     mainLayout->addWidget(titleBar_);
 
-    // ── 모드 전환 버튼 바 (플레이어 / OTT) ───────────────────────
-    auto* modeBar = new QWidget(this);
-    modeBar->setFixedHeight(34);
-    modeBar->setStyleSheet("background: #0d0d0d; border-bottom: 1px solid #1e1e1e;");
-    auto* modeLayout = new QHBoxLayout(modeBar);
-    modeLayout->setContentsMargins(8, 3, 8, 3);
-    modeLayout->setSpacing(4);
-
-    QString modeBtnStyle =
-        "QPushButton { background: #1a1a1a; color: #888; border: 1px solid #2a2a2a; "
-        "border-radius: 4px; padding: 3px 14px; font-size: 12px; }"
-        "QPushButton:hover { color: #ccc; border-color: #333; }"
-        "QPushButton[active=true] { background: #1565c0; color: #fff; border-color: #1976d2; }";
-
-    playerModeBtn_ = new QPushButton("▶  파일 플레이어", modeBar);
-    ottModeBtn_    = new QPushButton("🌐  OTT 스트리밍 (Netflix · Disney+ · YouTube)", modeBar);
-    playerModeBtn_->setStyleSheet(modeBtnStyle);
-    ottModeBtn_->setStyleSheet(modeBtnStyle);
-    playerModeBtn_->setProperty("active", true);
-    playerModeBtn_->setToolTip("로컈 파일 재생 모드");
-    ottModeBtn_->setToolTip("Edge WebView2 기반 OTT 스트리밍\nNetflix Dolby Atmos / 5.1 완전 지원");
-
-    modeLayout->addWidget(playerModeBtn_);
-    modeLayout->addWidget(ottModeBtn_);
-    modeLayout->addStretch();
-    mainLayout->addWidget(modeBar);
+    // 모드 버튼은 ControlBar에 통합됨 (modeBar 제거)
 
     // ── 메인 스택 (플레이어 / OTT 페이지) ───────────────────────
     mainStack_ = new QStackedWidget(this);
@@ -144,9 +119,7 @@ void MainWindow::setupUI() {
     controlBar_->embedTrackSelector(trackSelector_);
     mainLayout->addWidget(controlBar_);
 
-    // ── 오디오 정보 바 ────────────────────────────────────────────
-    audioInfoBar_ = new AudioInfoBar(this);
-    mainLayout->addWidget(audioInfoBar_);
+    // 오디오 정보는 ControlBar에 인라인으로 통합됨 (AudioInfoBar 제거)
 
     // ── 전문 기능 패널 (기본 숨김, P 키로 토글) ──────────────────────
     proFeatures_ = new ProFeaturesWidget(this);
@@ -173,7 +146,7 @@ void MainWindow::setupConnections() {
     connect(core, &MpvCore::videoInfoChanged,   this, &MainWindow::onVideoInfoChanged);
     connect(core, &MpvCore::tracksChanged,      this, &MainWindow::onTracksChanged);
 
-    audioInfoBar_->connectMpv(core);
+    controlBar_->connectMpv(core);  // AudioInfoBar 대체 - 인라인 오디오 정보
     trackSelector_->connectMpv(core);
 
     connect(controlBar_, &ControlBar::playPauseClicked,  core, &MpvCore::togglePause);
@@ -207,9 +180,9 @@ void MainWindow::setupConnections() {
         settings_.setValue("window/alwaysOnTop", pinned);
     });
 
-    // 모드 전환 버튼
-    connect(playerModeBtn_, &QPushButton::clicked, this, &MainWindow::switchToPlayerMode);
-    connect(ottModeBtn_,    &QPushButton::clicked, this, &MainWindow::switchToOttMode);
+    // 모드 전환 버튼 (ControlBar에 통합)
+    connect(controlBar_, &ControlBar::playerModeClicked, this, &MainWindow::switchToPlayerMode);
+    connect(controlBar_, &ControlBar::ottModeClicked,    this, &MainWindow::switchToOttMode);
 
     // OTT 타이틀 변경 시 윈도우 타이틀 업데이트
     // OTT titleChanged 연결은 switchToOttMode에서 처리
@@ -260,14 +233,14 @@ void MainWindow::switchToMusicMode() {
     isMusicMode_ = true;
     playerStack_->setCurrentIndex(1);
     controlBar_->hide();
-    audioInfoBar_->hide();
+    controlBar_->hide();
 }
 
 void MainWindow::switchToVideoMode() {
     isMusicMode_ = false;
     playerStack_->setCurrentIndex(0);
     controlBar_->show();
-    audioInfoBar_->show();
+    controlBar_->show();
 }
 
 void MainWindow::loadMusicMeta(const QString& path) {
@@ -741,13 +714,12 @@ void MainWindow::showContextMenu(const QPoint& globalPos) {
 void MainWindow::switchToPlayerMode() {
     isOttMode_ = false;
     mainStack_->setCurrentIndex(0);
-    playerModeBtn_->setProperty("active", true);
-    ottModeBtn_->setProperty("active", false);
-    // Qt 스타일 재적용 (property 변경 후 필요)
-    playerModeBtn_->style()->unpolish(playerModeBtn_);
-    playerModeBtn_->style()->polish(playerModeBtn_);
-    ottModeBtn_->style()->unpolish(ottModeBtn_);
-    ottModeBtn_->style()->polish(ottModeBtn_);
+    controlBar_->playerModeBtn()->setProperty("active", true);
+    controlBar_->ottModeBtn()->setProperty("active", false);
+    controlBar_->playerModeBtn()->style()->unpolish(controlBar_->playerModeBtn());
+    controlBar_->playerModeBtn()->style()->polish(controlBar_->playerModeBtn());
+    controlBar_->ottModeBtn()->style()->unpolish(controlBar_->ottModeBtn());
+    controlBar_->ottModeBtn()->style()->polish(controlBar_->ottModeBtn());
     updateWindowTitle();
 }
 
@@ -765,12 +737,12 @@ void MainWindow::switchToOttMode() {
         });
     }
     mainStack_->setCurrentIndex(1);
-    playerModeBtn_->setProperty("active", false);
-    ottModeBtn_->setProperty("active", true);
-    playerModeBtn_->style()->unpolish(playerModeBtn_);
-    playerModeBtn_->style()->polish(playerModeBtn_);
-    ottModeBtn_->style()->unpolish(ottModeBtn_);
-    ottModeBtn_->style()->polish(ottModeBtn_);
+    controlBar_->playerModeBtn()->setProperty("active", false);
+    controlBar_->ottModeBtn()->setProperty("active", true);
+    controlBar_->playerModeBtn()->style()->unpolish(controlBar_->playerModeBtn());
+    controlBar_->playerModeBtn()->style()->polish(controlBar_->playerModeBtn());
+    controlBar_->ottModeBtn()->style()->unpolish(controlBar_->ottModeBtn());
+    controlBar_->ottModeBtn()->style()->polish(controlBar_->ottModeBtn());
     updateWindowTitle("소리누리 OTT");
 }
 
