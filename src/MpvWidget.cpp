@@ -19,9 +19,9 @@ static void* getGlProcAddress(void* /*ctx*/, const char* name) {
 
 MpvWidget::MpvWidget(QWidget* parent) : QOpenGLWidget(parent) {
     setAutoFillBackground(false);
-    // 깜빡임 수정: 프레임 버퍼를 유지하여 포커스 전환 시 깜빡임 제거
-    // PartialUpdate: 이전 프레임을 지우지 않고 유지 → 검은 화면 깜빡임 없음
-    setUpdateBehavior(QOpenGLWidget::PartialUpdate);
+    // NoPartialUpdate: 매 프레임 전체 재렌더링 → 화면 끊김/잔상 없음
+    // PartialUpdate는 이전 버퍼 유지로 깜빡임을 줄이지만 끊김 발생 가능
+    setUpdateBehavior(QOpenGLWidget::NoPartialUpdate);
 
     core_ = new MpvCore(this);
 
@@ -229,7 +229,6 @@ void MpvWidget::maybeUpdate() {
         context()->swapBuffers(context()->surface());
         doneCurrent();
     } else {
-        // PartialUpdate 모드: 이전 프레임 버퍼 유지, 즉시 렌더링 요청
         update();
     }
 }

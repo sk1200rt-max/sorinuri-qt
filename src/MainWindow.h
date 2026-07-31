@@ -97,6 +97,8 @@ private:
     void updateWindowTitle(const QString& filename = {});
     void openUrl(const QString& url);
     void loadMusicMeta(const QString& path);
+    void showUI();
+    void hideUI();
 
     // ── 메인 스택 (플레이어 / OTT 모드) ──────────────
     QStackedWidget* mainStack_   = nullptr;
@@ -128,6 +130,9 @@ private:
     bool   isOttMode_         = false;
     bool   isMusicMode_       = false;
     bool   isProFeaturesOpen_ = false;
+    bool   isPlaying_         = false;
+    bool   uiVisible_         = true;
+    QTimer* uiHideTimer_      = nullptr;
     double totalDuration_     = 0;
     QString currentFilePath_;
     QSettings settings_;

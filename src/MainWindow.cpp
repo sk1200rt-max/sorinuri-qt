@@ -304,21 +304,54 @@ void MainWindow::onFileLoaded(const QString& path) {
     }
 }
 
+void MainWindow::showUI() {
+    if (!uiVisible_) {
+        titleBar_->show();
+        controlBar_->show();
+        uiVisible_ = true;
+    }
+    // 재생 중이면 3초 후 다시 숨김
+    if (isPlaying_ && uiHideTimer_) {
+        uiHideTimer_->start(3000);
+    }
+}
+
+void MainWindow::hideUI() {
+    if (uiVisible_ && isPlaying_ && !isFullscreen_) {
+        titleBar_->hide();
+        controlBar_->hide();
+        uiVisible_ = false;
+    }
+}
+
 void MainWindow::onPlaybackStarted() {
+    isPlaying_ = true;
     controlBar_->setPlaying(true);
+    // UI 자동 숨김 타이머 초기화
+    if (!uiHideTimer_) {
+        uiHideTimer_ = new QTimer(this);
+        uiHideTimer_->setSingleShot(true);
+        connect(uiHideTimer_, &QTimer::timeout, this, &MainWindow::hideUI);
+    }
+    uiHideTimer_->start(3000);  // 3초 후 UI 숨김
 #ifdef Q_OS_WIN
-    // 영상/음악 재생 중 화면 켜짐 및 절전모드 진입 방지
     SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED);
 #endif
 }
 void MainWindow::onPlaybackPaused() {
+    isPlaying_ = false;
     controlBar_->setPlaying(false);
+    // 일시정지 시 UI 항상 표시
+    if (uiHideTimer_) uiHideTimer_->stop();
+    showUI();
 #ifdef Q_OS_WIN
-    // 일시정지 시 절전모드 방지 해제
     SetThreadExecutionState(ES_CONTINUOUS);
 #endif
 }
 void MainWindow::onPlaybackEnded() {
+    isPlaying_ = false;
+    if (uiHideTimer_) uiHideTimer_->stop();
+    showUI();
     controlBar_->setPlaying(false);
     mpvWidget_->showLogo(true);
 #ifdef Q_OS_WIN
@@ -326,6 +359,9 @@ void MainWindow::onPlaybackEnded() {
 #endif
 }
 void MainWindow::onPlaybackStopped() {
+    isPlaying_ = false;
+    if (uiHideTimer_) uiHideTimer_->stop();
+    showUI();
     controlBar_->setPlaying(false);
     updateWindowTitle();
     mpvWidget_->showLogo(true);
@@ -530,6 +566,19 @@ bool MainWindow::nativeEvent(const QByteArray& type, void* msg, qintptr* result)
 #ifdef Q_OS_WIN
     if (type == "windows_generic_MSG") {
         MSG* m = static_cast<MSG*>(msg);
+
+        // Alt+F4: FramelessWindowHint이 시스템 메시지를 막으므로 직접 처리
+        if (m->message == WM_SYSKEYDOWN && m->wParam == VK_F4) {
+            close();
+            return true;
+        }
+
+        // WM_SYSCOMMAND SC_CLOSE (Alt+F4 또는 시스템 메뉴 닫기)
+        if (m->message == WM_SYSCOMMAND && (m->wParam & 0xFFF0) == SC_CLOSE) {
+            close();
+            return true;
+        }
+
         if (m->message == WM_NCHITTEST) {
             // WM_NCHITTEST lParam은 물리 픽셀(스크린 좌표)이므로
             // DPI 스케일로 나눠서 논리 픽셀으로 변환
@@ -564,6 +613,8 @@ void MainWindow::mousePressEvent(QMouseEvent* e) {
 }
 
 void MainWindow::mouseMoveEvent(QMouseEvent* e) {
+    // 마우스 움직임 시 UI 표시 (3초 후 다시 숨김)
+    showUI();
     if (!resizing_) {
         int edge = getResizeEdge(e->pos());
         if (edge == 0) {
