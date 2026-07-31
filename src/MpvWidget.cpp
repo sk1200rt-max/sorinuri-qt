@@ -1,6 +1,9 @@
 #include "MpvWidget.h"
 #include <QResizeEvent>
 #include <QShowEvent>
+#include <QPainter>
+#include <QFont>
+#include <QFontMetrics>
 #include <QOpenGLContext>
 #include <QDebug>
 #include <QTimer>
@@ -107,6 +110,65 @@ void MpvWidget::paintGL() {
         { MPV_RENDER_PARAM_INVALID,    nullptr   }
     };
     mpv_render_context_render(renderCtx_, params);
+
+    // ── AI 자막 오버레이 렌더링 ──────────────────────────────────
+    if (!aiSubText_.isEmpty()) {
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing);
+
+        // 신뢰도에 따른 배지 색상
+        QColor badgeColor;
+        QString badge;
+        if (aiSubConf_ >= 90) {
+            badgeColor = QColor(0, 200, 180);  // 청록 - 높은 신뢰도
+            badge = " [AI]";
+        } else if (aiSubConf_ >= 80) {
+            badgeColor = QColor(255, 200, 0);  // 노란 - 보통 신뢰도
+            badge = " [AI?]";
+        } else {
+            badgeColor = QColor(255, 140, 0);  // 주황 - 낮은 신뢰도
+            badge = " [AI!]";
+        }
+
+        // 자막 텍스트 + 배지
+        QString displayText = aiSubText_;
+
+        // 폰트 설정
+        QFont subFont("Malgun Gothic", 16, QFont::Bold);
+        painter.setFont(subFont);
+        QFontMetrics fm(subFont);
+
+        // 텍스트 영역 계산 (하단 15% 위치)
+        int textW = fm.horizontalAdvance(displayText) + 40;
+        int textH = fm.height() + 16;
+        int x = (width() - textW) / 2;
+        int y = height() - textH - static_cast<int>(height() * 0.08);
+
+        // 반투명 배경
+        painter.setBrush(QColor(0, 0, 0, 180));
+        painter.setPen(Qt::NoPen);
+        painter.drawRoundedRect(x - 8, y - 4, textW + 16, textH + 8, 6, 6);
+
+        // 자막 텍스트
+        painter.setPen(Qt::white);
+        painter.drawText(x, y + fm.ascent() + 4, displayText);
+
+        // 배지 (우측 끝)
+        QFont badgeFont("Consolas", 9, QFont::Bold);
+        painter.setFont(badgeFont);
+        QFontMetrics bfm(badgeFont);
+        int bw = bfm.horizontalAdvance(badge) + 8;
+        int bx = x + textW - bw - 4;
+        int by = y + (textH - bfm.height()) / 2 - 2;
+        painter.setBrush(badgeColor);
+        painter.setPen(Qt::NoPen);
+        painter.drawRoundedRect(bx, by, bw, bfm.height() + 4, 3, 3);
+        painter.setPen(Qt::black);
+        painter.setFont(badgeFont);
+        painter.drawText(bx + 4, by + bfm.ascent() + 2, badge);
+
+        painter.end();
+    }
 }
 
 void MpvWidget::resizeEvent(QResizeEvent* event) {

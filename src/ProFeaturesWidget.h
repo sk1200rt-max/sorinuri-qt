@@ -67,7 +67,8 @@ private slots:
 private:
     void updateAbLabel();
 
-    MpvCore* mpv_ = nullptr;
+    MpvCore*    mpv_       = nullptr;
+    QTabWidget* tabWidget_ = nullptr;  // 탭 컨테이너 - addTab()으로 외부 위젯 추가 가능
 
     // A-B 반복
     QPushButton* btnSetA_   = nullptr;

@@ -29,6 +29,7 @@ signals:
     void prevRequested();
     void nextRequested();
     void expandRequested();   // 메인 창으로 돌아가기
+    void closeRequested();    // 미니 플레이어 닫기 (메인 창 복귀)
     void seekRequested(double pos);
 
 protected:

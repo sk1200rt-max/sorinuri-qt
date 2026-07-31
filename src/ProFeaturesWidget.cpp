@@ -41,16 +41,33 @@ static QSlider* makeHSlider(int min, int max, int val, QWidget* parent = nullptr
 }
 
 ProFeaturesWidget::ProFeaturesWidget(QWidget* parent) : QWidget(parent) {
-    setFixedHeight(88);
+    setFixedHeight(120);  // 탭 헤더(24px) + 내용(88px) + 여백
     setStyleSheet("background: #060606; border-top: 1px solid #141414;");
 
-    auto* mainLayout = new QHBoxLayout(this);
-    mainLayout->setContentsMargins(12, 6, 12, 6);
+    // ── QTabWidget 생성 (this에 직접 붙임) ──────────────────────
+    tabWidget_ = new QTabWidget(this);
+    tabWidget_->setStyleSheet(
+        "QTabWidget::pane { border: none; background: #060606; }"
+        "QTabBar::tab { background: #0a0a0a; color: #888; padding: 2px 10px;"
+        "  border: 1px solid #1a1a1a; border-bottom: none; font-size: 10px; }"
+        "QTabBar::tab:selected { background: #060606; color: #00c8b4; border-color: #00c8b4; }"
+        "QTabBar::tab:hover { color: #ccc; }");
+    tabWidget_->setDocumentMode(true);
+
+    auto* outerLayout = new QVBoxLayout(this);
+    outerLayout->setContentsMargins(0, 0, 0, 0);
+    outerLayout->setSpacing(0);
+    outerLayout->addWidget(tabWidget_);
+
+    // ── 기본 전문 기능 탭 위젯 (tabWidget_의 자식) ───────────────
+    auto* mainTabWidget = new QWidget();
+    auto* mainLayout = new QHBoxLayout(mainTabWidget);
+    mainLayout->setContentsMargins(12, 4, 12, 4);
     mainLayout->setSpacing(16);
 
     // ── 섹션 구분선 ────────────────────────────────────────────
-    auto makeSep = [this]() {
-        auto* sep = new QFrame(this);
+    auto makeSep = [&]() {
+        auto* sep = new QFrame(mainTabWidget);
         sep->setFrameShape(QFrame::VLine);
         sep->setStyleSheet("color: #1e1e1e;");
         return sep;
@@ -58,7 +75,7 @@ ProFeaturesWidget::ProFeaturesWidget(QWidget* parent) : QWidget(parent) {
 
     // ── A-B 구간 반복 ─────────────────────────────────────────
     {
-        auto* sec = new QWidget(this);
+        auto* sec = new QWidget(mainTabWidget);
         auto* lay = new QVBoxLayout(sec);
         lay->setContentsMargins(0, 0, 0, 0);
         lay->setSpacing(4);
@@ -92,7 +109,7 @@ ProFeaturesWidget::ProFeaturesWidget(QWidget* parent) : QWidget(parent) {
 
     // ── 재생속도 ──────────────────────────────────────────────
     {
-        auto* sec = new QWidget(this);
+        auto* sec = new QWidget(mainTabWidget);
         auto* lay = new QVBoxLayout(sec);
         lay->setContentsMargins(0, 0, 0, 0);
         lay->setSpacing(4);
@@ -122,7 +139,7 @@ ProFeaturesWidget::ProFeaturesWidget(QWidget* parent) : QWidget(parent) {
 
     // ── 오디오 딜레이 ─────────────────────────────────────────
     {
-        auto* sec = new QWidget(this);
+        auto* sec = new QWidget(mainTabWidget);
         auto* lay = new QVBoxLayout(sec);
         lay->setContentsMargins(0, 0, 0, 0);
         lay->setSpacing(4);
@@ -153,7 +170,7 @@ ProFeaturesWidget::ProFeaturesWidget(QWidget* parent) : QWidget(parent) {
 
     // ── 자막 딜레이 ───────────────────────────────────────────
     {
-        auto* sec = new QWidget(this);
+        auto* sec = new QWidget(mainTabWidget);
         auto* lay = new QVBoxLayout(sec);
         lay->setContentsMargins(0, 0, 0, 0);
         lay->setSpacing(4);
@@ -184,7 +201,7 @@ ProFeaturesWidget::ProFeaturesWidget(QWidget* parent) : QWidget(parent) {
 
     // ── 화면 필터 ─────────────────────────────────────────────
     {
-        auto* sec = new QWidget(this);
+        auto* sec = new QWidget(mainTabWidget);
         auto* lay = new QVBoxLayout(sec);
         lay->setContentsMargins(0, 0, 0, 0);
         lay->setSpacing(2);
@@ -220,7 +237,7 @@ ProFeaturesWidget::ProFeaturesWidget(QWidget* parent) : QWidget(parent) {
 
     // ── 스크린샷 ──────────────────────────────────────────────
     {
-        auto* sec = new QWidget(this);
+        auto* sec = new QWidget(mainTabWidget);
         auto* lay = new QVBoxLayout(sec);
         lay->setContentsMargins(0, 0, 0, 0);
         lay->setSpacing(4);
@@ -235,6 +252,14 @@ ProFeaturesWidget::ProFeaturesWidget(QWidget* parent) : QWidget(parent) {
     }
 
     mainLayout->addStretch();
+
+    // 기본 전문 기능 탭을 QTabWidget에 추가
+    tabWidget_->addTab(mainTabWidget, "전문 기능");
+}
+
+void ProFeaturesWidget::addTab(QWidget* w, const QString& title) {
+    if (!tabWidget_ || !w) return;
+    tabWidget_->addTab(w, title);
 }
 
 void ProFeaturesWidget::connectMpv(MpvCore* core) {
@@ -268,7 +293,6 @@ void ProFeaturesWidget::setAbPointA() {
     btnSetA_->setChecked(true);
     mpv_->setProperty("ab-loop-a", abPointA_);
 
-    // B가 설정되어 있으면 루프 활성화
     if (abPointB_ > abPointA_) {
         mpv_->setProperty("ab-loop-b", abPointB_);
         updateAbLabel();
@@ -345,7 +369,6 @@ void ProFeaturesWidget::resetFilters() {
 
 void ProFeaturesWidget::takeScreenshot() {
     if (!mpv_) return;
-    // MPV screenshot 명령 실행 (현재 프레임을 PNG로 저장)
     mpv_->command({"screenshot", "video"});
 }
 
@@ -355,9 +378,4 @@ void ProFeaturesWidget::setAudioDelay(double ms) {
 
 void ProFeaturesWidget::setSubDelay(double ms) {
     subDelaySlider_->setValue(static_cast<int>(ms));
-}
-void ProFeaturesWidget::addTab(QWidget* w, const QString& title) {
-    // ProFeaturesWidget은 QTabWidget이 아니므로
-    // 새 탭을 추가할 수 없음 - 별도 패널로 처리
-    Q_UNUSED(w); Q_UNUSED(title);
 }

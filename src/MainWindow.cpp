@@ -2,6 +2,10 @@
 #include "UrlDialog.h"
 #include "ProFeaturesWidget.h"
 #include "ShortcutOverlay.h"
+#include "WhisperWidget.h"
+#include "UpscaleWidget.h"
+#include "ChapterWidget.h"
+#include "MiniPlayerWidget.h"
 #include <QApplication>
 #include <QMessageBox>
 #include <QProgressDialog>
@@ -296,6 +300,7 @@ void MainWindow::onMusicVolumeChanged(int vol) {
 }
 
 void MainWindow::onFileLoaded(const QString& path) {
+    currentFilePath_ = path;
     updateWindowTitle(QFileInfo(path).fileName());
     if (isMusicMode_) {
         // 음악 모드: 메타데이터 로드 (파일 로드 후 MPV가 태그를 읽은 시점)
@@ -303,6 +308,12 @@ void MainWindow::onFileLoaded(const QString& path) {
         musicPage_->setPlaying(true);
     } else {
         controlBar_->setPlaying(true);
+    }
+    // 챕터 위젯이 열려 있으면 새 파일의 챕터 로드
+    if (chapterWidget_) {
+        chapterWidget_->setDuration(totalDuration_);
+        chapterWidget_->loadChapters();
+        chapterWidget_->generateThumbnails(path);
     }
 }
 
@@ -468,6 +479,44 @@ void MainWindow::keyPressEvent(QKeyEvent* e) {
 
 void MainWindow::toggleProFeatures() {
     isProFeaturesOpen_ = !isProFeaturesOpen_;
+
+    // 처음 열 때 지연 초기화 위젯 생성 및 탭 추가
+    if (isProFeaturesOpen_) {
+        auto* core = mpvWidget_->core();
+
+        if (!whisperWidget_) {
+            whisperWidget_ = new WhisperWidget(this);
+            proFeatures_->addTab(whisperWidget_, "AI 자막");
+            // AI 자막 → MPV 자막 오버레이 연결
+            connect(whisperWidget_, &WhisperWidget::subtitleGenerated,
+                    this, [this](const QString& text, double, double, int conf) {
+                mpvWidget_->setAiSubtitle(text, conf);
+            });
+            connect(whisperWidget_, &WhisperWidget::seekToSubtitle,
+                    core, [core](double sec) { core->seek(sec); });
+        }
+
+        if (!upscaleWidget_) {
+            upscaleWidget_ = new UpscaleWidget(core, this);
+            proFeatures_->addTab(upscaleWidget_, "화질 개선");
+        }
+
+        if (!chapterWidget_) {
+            chapterWidget_ = new ChapterWidget(core, this);
+            proFeatures_->addTab(chapterWidget_, "챕터/북마크");
+            connect(chapterWidget_, &ChapterWidget::seekRequested,
+                    core, [core](double sec) { core->seek(sec); });
+            connect(core, &MpvCore::positionChanged,
+                    chapterWidget_, &ChapterWidget::onPositionChanged);
+            // 현재 파일 정보 즉시 로드
+            if (!currentFilePath_.isEmpty()) {
+                chapterWidget_->setDuration(totalDuration_);
+                chapterWidget_->loadChapters();
+                chapterWidget_->generateThumbnails(currentFilePath_);
+            }
+        }
+    }
+
     proFeatures_->setVisible(isProFeaturesOpen_);
 }
 
@@ -845,15 +894,42 @@ void MainWindow::updateWindowTitle(const QString& filename) {
 }
 
 void MainWindow::toggleMiniPlayer() {
-    if (!miniPlayer_ || !isMusicMode_) return;
+    if (!isMusicMode_) return;
+
+    // 처음 호출 시 지연 초기화
+    if (!miniPlayer_) {
+        miniPlayer_ = new MiniPlayerWidget(nullptr);  // 독립 창이므로 parent=nullptr
+        auto* core = mpvWidget_->core();
+        // 미니 플레이어 시그널 연결
+        connect(miniPlayer_, &MiniPlayerWidget::playPauseRequested,
+                core, &MpvCore::togglePause);
+        connect(miniPlayer_, &MiniPlayerWidget::prevRequested,
+                core, [core]() { core->command({"playlist-prev"}); });
+        connect(miniPlayer_, &MiniPlayerWidget::nextRequested,
+                core, [core]() { core->command({"playlist-next"}); });
+        connect(miniPlayer_, &MiniPlayerWidget::expandRequested,
+                this, &MainWindow::toggleMiniPlayer);
+        // MPV 상태 → 미니 플레이어 업데이트
+        connect(core, &MpvCore::positionChanged,
+                miniPlayer_, [this](double pos) {
+            if (miniPlayer_) miniPlayer_->updatePosition(pos, totalDuration_);
+        });
+        connect(core, &MpvCore::playbackStarted,
+                miniPlayer_, [this]() { if (miniPlayer_) miniPlayer_->setPlaying(true); });
+        connect(core, &MpvCore::playbackPaused,
+                miniPlayer_, [this]() { if (miniPlayer_) miniPlayer_->setPlaying(false); });
+    }
+
     if (miniPlayer_->isVisible()) {
         miniPlayer_->hide();
         show();
         activateWindow();
     } else {
-        // 미니 플레이어에 현재 메타 정보 전달
+        // 현재 트랙 메타 정보 전달
         if (musicPage_) {
-            // 미니 플레이어 업데이트는 loadMusicMeta에서 처리
+            // MusicWidget에서 현재 메타 정보를 miniPlayer에 전달
+            miniPlayer_->updatePosition(mpvWidget_->core()->position(), totalDuration_);
+            miniPlayer_->setPlaying(!mpvWidget_->core()->isPaused());
         }
         hide();
         miniPlayer_->show();
@@ -862,17 +938,29 @@ void MainWindow::toggleMiniPlayer() {
 }
 
 void MainWindow::toggleWhisper(bool on) {
-    if (whisperWidget_) {
-        whisperWidget_->setMediaFile(currentFilePath_);
-        whisperWidget_->setActive(on);
+    // whisperWidget_이 없으면 ProFeatures 패널을 열어서 생성
+    if (!whisperWidget_) {
+        if (!isProFeaturesOpen_) toggleProFeatures();
+        // 생성 후 재시도
+        if (whisperWidget_) {
+            whisperWidget_->setMediaFile(currentFilePath_);
+            whisperWidget_->setActive(on);
+        }
+        return;
     }
+    whisperWidget_->setMediaFile(currentFilePath_);
+    whisperWidget_->setActive(on);
 }
 
 void MainWindow::onChapterBookmark() {
-    if (chapterWidget_ && mpvWidget_) {
-        double pos = mpvWidget_->core()->getProperty("time-pos").toDouble();
-        chapterWidget_->addBookmark(pos);
+    if (!mpvWidget_) return;
+    double pos = mpvWidget_->core()->getProperty("time-pos").toDouble();
+    // chapterWidget_이 없으면 P 패널을 열어서 생성
+    if (!chapterWidget_) {
+        if (!isProFeaturesOpen_) toggleProFeatures();
+        return;
     }
+    chapterWidget_->addBookmark(pos);
 }
 
 void MainWindow::toggleMultiView(MultiViewLayout l) {
