@@ -708,6 +708,24 @@ void MainWindow::toggleProFeatures() {
                 chapterWidget_->generateThumbnails(currentFilePath_);
             }
         }
+        // 하이엔드 오디오 고급 기능 (컨볼루션 룸 코렉션 + VST)
+        if (!audioAdvancedWidget_) {
+            audioAdvancedWidget_ = new AudioAdvancedWidget(core, this);
+            proFeatures_->addTab(audioAdvancedWidget_, "하이엔드 오디오");
+        }
+        // 하이엔드 비디오 고급 기능 (3D LUT 케리브레이션)
+        if (!videoAdvancedWidget_) {
+            videoAdvancedWidget_ = new VideoAdvancedWidget(core, this);
+            proFeatures_->addTab(videoAdvancedWidget_, "하이엔드 비디오");
+        }
+        // 네트워크 탐색 (SMB/NAS + 360도 VR + 캐스팅)
+        if (!networkBrowserWidget_) {
+            networkBrowserWidget_ = new NetworkBrowserWidget(core, this);
+            proFeatures_->addTab(networkBrowserWidget_, "네트워크");
+            // SMB 파일 열기 요청 연결
+            connect(networkBrowserWidget_, &NetworkBrowserWidget::openFileRequested,
+                    this, [this](const QString& path) { openFiles({path}); });
+        }
     }
 
     proFeatures_->setVisible(isProFeaturesOpen_);

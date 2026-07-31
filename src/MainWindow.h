@@ -32,6 +32,9 @@
 #include "ChapterWidget.h"
 #include "MultiViewWidget.h"
 #include "SubtitleSearchDialog.h"
+#include "AudioAdvancedWidget.h"
+#include "VideoAdvancedWidget.h"
+#include "NetworkBrowserWidget.h"
 
 
 class MainWindow : public QMainWindow {
@@ -135,7 +138,10 @@ private:
     WhisperWidget*     whisperWidget_   = nullptr;
     UpscaleWidget*     upscaleWidget_   = nullptr;
     ChapterWidget*     chapterWidget_   = nullptr;
-    MultiViewWidget*   multiViewWidget_ = nullptr;
+    MultiViewWidget*   multiViewWidget_    = nullptr;
+    AudioAdvancedWidget* audioAdvancedWidget_ = nullptr;  // 하이엔드 오디오 (컨볼루션/VST)
+    VideoAdvancedWidget* videoAdvancedWidget_ = nullptr;  // 하이엔드 비디오 (3D LUT)
+    NetworkBrowserWidget* networkBrowserWidget_ = nullptr;  // SMB/DLNA + 360도 VR + 캐스팅
 
     bool   isFullscreen_      = false;
     bool   isOttMode_         = false;
