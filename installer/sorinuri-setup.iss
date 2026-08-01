@@ -27,6 +27,8 @@ AllowNoIcons=yes
 OutputDir=..\dist
 OutputBaseFilename=Sorinuri-Setup-{#MyAppVersion}
 SetupIconFile=..\resources\sorinuri.ico
+; HiDPI Per-Monitor V2 manifest - 설치 화면이 고해상도 모니터에서 선명하게 표시됨
+SetupManifestFile=setup-dpi.manifest
 Compression=lzma2/ultra64
 SolidCompression=yes
 ArchitecturesInstallIn64BitMode=x64compatible
@@ -38,8 +40,6 @@ UninstallDisplayName={#MyAppName}
 WizardStyle=modern
 WizardResizable=no
 RestartIfNeededByRun=no
-; HiDPI (고해상도 모니터) 지원 - Per-Monitor DPI Aware
-DPIAware=yes
 ; 설치 마법사 이미지 (소리누리 브랜드)
 WizardImageFile=wizard-banner.bmp
 WizardSmallImageFile=wizard-small.bmp
