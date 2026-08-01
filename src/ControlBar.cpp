@@ -61,6 +61,7 @@ ControlBar::ControlBar(QWidget* parent) : QWidget(parent) {
     seekSlider_->setRange(0, 10000);
     seekSlider_->setValue(0);
     seekSlider_->setStyleSheet(SEEK_STYLE);
+    seekSlider_->setFocusPolicy(Qt::NoFocus);  // 키 이벤트가 MainWindow로 전달되도록
     // 시크바 클릭 즉시 이동 (드래그 전에도 클릭한 위치로 이동)
     seekSlider_->setTracking(true);
     connect(seekSlider_, &QSlider::sliderPressed,  [this]() {
@@ -110,6 +111,7 @@ ControlBar::ControlBar(QWidget* parent) : QWidget(parent) {
     volSlider_->setValue(100);
     volSlider_->setFixedWidth(80);
     volSlider_->setStyleSheet(VOL_STYLE);
+    volSlider_->setFocusPolicy(Qt::NoFocus);  // 키 이벤트가 MainWindow로 전달되도록
     connect(volSlider_, &QSlider::valueChanged, this, &ControlBar::onVolMoved);
 
     volLabel_ = new QLabel("100%", this);

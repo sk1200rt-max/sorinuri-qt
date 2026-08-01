@@ -44,7 +44,11 @@ def bump(new_ver):
     path = os.path.join(root, 'installer', 'sorinuri-setup.iss')
     if os.path.exists(path):
         c = open(path).read()
-        c2 = re.sub(r'(AppVersion=)[\d\.]+', lambda m: m.group(1) + new_ver, c)
+        # #define MyAppVersion "x.x.x" 패턴 (주요 패턴)
+        c2 = re.sub(r'(#define MyAppVersion\s+")[\d\.]+"', lambda m: m.group(1) + new_ver + '"', c)
+        # AppVersion=x.x.x 패턴 (혹시 있을 경우)
+        c2 = re.sub(r'(AppVersion=)[\d\.]+', lambda m: m.group(1) + new_ver, c2)
+        # OutputBaseFilename=Sorinuri-Setup-x.x.x 패턴
         c2 = re.sub(r'(OutputBaseFilename=Sorinuri-Setup-)[\d\.]+', lambda m: m.group(1) + new_ver, c2)
         if c2 != c:
             open(path, 'w').write(c2)

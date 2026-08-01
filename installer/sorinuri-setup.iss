@@ -3,7 +3,7 @@
 
 #define MyAppName "소리누리"
 #define MyAppNameEn "Sorinuri"
-#define MyAppVersion "6.1.1"
+#define MyAppVersion "6.3.1"
 #define MyAppPublisher "Sorinuri"
 #define MyAppURL "https://sorinuri.com"
 #define MyAppExeName "Sorinuri.exe"
@@ -154,7 +154,9 @@ begin
   // HiDPI 스케일 팩터 적용 (96 DPI = 100%, 192 DPI = 200% 등)
   ScaleFactor := WizardForm.Font.PixelsPerInch;
   // 기본 폰트 크기: 96 DPI에서 9pt, HiDPI에서 비례 확대
+  // 250% 배율(240 DPI)에서 글씨 잘림 방지: 최대 11pt로 제한
   BaseFontSize := MulDiv(9, ScaleFactor, 96);
+  if BaseFontSize > 11 then BaseFontSize := 11;
 
   DolbyPage := CreateCustomPage(
     wpSelectTasks,
