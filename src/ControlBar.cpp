@@ -1,16 +1,19 @@
 #include "ControlBar.h"
 
 static const char* SEEK_STYLE =
-    "QSlider::groove:horizontal { height: 3px; background: #1e1e1e; border-radius: 1px; }"
-    "QSlider::handle:horizontal { width: 10px; height: 10px; margin: -4px 0;"
-    "  background: #4fc3f7; border-radius: 5px; }"
-    "QSlider::sub-page:horizontal { background: #1565c0; border-radius: 1px; }";
-
+    "QSlider::groove:horizontal { height: 4px; background: #2a2a2a; border-radius: 2px; }"
+    "QSlider::handle:horizontal { width: 12px; height: 12px; margin: -4px 0;"
+    "  background: #4fc3f7; border-radius: 6px; }"
+    "QSlider::handle:horizontal:hover { width: 16px; height: 16px; margin: -6px 0;"
+    "  background: #81d4fa; border-radius: 8px; }"
+    "QSlider::sub-page:horizontal { background: #1976d2; border-radius: 2px; }"
+    "QSlider::sub-page:horizontal:hover { background: #42a5f5; }";
 static const char* VOL_STYLE =
-    "QSlider::groove:horizontal { height: 3px; background: #1e1e1e; border-radius: 1px; }"
-    "QSlider::handle:horizontal { width: 8px; height: 8px; margin: -3px 0;"
-    "  background: #888; border-radius: 4px; }"
-    "QSlider::sub-page:horizontal { background: #444; border-radius: 1px; }";
+    "QSlider::groove:horizontal { height: 3px; background: #2a2a2a; border-radius: 1px; }"
+    "QSlider::handle:horizontal { width: 10px; height: 10px; margin: -4px 0;"
+    "  background: #aaa; border-radius: 5px; }"
+    "QSlider::handle:horizontal:hover { background: #fff; }"
+    "QSlider::sub-page:horizontal { background: #666; border-radius: 1px; }";
 
 QPushButton* ControlBar::makeBtn(const QString& svg, const QString& tip, int size) {
     auto* btn = new QPushButton();
@@ -54,21 +57,26 @@ ControlBar::ControlBar(QWidget* parent) : QWidget(parent) {
     auto* seekRow = new QHBoxLayout();
     seekRow->setSpacing(6);
 
-    seekSlider_ = new QSlider(Qt::Horizontal, this);
+        seekSlider_ = new QSlider(Qt::Horizontal, this);
     seekSlider_->setRange(0, 10000);
     seekSlider_->setValue(0);
     seekSlider_->setStyleSheet(SEEK_STYLE);
-    connect(seekSlider_, &QSlider::sliderPressed,  [this]() { seeking_ = true; });
+    // 시크바 클릭 즉시 이동 (드래그 전에도 클릭한 위치로 이동)
+    seekSlider_->setTracking(true);
+    connect(seekSlider_, &QSlider::sliderPressed,  [this]() {
+        seeking_ = true;
+        // 클릭 위치로 즉시 이동 (QStyle 통해 정확한 위치 계산)
+        emit seeked((seekSlider_->value() / 10000.0) * totalDuration_);
+    });
     connect(seekSlider_, &QSlider::sliderMoved,    this, &ControlBar::onSeekMoved);
     connect(seekSlider_, &QSlider::sliderReleased, [this]() {
         seeking_ = false;
         emit seeked((seekSlider_->value() / 10000.0) * totalDuration_);
     });
-
     timeLabel_ = new QLabel("00:00 / 00:00", this);
     timeLabel_->setStyleSheet(
-        "color: #444; font-size: 10px; font-family: 'Consolas', monospace;"
-        "min-width: 100px; background: transparent;");
+        "color: #888; font-size: 11px; font-family: 'Consolas', monospace;"
+        "min-width: 110px; background: transparent;");
     timeLabel_->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
 
     seekRow->addWidget(seekSlider_, 1);

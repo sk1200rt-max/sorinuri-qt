@@ -98,7 +98,8 @@ SettingsDialog::SettingsDialog(MpvCore* mpv, QWidget* parent)
     : QDialog(parent), mpv_(mpv), settings_("Sorinuri", "SorinuriPlayer")
 {
     setWindowTitle("소리누리 설정");
-    setMinimumSize(560, 480);
+    setMinimumSize(640, 540);
+    resize(700, 580);
     setStyleSheet(DIALOG_STYLE);
 
     QVBoxLayout* mainLayout = new QVBoxLayout(this);

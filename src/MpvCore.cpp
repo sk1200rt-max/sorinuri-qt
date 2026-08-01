@@ -100,6 +100,14 @@ bool MpvCore::initialize(WId windowId) {
     // display-resample은 모니터 주사율 재샘플링으로 끊김 발생 가능
     check_error(mpv_set_property_string(mpv_, "video-sync", "audio"));
 
+    // ── 영상 크기/비율 ────────────────────────────────────────────────
+    // keepaspect=yes: 비율 유지 (기본값)
+    // keepaspect-window=no: FBO(위젯) 크기에 맞게 영상을 꽉 채움
+    //   → 16:9 영상이 16:9 창에서 좌우 여백 없이 꽉 채워짐
+    //   → 4:3 영상은 위아래 레터박스(정상 동작)
+    check_error(mpv_set_property_string(mpv_, "keepaspect",        "yes"));
+    check_error(mpv_set_property_string(mpv_, "keepaspect-window", "no"));
+
     // ── 업스케일링 알고리즘 (화질 핵심) ─────────────────────────────
     // ewa_lanczossharp: 현존 최고의 업스케일 선명도 (1080p→4K 등)
     // mitchell: 다운스케일 시 링잉 없이 부드럽게

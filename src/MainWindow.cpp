@@ -347,22 +347,41 @@ void MainWindow::onFileLoaded(const QString& path) {
 
 void MainWindow::showUI() {
     if (!uiVisible_) {
-        titleBar_->show();
-        controlBar_->show();
+        // 전체화면/창 모드 모두 UI 표시
+        if (isFullscreen_) {
+            // 전체화면에서는 타이틀바 숨김 유지, 컨트롤바만 표시
+            controlBar_->show();
+        } else {
+            titleBar_->show();
+            controlBar_->show();
+        }
         uiVisible_ = true;
     }
+    // 마우스 커서 복원
+    if (cursor().shape() == Qt::BlankCursor)
+        unsetCursor();
+    mpvWidget_->unsetCursor();
     // 재생 중 마우스 움직임이 있으면 3초 후 숨김 타이머 재시작
-    // (재생 중이 아니면 타이머 시작 안 함 - UI 항상 표시)
     if (isPlaying_ && uiHideTimer_) {
         uiHideTimer_->start(3000);
     }
 }
 
 void MainWindow::hideUI() {
-    if (uiVisible_ && isPlaying_ && !isFullscreen_) {
-        titleBar_->hide();
-        controlBar_->hide();
+    // 버그 수정: !isFullscreen_ 조건 제거 → 전체화면에서도 자동 숨김 동작
+    if (uiVisible_ && isPlaying_) {
+        if (isFullscreen_) {
+            // 전체화면: 컨트롤바만 숨김 (타이틀바는 이미 숨겨져 있음)
+            controlBar_->hide();
+        } else {
+            // 창 모드: 타이틀바+컨트롤바 모두 숨김
+            titleBar_->hide();
+            controlBar_->hide();
+        }
         uiVisible_ = false;
+        // 마우스 커서 숨김
+        setCursor(Qt::BlankCursor);
+        mpvWidget_->setCursor(Qt::BlankCursor);
     }
 }
 
@@ -374,9 +393,11 @@ void MainWindow::onPlaybackStarted() {
         uiHideTimer_->setSingleShot(true);
         connect(uiHideTimer_, &QTimer::timeout, this, &MainWindow::hideUI);
     }
-    // isPlaying_ 설정 전에 showUI 호용 → 타이머 시작 안 됨
+    // isPlaying_ 먼저 설정 → showUI에서 타이머 즉시 시작
+    isPlaying_ = true;
     showUI();
-    isPlaying_ = true;  // showUI 후에 설정 → 마우스 움직임 시에만 타이머 시작
+    // 재생 시작 즉시 3초 후 자동 숨김 타이머 시작
+    uiHideTimer_->start(3000);
 #ifdef Q_OS_WIN
     SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED);
 #endif
@@ -804,9 +825,36 @@ void MainWindow::mousePressEvent(QMouseEvent* e) {
 }
 
 bool MainWindow::eventFilter(QObject* obj, QEvent* event) {
-    // MpvWidget 위에서 마우스 움직임 시 UI 표시
-    if (obj == mpvWidget_ && event->type() == QEvent::MouseMove) {
-        showUI();
+    if (obj == mpvWidget_) {
+        if (event->type() == QEvent::MouseMove) {
+            auto* me = static_cast<QMouseEvent*>(event);
+            showUI();
+            // 전체화면: 상단 60px 영역에 마우스 오면 타이틀바 일시 표시
+            if (isFullscreen_) {
+                if (me->pos().y() <= 60) {
+                    titleBar_->show();
+                } else {
+                    if (!uiVisible_) titleBar_->hide();
+                }
+            }
+        } else if (event->type() == QEvent::MouseButtonDblClick) {
+            // 영상 더블클릭 → 전체화면 토글 (팟플레이어 동일 동작)
+            auto* me = static_cast<QMouseEvent*>(event);
+            if (me->button() == Qt::LeftButton) {
+                toggleFullscreen();
+                return true;
+            }
+        } else if (event->type() == QEvent::Wheel) {
+            // 영상 위 휠 스크롤 → 볼륨 조절 (위=+5, 아래=-5)
+            auto* we = static_cast<QWheelEvent*>(event);
+            auto* core = mpvWidget_->core();
+            if (we->angleDelta().y() > 0)
+                core->setVolume(qMin(core->volume() + 5, 200));
+            else
+                core->setVolume(qMax(core->volume() - 5, 0));
+            showUI();  // 볼륨 변경 시 UI 잠깐 표시
+            return true;
+        }
     }
     return QMainWindow::eventFilter(obj, event);
 }
@@ -879,8 +927,8 @@ void MainWindow::showContextMenu(const QPoint& globalPos) {
     actOpen->setShortcut(QKeySequence("Ctrl+O"));
     connect(actOpen, &QAction::triggered, this, &MainWindow::onOpenFile);
 
-        // URL 열기 (유튜브, 트위치 등)
-    QAction* actUrl = menu.addAction("▶  URL 열기... (YouTube/스트리밍)");
+    // URL 열기 (유튜브, 트위치 등)
+    QAction* actUrl = menu.addAction("URL 열기... (YouTube/스트리밍)");
     actUrl->setShortcut(QKeySequence("Ctrl+U"));
     connect(actUrl, &QAction::triggered, this, &MainWindow::onOpenUrl);
     // 최근 파일 서브메뉴
@@ -943,7 +991,7 @@ void MainWindow::showContextMenu(const QPoint& globalPos) {
     // 자막 서브메뉴
     QMenu* subMenu = menu.addMenu("자막");
     // OpenSubtitles 자막 검색
-    QAction* actSubSearch = subMenu->addAction("U0001f50d  자막 자동 검색 (OpenSubtitles)");
+    QAction* actSubSearch = subMenu->addAction("자막 자동 검색 (OpenSubtitles)");
     actSubSearch->setEnabled(!currentFilePath_.isEmpty() && !currentFilePath_.startsWith("http"));
     connect(actSubSearch, &QAction::triggered, this, &MainWindow::onSubtitleSearch);
     subMenu->addSeparator();
@@ -962,36 +1010,48 @@ void MainWindow::showContextMenu(const QPoint& globalPos) {
 
     menu.addSeparator();
 
-    // 화면 크기
+    // 화면 크기 서브메뉴
     QMenu* sizeMenu = menu.addMenu("화면 크기");
-    QAction* act50  = sizeMenu->addAction("50%");
-    QAction* act100 = sizeMenu->addAction("100%");
+    QAction* act50  = sizeMenu->addAction("50%  (S)");
+    QAction* act100 = sizeMenu->addAction("100%  (1)");
     QAction* act150 = sizeMenu->addAction("150%");
     QAction* act200 = sizeMenu->addAction("200%");
     connect(act50,  &QAction::triggered, [this, core]() {
         int w = core->getProperty("video-params/w").toInt();
         int h = core->getProperty("video-params/h").toInt();
-        if (w>0 && h>0) resize(w/2, h/2 + 120);
+        if (w>0 && h>0) resize(w/2, h/2 + 62);
     });
     connect(act100, &QAction::triggered, [this, core]() {
         int w = core->getProperty("video-params/w").toInt();
         int h = core->getProperty("video-params/h").toInt();
-        if (w>0 && h>0) resize(w, h + 120);
+        if (w>0 && h>0) resize(w, h + 62);
     });
     connect(act150, &QAction::triggered, [this, core]() {
         int w = core->getProperty("video-params/w").toInt();
         int h = core->getProperty("video-params/h").toInt();
-        if (w>0 && h>0) resize(w*3/2, h*3/2 + 120);
+        if (w>0 && h>0) resize(w*3/2, h*3/2 + 62);
     });
     connect(act200, &QAction::triggered, [this, core]() {
         int w = core->getProperty("video-params/w").toInt();
         int h = core->getProperty("video-params/h").toInt();
-        if (w>0 && h>0) resize(w*2, h*2 + 120);
+        if (w>0 && h>0) resize(w*2, h*2 + 62);
     });
 
+    // 화면 비율 서브메뉴 (영상 비율 강제 설정)
+    QMenu* aspectMenu = menu.addMenu("화면 비율");
+    QAction* actAspectAuto = aspectMenu->addAction("원본 비율 (자동)");
+    QAction* actAspect169  = aspectMenu->addAction("16:9");
+    QAction* actAspect43   = aspectMenu->addAction("4:3");
+    QAction* actAspect235  = aspectMenu->addAction("2.35:1 (시네마스코프)");
+    QAction* actAspect11   = aspectMenu->addAction("1:1");
+    connect(actAspectAuto, &QAction::triggered, [core]() { core->setProperty("video-aspect-override", QString("-1")); });
+    connect(actAspect169,  &QAction::triggered, [core]() { core->setProperty("video-aspect-override", QString("16:9")); });
+    connect(actAspect43,   &QAction::triggered, [core]() { core->setProperty("video-aspect-override", QString("4:3")); });
+    connect(actAspect235,  &QAction::triggered, [core]() { core->setProperty("video-aspect-override", QString("2.35:1")); });
+    connect(actAspect11,   &QAction::triggered, [core]() { core->setProperty("video-aspect-override", QString("1:1")); });
+
     // 전체화면
-    QAction* actFull = menu.addAction(isFullscreen_ ? "전체화면 해제" : "전체화면");
-    actFull->setShortcut(QKeySequence("F"));
+    QAction* actFull = menu.addAction(isFullscreen_ ? "전체화면 해제  (F)": "전체화면  (F)");
     connect(actFull, &QAction::triggered, this, &MainWindow::toggleFullscreen);
 
     menu.addSeparator();
@@ -1004,7 +1064,7 @@ void MainWindow::showContextMenu(const QPoint& globalPos) {
     menu.addSeparator();
 
     // 종료
-    QAction* actQuit = menu.addAction("종료");
+    QAction* actQuit = menu.addAction("소리누리 종료");
     actQuit->setShortcut(QKeySequence("Alt+F4"));
     connect(actQuit, &QAction::triggered, this, &QMainWindow::close);
 
