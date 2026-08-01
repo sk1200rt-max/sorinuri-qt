@@ -5,6 +5,7 @@
 #include <QLabel>
 #include <QProgressBar>
 #include <QComboBox>
+#include <QCheckBox>
 #include "SubtitleDownloader.h"
 
 /**
@@ -24,6 +25,7 @@ public:
 private slots:
     void onSearchFinished(const QList<SubtitleResult>& results);
     void onDownloadFinished(const QString& path);
+    void onTranslateFinished(const QString& translatedPath);
     void onError(const QString& msg);
     void onDownloadClicked();
 
@@ -39,8 +41,9 @@ private:
     QProgressBar* progressBar_  = nullptr;
     QComboBox*    langCombo_    = nullptr;
     QTableWidget* resultTable_  = nullptr;
-    QPushButton*  downloadBtn_  = nullptr;
-    QPushButton*  cancelBtn_    = nullptr;
+    QPushButton*  downloadBtn_   = nullptr;
+    QPushButton*  cancelBtn_     = nullptr;
+    QCheckBox*    translateCheck_ = nullptr;  // 자동 번역 옵션
 
     QList<SubtitleResult> results_;
 };

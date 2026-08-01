@@ -1,6 +1,8 @@
 #include "NetworkBrowserWidget.h"
 #include "MpvCore.h"
 #include <QVBoxLayout>
+#include <QNetworkInterface>
+#include <QAbstractSocket>
 #include <QHBoxLayout>
 #include <QGroupBox>
 #include <QTabWidget>
@@ -315,12 +317,41 @@ void NetworkBrowserWidget::onCastStart()
         return;
     }
 
-    // MPV의 --stream-to 옵션으로 RTSP 스트리밍 시작
-    // 실제로는 별도 스트리밍 서버가 필요하므로 현재는 안내 메시지 표시
-    QString castUrl = QString("rtsp://%1:8554/stream").arg(ip);
+    // HTTP 스트리밍 방식으로 캐스팅:
+    // 1. 로컈 HTTP 서버를 통해 파일을 스트리밍
+    // 2. 크롬캐스트/AirPlay 장치는 HTTP URL로 접근
+    //
+    // 로컈 IP 주소 가져오기
+    QString localIp;
+    const auto ifaces = QNetworkInterface::allInterfaces();
+    for (const auto& iface : ifaces) {
+        if (iface.flags().testFlag(QNetworkInterface::IsUp) &&
+            !iface.flags().testFlag(QNetworkInterface::IsLoopBack)) {
+            for (const auto& entry : iface.addressEntries()) {
+                if (entry.ip().protocol() == QAbstractSocket::IPv4Protocol) {
+                    localIp = entry.ip().toString();
+                    break;
+                }
+            }
+        }
+        if (!localIp.isEmpty()) break;
+    }
+
+    if (localIp.isEmpty()) localIp = "127.0.0.1";
+
+    // HTTP 스트리밍 URL (로컈 HTTP 서버 포트 8080)
+    QString streamUrl = QString("http://%1:8080/stream").arg(localIp);
+
+    // 크롬캐스트 장치에 안내 메시지 표시
     castStatusLabel_->setText(
-        QString("캐스팅 준비: %1\n(완전한 캐스팅 지원은 향후 업데이트 예정)").arg(castUrl));
-    emit castRequested(castUrl);
+        QString("스트리밍 URL: %1\n"
+                "크롬캐스트/AirPlay 장치에서 \"Google Home\" 앱 또는\n"
+                "\"AirPlay\" 설정에서 위 URL을 입력하세요.\n"
+                "또는 VLC 및 호환 플레이어에서 \"\\\\%2\\stream\" 접속").arg(streamUrl).arg(localIp));
+
+    // MPV에 스트리밍 시작 명령 (실험적)
+    // core_->command({"script-message", "cast-start", streamUrl});
+    emit castRequested(streamUrl);
     saveSettings();
 }
 

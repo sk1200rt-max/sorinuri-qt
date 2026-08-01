@@ -16,6 +16,7 @@ public:
     void setCurrentFile(const QString& path);
     void playNext();
     void playPrev();
+    void highlightCurrent();
 
     QString filePath(int index) const;
     int     currentIndex() const;

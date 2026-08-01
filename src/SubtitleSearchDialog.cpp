@@ -39,6 +39,8 @@ SubtitleSearchDialog::SubtitleSearchDialog(const QString& videoPath, QWidget* pa
             this, &SubtitleSearchDialog::onSearchFinished);
     connect(downloader_, &SubtitleDownloader::downloadFinished,
             this, &SubtitleSearchDialog::onDownloadFinished);
+    connect(downloader_, &SubtitleDownloader::translateFinished,
+            this, &SubtitleSearchDialog::onTranslateFinished);
     connect(downloader_, &SubtitleDownloader::errorOccurred,
             this, &SubtitleSearchDialog::onError);
 
@@ -98,6 +100,18 @@ void SubtitleSearchDialog::setupUI()
     resultTable_->setStyleSheet(resultTable_->styleSheet() +
         "QTableWidget { alternate-background-color: #141414; }");
     mainLayout->addWidget(resultTable_, 1);
+
+    // 번역 옵션 선택
+    auto* transRow = new QHBoxLayout();
+    translateCheck_ = new QCheckBox("다운로드 후 한국어로 자동 번역", this);
+    translateCheck_->setStyleSheet("QCheckBox { color: #aaa; font-size: 12px; }"
+        "QCheckBox::indicator { width:14px; height:14px; border:1px solid #444; border-radius:2px; background:#1e1e1e; }"
+        "QCheckBox::indicator:checked { background:#4fc3f7; border-color:#4fc3f7; }");
+    translateCheck_->setToolTip("DeepL API 또는 파파고 API를 사용하여 \n다운로드된 자막을 한국어로 번역합니다.\n"
+                                  "설정 → 자막 탭에서 API 키를 입력하세요.");
+    transRow->addWidget(translateCheck_);
+    transRow->addStretch();
+    mainLayout->addLayout(transRow);
 
     // 하단 버튼
     auto* btnRow = new QHBoxLayout();
@@ -186,7 +200,32 @@ void SubtitleSearchDialog::onDownloadFinished(const QString& path)
     progressBar_->setRange(0, 1);
     progressBar_->setValue(1);
     downloadedPath_ = path;
+
+    // 자동 번역 옵션이 켜져 있으면 번역 시도
+    if (translateCheck_ && translateCheck_->isChecked()) {
+        statusLabel_->setText("자막 번역 중... (DeepL/파파고 API 필요)");
+        QSettings s("Sorinuri", "SorinuriPlayer");
+        QString deeplKey  = s.value("subtitle/deepl_api_key").toString();
+        QString papagoId  = s.value("subtitle/papago_client_id").toString();
+        QString papagoSec = s.value("subtitle/papago_client_secret").toString();
+
+        if (deeplKey.isEmpty() && (papagoId.isEmpty() || papagoSec.isEmpty())) {
+            statusLabel_->setText("번역 API 키가 없습니다. 설정 → 자막 탭에서 API 키를 입력하세요.");
+        } else {
+            // 번역 요청은 SubtitleDownloader에 위임
+            downloader_->translate(path, "ko", deeplKey, papagoId, papagoSec);
+            return;  // 번역 완료 시에 accept()
+        }
+    }
+
     statusLabel_->setText("자막 다운로드 완료: " + QFileInfo(path).fileName());
+    accept();
+}
+
+void SubtitleSearchDialog::onTranslateFinished(const QString& translatedPath)
+{
+    downloadedPath_ = translatedPath;
+    statusLabel_->setText("번역 완료: " + QFileInfo(translatedPath).fileName());
     accept();
 }
 

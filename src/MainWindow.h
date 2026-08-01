@@ -35,6 +35,8 @@
 #include "AudioAdvancedWidget.h"
 #include "VideoAdvancedWidget.h"
 #include "NetworkBrowserWidget.h"
+#include "OsdWidget.h"
+#include "MediaLibraryWidget.h"
 
 
 class MainWindow : public QMainWindow {
@@ -142,6 +144,8 @@ private:
     AudioAdvancedWidget* audioAdvancedWidget_ = nullptr;  // 하이엔드 오디오 (컨볼루션/VST)
     VideoAdvancedWidget* videoAdvancedWidget_ = nullptr;  // 하이엔드 비디오 (3D LUT)
     NetworkBrowserWidget* networkBrowserWidget_ = nullptr;  // SMB/DLNA + 360도 VR + 캐스팅
+    OsdWidget*           osdWidget_            = nullptr;  // 화면 중앙 OSD
+    MediaLibraryWidget*  mediaLibrary_         = nullptr;  // 스마트 미디어 라이브러리
 
     bool   isFullscreen_      = false;
     bool   isOttMode_         = false;

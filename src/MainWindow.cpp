@@ -25,6 +25,8 @@
 #include <QUrl>
 #include <QMenu>
 #include <QAction>
+#include <QCryptographicHash>
+#include <QDateTime>
 
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -145,6 +147,10 @@ void MainWindow::setupUI() {
     // ── 단축키 오버레이 (영상 위에 표시) ─────────────────────────────
     shortcutOverlay_ = new ShortcutOverlay(mpvWidget_);
     shortcutOverlay_->hide();
+
+    // OSD 위젯 (화면 중앙 반투명 표시) - mpvWidget_ 위에 오버레이
+    osdWidget_ = new OsdWidget(mpvWidget_);
+    osdWidget_->hide();
 }
 
 void MainWindow::setupConnections() {
@@ -330,6 +336,17 @@ void MainWindow::onFileLoaded(const QString& path) {
     updateWindowTitle(QFileInfo(path).fileName());
     addToRecentFiles(path);
     tryResumePosition(path);
+
+    // 재생 통계 업데이트 (재생 횟수 + 마지막 재생 시각)
+    if (!path.startsWith("http")) {
+        QString statsKey = "stats/" + QString::fromUtf8(
+            QCryptographicHash::hash(path.toUtf8(), QCryptographicHash::Md5).toHex());
+        int playCount = settings_.value(statsKey + "/count", 0).toInt();
+        settings_.setValue(statsKey + "/count", playCount + 1);
+        settings_.setValue(statsKey + "/last_played",
+            QDateTime::currentDateTime().toString(Qt::ISODate));
+        settings_.setValue(statsKey + "/path", path);
+    }
     if (isMusicMode_) {
         // 음악 모드: 메타데이터 로드 (파일 로드 후 MPV가 태그를 읽은 시점)
         QTimer::singleShot(200, this, [this, path]() { loadMusicMeta(path); });
@@ -486,7 +503,14 @@ void MainWindow::addToRecentFiles(const QString& path) {
     settings_.setValue("recent/files", recent);
 }
 void MainWindow::onDurationChanged(double s) { totalDuration_ = s; controlBar_->setDuration(s); }
-void MainWindow::onVolumeChanged(int v)      { controlBar_->setVolume(v); }
+void MainWindow::onVolumeChanged(int v) {
+    controlBar_->setVolume(v);
+    // OSD 볼륨 표시
+    if (osdWidget_) {
+        bool muted = mpvWidget_->core()->getProperty("mute").toBool();
+        osdWidget_->showVolume(v, muted);
+    }
+}
 
 void MainWindow::onAudioFormatChanged(const QString& codec, int, int, const QString&) {
     titleBar_->setAudioBadge(codec.toUpper());
@@ -595,11 +619,13 @@ void MainWindow::keyPressEvent(QKeyEvent* e) {
         if (e->modifiers() & Qt::ShiftModifier)  core->seek(-60, true);
         else if (e->modifiers() & Qt::ControlModifier) core->seek(-10, true);
         else core->seek(-5, true);
+        if (osdWidget_) osdWidget_->showSeek(core->position(), totalDuration_);
         break;
     case Qt::Key_Right:
         if (e->modifiers() & Qt::ShiftModifier)  core->seek(60, true);
         else if (e->modifiers() & Qt::ControlModifier) core->seek(10, true);
         else core->seek(5, true);
+        if (osdWidget_) osdWidget_->showSeek(core->position(), totalDuration_);
         break;
     case Qt::Key_Up:     core->setVolume(qMin(core->volume() + 5, 200)); break;
     case Qt::Key_Down:   core->setVolume(qMax(core->volume() - 5, 0)); break;
@@ -640,12 +666,15 @@ void MainWindow::keyPressEvent(QKeyEvent* e) {
     case Qt::Key_Plus:   // 재생 속도 증가
     case Qt::Key_Equal:
         core->command({"add", "speed", "0.1"});
+        if (osdWidget_) osdWidget_->showSpeed(core->getProperty("speed").toDouble());
         break;
     case Qt::Key_Minus:  // 재생 속도 감소
         core->command({"add", "speed", "-0.1"});
+        if (osdWidget_) osdWidget_->showSpeed(core->getProperty("speed").toDouble());
         break;
     case Qt::Key_0:      // 재생 속도 원래대로
         core->command({"set", "speed", "1.0"});
+        if (osdWidget_) osdWidget_->showSpeed(1.0);
         break;
     case Qt::Key_J:  // 자막 다음
         core->command({"sub-step", "1"});
@@ -750,6 +779,13 @@ void MainWindow::toggleProFeatures() {
             connect(networkBrowserWidget_, &NetworkBrowserWidget::openFileRequested,
                     this, [this](const QString& path) { openFiles({path}); });
         }
+        // 스마트 미디어 라이브러리
+        if (!mediaLibrary_) {
+            mediaLibrary_ = new MediaLibraryWidget(this);
+            proFeatures_->addTab(mediaLibrary_, "미디어 라이브러리");
+            connect(mediaLibrary_, &MediaLibraryWidget::fileRequested,
+                    this, [this](const QString& path) { openFiles({path}); });
+        }
     }
 
     proFeatures_->setVisible(isProFeaturesOpen_);
@@ -852,6 +888,11 @@ bool MainWindow::eventFilter(QObject* obj, QEvent* event) {
                 core->setVolume(qMin(core->volume() + 5, 200));
             else
                 core->setVolume(qMax(core->volume() - 5, 0));
+            // OSD 볼륨 표시
+            if (osdWidget_) {
+                bool muted = core->getProperty("mute").toBool();
+                osdWidget_->showVolume(core->volume(), muted);
+            }
             showUI();  // 볼륨 변경 시 UI 잠깐 표시
             return true;
         }

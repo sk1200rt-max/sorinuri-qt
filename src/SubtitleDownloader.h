@@ -40,12 +40,19 @@ public:
     // 자막 다운로드 (file_id → 임시 파일 경로 반환)
     void download(const QString& fileId, const QString& destDir);
 
+    // 자막 번역 (DeepL 또는 파파고 API 사용)
+    void translate(const QString& srtPath, const QString& targetLang,
+                   const QString& deeplKey,
+                   const QString& papagoClientId,
+                   const QString& papagoClientSecret);
+
     void setApiKey(const QString& key) { apiKey_ = key; }
     QString apiKey() const { return apiKey_; }
 
 signals:
     void searchFinished(const QList<SubtitleResult>& results);
-    void downloadFinished(const QString& savedPath);   // 성공
+    void downloadFinished(const QString& savedPath);      // 다운로드 성공
+    void translateFinished(const QString& translatedPath); // 번역 성공
     void errorOccurred(const QString& message);
 
 private slots:

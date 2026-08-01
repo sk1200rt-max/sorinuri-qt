@@ -221,6 +221,48 @@ void UpscaleWidget::buildUI() {
     });
 
     // ── 3. 비교 체크박스 + 상태 행 ───────────────────────
+
+    // ── 2.5 성능 프리셋 + GPU 자동 감지 ─────────────────────────────────────
+    {
+        auto* rowPreset = new QHBoxLayout;
+        rowPreset->setContentsMargins(0,0,0,0);
+        rowPreset->setSpacing(8);
+        auto* lblPreset = new QLabel("성능 프리셋:");
+        lblPreset->setObjectName("lbl");
+        lblPreset->setFixedWidth(100);
+        rowPreset->addWidget(lblPreset);
+        auto* presetGrp = new QButtonGroup(this);
+        QStringList presetNames = {"품질 우선", "균형 (권장)", "속도 우선"};
+        for (int i = 0; i < presetNames.size(); ++i) {
+            auto* btn = new QPushButton(presetNames[i]);
+            btn->setCheckable(true);
+            btn->setChecked(i == 1);
+            btn->setStyleSheet(
+                "QPushButton{background:#1e1e1e;color:#888;border:1px solid #333;border-radius:4px;padding:4px 12px;font-size:11px;}"
+                "QPushButton:checked{background:#00c8b4;color:#0e0e0e;border-color:#00c8b4;}"
+                "QPushButton:hover{background:#2a2a2a;color:white;}");
+            presetGrp->addButton(btn, i);
+            rowPreset->addWidget(btn);
+        }
+        QString gpuName = detectGpu();
+            auto* gpuLabel = new QLabel("감지: " + gpuName);
+            gpuLabel->setStyleSheet("color:#4fc3f7; font-size:10px;");
+            rowPreset->addStretch();
+            rowPreset->addWidget(gpuLabel);
+        } else {
+            rowPreset->addStretch();
+        }
+        root->addLayout(rowPreset);
+        root->addSpacing(8);
+        connect(presetGrp, QOverload<int>::of(&QButtonGroup::idClicked), this, [this](int id) {
+            switch (id) {
+            case 0: sldStrength_->setValue(4); break;
+            case 1: sldStrength_->setValue(3); break;
+            case 2: sldStrength_->setValue(1); break;
+            }
+        });
+    }
+
     auto* rowCmp = new QHBoxLayout;
     rowCmp->setContentsMargins(0,0,0,0);
 

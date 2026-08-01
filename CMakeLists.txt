@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(Sorinuri VERSION 5.1.0 LANGUAGES CXX)
+project(Sorinuri VERSION 6.0.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -16,6 +16,7 @@ find_package(Qt6 REQUIRED COMPONENTS
     OpenGLWidgets
     Concurrent
     Network
+    Sql
 )
 
 # libmpv 헤더/라이브러리 경로 (GitHub Actions에서 설정)
@@ -100,6 +101,10 @@ set(SOURCES
     src/VideoAdvancedWidget.h
     src/NetworkBrowserWidget.cpp
     src/NetworkBrowserWidget.h
+    src/OsdWidget.cpp
+    src/OsdWidget.h
+    src/MediaLibraryWidget.cpp
+    src/MediaLibraryWidget.h
     resources/resources.qrc
 )
 
@@ -135,6 +140,7 @@ target_link_libraries(Sorinuri PRIVATE
     Qt6::OpenGLWidgets
     Qt6::Concurrent
     Qt6::Network
+    Qt6::Sql
     ${MPV_LIBRARY}
 )
 

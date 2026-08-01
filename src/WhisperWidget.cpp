@@ -335,8 +335,24 @@ void WhisperWidget::buildSettingsTab(QWidget* parent) {
     auto* lblLang = new QLabel("언어");
     lblLang->setObjectName("lbl");
     cmbLang_ = new QComboBox;
-    cmbLang_->addItems({"자동 감지", "영어", "일본어", "중국어", "스페인어", "프랑스어", "독일어"});
-    cmbLang_->setCurrentIndex(1);
+    cmbLang_->addItems({
+        "자동 감지",   // auto
+        "영어",        // en
+        "한국어",      // ko
+        "일본어",      // ja
+        "중국어",      // zh
+        "스페인어",    // es
+        "프랑스어",    // fr
+        "독일어",      // de
+        "이탈리아어",  // it
+        "포르투갈어",  // pt
+        "러시아어",    // ru
+        "아랍어",      // ar
+        "힌디어",      // hi
+        "태국어",      // th
+        "베트남어",    // vi
+    });
+    cmbLang_->setCurrentIndex(1);  // 영어 기본
     colLang->addWidget(lblLang);
     colLang->addWidget(cmbLang_);
 
@@ -673,7 +689,23 @@ void WhisperWidget::onPositionChanged(double sec) {
 void WhisperWidget::onProcessError()           {}
 void WhisperWidget::onProcessFinished(int)     { if (active_) setActive(false); }
 void WhisperWidget::onLangChanged(int idx) {
-    static const QStringList c={"auto","en","ja","zh","es","fr","de"};
+    static const QStringList c={
+        "auto",  // 자동 감지
+        "en",    // 영어
+        "ko",    // 한국어
+        "ja",    // 일본어
+        "zh",    // 중국어
+        "es",    // 스페인어
+        "fr",    // 프랑스어
+        "de",    // 독일어
+        "it",    // 이탈리아어
+        "pt",    // 포르투갈어
+        "ru",    // 러시아어
+        "ar",    // 아랍어
+        "hi",    // 힌디어
+        "th",    // 태국어
+        "vi",    // 베트남어
+    };
     if (idx < c.size()) cfg_.language = c[idx];
 }
 void WhisperWidget::onModelChanged(int idx) {

@@ -4,15 +4,17 @@
 #include <QSlider>
 #include <QPushButton>
 #include <QPixmap>
+#include <QTimer>
 
 class MpvCore;
 
 /**
- * MiniPlayerWidget - 항상 위에 고정되는 콤팩트 음악 플레이어 바
+ * MiniPlayerWidget - 항상 위에 고정되는 콜팟트 음악 플레이어 바
  *
- * 크기: 400x80px (고정)
+ * 크기: 300~700px (사용자 조절 가능)
  * 위치: 화면 우측 하단 (항상 위에 고정)
  * 단축키: M 키로 메인 창에서 토글
+ * 마우스 오버 시 콘트롤 버튼 표시
  */
 class MiniPlayerWidget : public QWidget {
     Q_OBJECT
@@ -37,6 +39,8 @@ protected:
     void mousePressEvent(QMouseEvent* e) override;
     void mouseMoveEvent(QMouseEvent* e) override;
     void mouseReleaseEvent(QMouseEvent* e) override;
+    void enterEvent(QEnterEvent* e) override;
+    void leaveEvent(QEvent* e) override;
 
 private:
     void setupUI();
@@ -51,6 +55,10 @@ private:
     QPushButton* btnPlay_       = nullptr;
     QPushButton* btnNext_       = nullptr;
     QPushButton* btnExpand_     = nullptr;
+
+    // 마우스 오버 시 표시되는 콘트롤 컨테이너
+    QWidget*     ctrlWidget_         = nullptr;
+    QTimer*      controlHideTimer_   = nullptr;
 
     bool   isPlaying_  = false;
     double duration_   = 0;

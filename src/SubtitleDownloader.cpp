@@ -249,3 +249,92 @@ void SubtitleDownloader::onFileDownloadReply(QNetworkReply* reply, const QString
         emit errorOccurred("자막 파일 저장 실패: " + destPath);
     }
 }
+
+// ─── 자막 번역 (DeepL / 파파고 API) ──────────────────────────────────────
+void SubtitleDownloader::translate(const QString& srtPath, const QString& targetLang,
+                                    const QString& deeplKey,
+                                    const QString& papagoClientId,
+                                    const QString& papagoClientSecret)
+{
+    QFile f(srtPath);
+    if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        emit errorOccurred("번역할 자막 파일을 열 수 없습니다: " + srtPath);
+        return;
+    }
+    QString content = QString::fromUtf8(f.readAll());
+    f.close();
+
+    QString outPath = srtPath;
+    outPath.replace(QRegularExpression("\\.(srt|ass|ssa)$", QRegularExpression::CaseInsensitiveOption),
+                    "_ko.srt");
+
+    if (!deeplKey.isEmpty()) {
+        // DeepL Free API 사용
+        QNetworkRequest req(QUrl("https://api-free.deepl.com/v2/translate"));
+        req.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
+        req.setRawHeader("Authorization", ("DeepL-Auth-Key " + deeplKey).toUtf8());
+
+        QString body = "text=" + QString::fromUtf8(QUrl::toPercentEncoding(content))
+                     + "&target_lang=" + targetLang.toUpper();
+
+        auto* reply = nam_->post(req, body.toUtf8());
+        connect(reply, &QNetworkReply::finished, this, [this, reply, outPath]() {
+            reply->deleteLater();
+            if (reply->error() != QNetworkReply::NoError) {
+                emit errorOccurred("DeepL 번역 실패: " + reply->errorString());
+                return;
+            }
+            QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+            QString translated = doc["translations"][0]["text"].toString();
+            if (translated.isEmpty()) {
+                emit errorOccurred("DeepL 번역 결과가 비어 있습니다.");
+                return;
+            }
+            QFile out(outPath);
+            if (out.open(QIODevice::WriteOnly | QIODevice::Text)) {
+                out.write(translated.toUtf8());
+                out.close();
+                emit translateFinished(outPath);
+            } else {
+                emit errorOccurred("번역 파일 저장 실패: " + outPath);
+            }
+        });
+
+    } else if (!papagoClientId.isEmpty() && !papagoClientSecret.isEmpty()) {
+        // 파파고 API 사용 (Naver) - 5000자 제한
+        QNetworkRequest req(QUrl("https://openapi.naver.com/v1/papago/n2mt"));
+        req.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
+        req.setRawHeader("X-Naver-Client-Id",     papagoClientId.toUtf8());
+        req.setRawHeader("X-Naver-Client-Secret", papagoClientSecret.toUtf8());
+
+        QString truncated = content.left(4800);
+        QString body = "source=en&target=ko&text="
+                     + QString::fromUtf8(QUrl::toPercentEncoding(truncated));
+
+        auto* reply = nam_->post(req, body.toUtf8());
+        connect(reply, &QNetworkReply::finished, this, [this, reply, outPath]() {
+            reply->deleteLater();
+            if (reply->error() != QNetworkReply::NoError) {
+                emit errorOccurred("파파고 번역 실패: " + reply->errorString());
+                return;
+            }
+            QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+            QString translated = doc["message"]["result"]["translatedText"].toString();
+            if (translated.isEmpty()) {
+                emit errorOccurred("파파고 번역 결과가 비어 있습니다.");
+                return;
+            }
+            QFile out(outPath);
+            if (out.open(QIODevice::WriteOnly | QIODevice::Text)) {
+                out.write(translated.toUtf8());
+                out.close();
+                emit translateFinished(outPath);
+            } else {
+                emit errorOccurred("번역 파일 저장 실패: " + outPath);
+            }
+        });
+    } else {
+        emit errorOccurred("번역 API 키가 설정되지 않았습니다.\n"
+                           "설정 → 자막 탭에서 DeepL 또는 파파고 API 키를 입력하세요.");
+    }
+}

@@ -6,6 +6,7 @@
 #include <QApplication>
 #include <QHBoxLayout>
 #include <QVBoxLayout>
+#include <QSizeGrip>
 
 MiniPlayerWidget::MiniPlayerWidget(QWidget* parent)
     : QWidget(parent)
@@ -13,7 +14,21 @@ MiniPlayerWidget::MiniPlayerWidget(QWidget* parent)
     // 항상 위에 + 프레임 없음 + 작업표시줄 미표시
     setWindowFlags(Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint | Qt::Tool);
     setAttribute(Qt::WA_TranslucentBackground);
-    setFixedSize(420, 80);
+
+    // 고정 크기 제거 → 사용자가 크기 조절 가능
+    setMinimumSize(300, 68);
+    setMaximumSize(700, 110);
+    resize(420, 80);
+
+    // 마우스 트래킹 활성화 (호버 시 컨트롤 표시)
+    setMouseTracking(true);
+
+    // 컨트롤 자동 숨김 타이머
+    controlHideTimer_ = new QTimer(this);
+    controlHideTimer_->setSingleShot(true);
+    connect(controlHideTimer_, &QTimer::timeout, this, [this]() {
+        if (ctrlWidget_) ctrlWidget_->setVisible(false);
+    });
 
     // 화면 우측 하단 배치
     if (auto* screen = QApplication::primaryScreen()) {
@@ -90,10 +105,13 @@ void MiniPlayerWidget::setupUI() {
 
     root->addLayout(center, 1);
 
-    // 우측: 컨트롤 버튼
-    auto* ctrlCol = new QVBoxLayout;
+    // 우측: 컨트롤 버튼 (마우스 오버 시 표시)
+    ctrlWidget_ = new QWidget(this);
+    ctrlWidget_->setStyleSheet("background: transparent;");
+    auto* ctrlCol = new QVBoxLayout(ctrlWidget_);
     ctrlCol->setSpacing(4);
     ctrlCol->setAlignment(Qt::AlignVCenter);
+    ctrlCol->setContentsMargins(0, 0, 0, 0);
 
     auto* btnRow = new QHBoxLayout;
     btnRow->setSpacing(4);
@@ -124,7 +142,14 @@ void MiniPlayerWidget::setupUI() {
     ctrlCol->addLayout(btnRow);
     ctrlCol->addWidget(btnExpand_, 0, Qt::AlignRight);
 
-    root->addLayout(ctrlCol);
+    // 초기에는 컨트롤 숨김 (마우스 오버 시 표시)
+    ctrlWidget_->setVisible(false);
+
+    root->addWidget(ctrlWidget_);
+
+    // 크기 조절 핸들 (우측 하단)
+    auto* sizeGrip = new QSizeGrip(this);
+    sizeGrip->setStyleSheet("background: transparent;");
 
     connect(btnPlay_,   &QPushButton::clicked, this, &MiniPlayerWidget::playPauseRequested);
     connect(btnPrev_,   &QPushButton::clicked, this, &MiniPlayerWidget::prevRequested);
@@ -134,12 +159,12 @@ void MiniPlayerWidget::setupUI() {
 
 void MiniPlayerWidget::setMeta(const QString& title, const QString& artist,
                                 const QPixmap& art, const QString& codec, int bitDepth) {
+    Q_UNUSED(bitDepth)
     titleLabel_->setText(title.isEmpty() ? "알 수 없는 트랙" : title);
     artistLabel_->setText(artist.isEmpty() ? "" : artist);
     codecLabel_->setText(codec.isEmpty() ? "PCM" : codec.toUpper());
 
     if (!art.isNull()) {
-        // 원형 마스크 적용
         QPixmap scaled = art.scaled(56, 56, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation);
         QPixmap rounded(56, 56);
         rounded.fill(Qt::transparent);
@@ -174,13 +199,22 @@ void MiniPlayerWidget::setPlaying(bool playing) {
 void MiniPlayerWidget::paintEvent(QPaintEvent*) {
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
-    // 반투명 다크 배경
     QPainterPath path;
     path.addRoundedRect(rect(), 10, 10);
     p.fillPath(path, QColor(12, 12, 12, 230));
-    // 테두리
     p.setPen(QPen(QColor(40, 40, 40), 1));
     p.drawPath(path);
+}
+
+void MiniPlayerWidget::enterEvent(QEnterEvent*) {
+    // 마우스 진입 시 컨트롤 표시
+    controlHideTimer_->stop();
+    if (ctrlWidget_) ctrlWidget_->setVisible(true);
+}
+
+void MiniPlayerWidget::leaveEvent(QEvent*) {
+    // 마우스 이탈 시 2초 후 컨트롤 숨김
+    controlHideTimer_->start(2000);
 }
 
 void MiniPlayerWidget::mousePressEvent(QMouseEvent* e) {

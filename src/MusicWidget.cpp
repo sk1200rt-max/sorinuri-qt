@@ -2,6 +2,8 @@
 #include "LyricsWidget.h"
 #include "MpvCore.h"
 #include <QPainter>
+#include <QSettings>
+#include <QTimer>
 #include <QPainterPath>
 #include <QResizeEvent>
 #include <QImage>
@@ -119,7 +121,34 @@ void EqPanel::buildUI(){
     br->setStyleSheet("QPushButton{background:#222;color:#aaa;border:1px solid #444;border-radius:4px;padding:4px 16px;font-size:12px;}"
                       "QPushButton:hover{background:#2a2a2a;color:white;}");
     connect(br,&QPushButton::clicked,this,[this](){applyPreset(0);});
-    auto* brow=new QHBoxLayout;brow->addWidget(br);brow->addStretch();root->addLayout(brow);
+
+    // 사용자 정의 프리셋 저장/불러오기
+    auto* saveBtn=new QPushButton("프리셋 저장",this);
+    saveBtn->setStyleSheet(br->styleSheet());
+    connect(saveBtn,&QPushButton::clicked,this,[this,saveBtn](){
+        QSettings s("Sorinuri","SorinuriPlayer");
+        QVariantList list;
+        for(auto* sl:sliders_) list.append(sl->value()/10.0);
+        s.setValue("eq/user_preset",list);
+        saveBtn->setText("✓ 저장됨");
+        QTimer::singleShot(1500,saveBtn,[saveBtn](){saveBtn->setText("프리셋 저장");});
+    });
+
+    auto* loadBtn=new QPushButton("저장된 프리셋",this);
+    loadBtn->setStyleSheet(br->styleSheet());
+    connect(loadBtn,&QPushButton::clicked,this,[this](){
+        QSettings s("Sorinuri","SorinuriPlayer");
+        QVariantList list=s.value("eq/user_preset").toList();
+        if(list.size()==10)
+            for(int i=0;i<10;++i) sliders_[i]->setValue(qRound(list[i].toDouble()*10));
+    });
+
+    auto* brow=new QHBoxLayout;
+    brow->addWidget(br);
+    brow->addWidget(saveBtn);
+    brow->addWidget(loadBtn);
+    brow->addStretch();
+    root->addLayout(brow);
 }
 
 void EqPanel::applyPreset(int idx){

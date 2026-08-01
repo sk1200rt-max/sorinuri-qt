@@ -70,7 +70,10 @@ private:
     QCheckBox*  motionSmoothingCheck_ = nullptr;  // 모션 스무딩 (프레임 보간)
 
     // 자막 탭
-    QLineEdit*  subApiKeyEdit_      = nullptr;  // OpenSubtitles API 키
+    QLineEdit*  subApiKeyEdit_          = nullptr;  // OpenSubtitles API 키
+    QLineEdit*  deeplApiKeyEdit_        = nullptr;  // DeepL 번역 API 키
+    QLineEdit*  papagoClientIdEdit_     = nullptr;  // 파파고 Client ID
+    QLineEdit*  papagoClientSecretEdit_ = nullptr;  // 파파고 Client Secret
     QComboBox*  subFontCombo_       = nullptr;
     QSlider*    subSizeSlider_      = nullptr;
     QLabel*     subSizeLabel_       = nullptr;

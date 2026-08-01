@@ -403,6 +403,40 @@ void SettingsDialog::setupSubtitleTab(QTabWidget* tabs) {
     apiLay->addLayout(apiRow);
 
     layout->addWidget(apiGroup);
+
+    // ── 자동 번역 API 설정 ───────────────────────────────────────────────
+    QGroupBox* transGroup = new QGroupBox("자동 번역 API", page);
+    QFormLayout* transForm = new QFormLayout(transGroup);
+    transForm->setSpacing(8);
+
+    QLabel* transHint = new QLabel(
+        "자막 다운로드 후 한국어로 자동 번역 시 사용합니다.\n"
+        "DeepL 또는 파파고 중 하나를 입력하세요.", page);
+    transHint->setStyleSheet("color: #666; font-size: 11px;");
+    transHint->setWordWrap(true);
+    transForm->addRow("", transHint);
+
+    deeplApiKeyEdit_ = new QLineEdit(page);
+    deeplApiKeyEdit_->setPlaceholderText("DeepL API Key (api-free.deepl.com)");
+    deeplApiKeyEdit_->setEchoMode(QLineEdit::Password);
+    deeplApiKeyEdit_->setStyleSheet(
+        "QLineEdit { background:#1a1a1a; border:1px solid #2a2a2a; border-radius:3px;"
+        "  padding:4px 8px; color:#e0e0e0; }"
+        "QLineEdit:focus { border-color:#4fc3f7; }");
+    transForm->addRow("DeepL API Key:", deeplApiKeyEdit_);
+
+    papagoClientIdEdit_ = new QLineEdit(page);
+    papagoClientIdEdit_->setPlaceholderText("파파고 Client ID (developers.naver.com)");
+    papagoClientIdEdit_->setStyleSheet(deeplApiKeyEdit_->styleSheet());
+    transForm->addRow("파파고 Client ID:", papagoClientIdEdit_);
+
+    papagoClientSecretEdit_ = new QLineEdit(page);
+    papagoClientSecretEdit_->setPlaceholderText("파파고 Client Secret");
+    papagoClientSecretEdit_->setEchoMode(QLineEdit::Password);
+    papagoClientSecretEdit_->setStyleSheet(deeplApiKeyEdit_->styleSheet());
+    transForm->addRow("파파고 Secret:", papagoClientSecretEdit_);
+
+    layout->addWidget(transGroup);
     layout->addStretch();
 
     tabs->addTab(page, "자막");
@@ -492,6 +526,12 @@ void SettingsDialog::loadSettings() {
     autoLoadSubCheck_->setChecked(settings_.value("subtitle/auto_load", true).toBool());
     if (subApiKeyEdit_)
         subApiKeyEdit_->setText(settings_.value("subtitle/opensubtitles_apikey").toString());
+    if (deeplApiKeyEdit_)
+        deeplApiKeyEdit_->setText(settings_.value("subtitle/deepl_api_key").toString());
+    if (papagoClientIdEdit_)
+        papagoClientIdEdit_->setText(settings_.value("subtitle/papago_client_id").toString());
+    if (papagoClientSecretEdit_)
+        papagoClientSecretEdit_->setText(settings_.value("subtitle/papago_client_secret").toString());
 }
 
 void SettingsDialog::applyToMpv() {
@@ -572,6 +612,12 @@ void SettingsDialog::onApply() {
     settings_.setValue("subtitle/auto_load",autoLoadSubCheck_->isChecked());
     if (subApiKeyEdit_)
         settings_.setValue("subtitle/opensubtitles_apikey", subApiKeyEdit_->text().trimmed());
+    if (deeplApiKeyEdit_)
+        settings_.setValue("subtitle/deepl_api_key", deeplApiKeyEdit_->text().trimmed());
+    if (papagoClientIdEdit_)
+        settings_.setValue("subtitle/papago_client_id", papagoClientIdEdit_->text().trimmed());
+    if (papagoClientSecretEdit_)
+        settings_.setValue("subtitle/papago_client_secret", papagoClientSecretEdit_->text().trimmed());
 
     applyToMpv();
     emit settingsApplied();
