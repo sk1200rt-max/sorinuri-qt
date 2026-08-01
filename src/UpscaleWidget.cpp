@@ -245,6 +245,7 @@ void UpscaleWidget::buildUI() {
             rowPreset->addWidget(btn);
         }
         QString gpuName = detectGpu();
+        if (!gpuName.isEmpty()) {
             auto* gpuLabel = new QLabel("감지: " + gpuName);
             gpuLabel->setStyleSheet("color:#4fc3f7; font-size:10px;");
             rowPreset->addStretch();
