@@ -5,7 +5,9 @@
 #include <QJsonObject>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
+#include <QNetworkRequest>
 #include <QMouseEvent>
+#include <QPaintEvent>
 
 /**
  * SplashAdWidget — 앱 시작 시 로고 옆에 표시되는 광고 위젯
@@ -35,11 +37,11 @@ private slots:
     void onTimeout();
 
 private:
-    QLabel*       imageLabel_  = nullptr;
-    QLabel*       countLabel_  = nullptr;  // 남은 시간 표시
-    QTimer*       closeTimer_  = nullptr;
-    QTimer*       countTimer_  = nullptr;
-    QNetworkAccessManager* nam_ = nullptr;
+    QLabel*               imageLabel_  = nullptr;
+    QLabel*               countLabel_  = nullptr;
+    QTimer*               closeTimer_  = nullptr;
+    QTimer*               countTimer_  = nullptr;
+    QNetworkAccessManager* nam_        = nullptr;
 
     QJsonObject   adObj_;
     int           remainSec_   = 3;
