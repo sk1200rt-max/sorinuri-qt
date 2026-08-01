@@ -1,0 +1,85 @@
+name: Promote to Production (자동 업데이트 확정)
+
+# 수동으로만 실행 가능 - 테스트 완료 후 실행
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '확정할 버전 (예: 6.0.0)'
+        required: true
+        default: '6.0.0'
+      confirm:
+        description: '확정 확인 (yes 입력)'
+        required: true
+        default: 'no'
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.confirm == 'yes'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Promote staging to production
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          APP_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          if [ -z "$SSH_KEY" ] || [ -z "$DEPLOY_HOST" ]; then
+            echo "배포 Secrets 미설정"
+            exit 1
+          fi
+          mkdir -p ~/.ssh
+          printf '%s' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+          REAL_PATH="/var/www/sorinuri/downloads"
+
+          # 스테이징 파일이 존재하는지 확인
+          STAGING_EXISTS=$(ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            "test -f ${REAL_PATH}/version-staging.json && echo yes || echo no")
+
+          if [ "$STAGING_EXISTS" != "yes" ]; then
+            echo "오류: version-staging.json 파일이 서버에 없습니다"
+            exit 1
+          fi
+
+          # 스테이징 버전 확인
+          STAGING_VER=$(ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            "python3 -c \"import json; d=json.load(open('${REAL_PATH}/version-staging.json')); print(d['version'])\"")
+
+          echo "스테이징 버전: $STAGING_VER"
+          echo "확정 요청 버전: $APP_VERSION"
+
+          if [ "$STAGING_VER" != "$APP_VERSION" ]; then
+            echo "오류: 스테이징 버전($STAGING_VER)과 확정 요청 버전($APP_VERSION)이 다릅니다"
+            exit 1
+          fi
+
+          # 기존 version.json 백업
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            "cp -f ${REAL_PATH}/version.json ${REAL_PATH}/version.json.bak 2>/dev/null || true"
+
+          # 스테이징 → 프로덕션 승격
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            "cp -f ${REAL_PATH}/version-staging.json ${REAL_PATH}/version.json && \
+             python3 -c \"import json; d=json.load(open('${REAL_PATH}/version.json')); d['channel']='production'; json.dump(d, open('${REAL_PATH}/version.json','w'), indent=2, ensure_ascii=False)\""
+
+          echo ""
+          echo "======================================"
+          echo "v${APP_VERSION} 프로덕션 배포 완료!"
+          echo "이제 모든 사용자에게 자동 업데이트 팝업이 표시됩니다"
+          echo "======================================"
+
+          # 최종 확인
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            "cat ${REAL_PATH}/version.json"

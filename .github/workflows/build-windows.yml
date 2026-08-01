@@ -354,11 +354,11 @@ jobs:
           name: deploy-files
           path: dist/
 
-      - name: Generate version.json
+      - name: Generate version-staging.json
         env:
           APP_VERSION: "6.0.0"
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-        run: python3 scripts/make_version_json.py "$APP_VERSION" "$DEPLOY_HOST"
+        run: python3 scripts/make_version_json.py "$APP_VERSION" "$DEPLOY_HOST" staging
 
       - name: Deploy to Server
         env:
@@ -397,10 +397,13 @@ jobs:
               "${DEPLOY_USER}@${DEPLOY_HOST}:${REAL_PATH}/Sorinuri-Setup-${APP_VERSION}.exe"
           fi
 
-          # version.json 생성 및 배포 (자동 업데이트용)
+          # version-staging.json 배포 (테스트용 - 자동 업데이트에 연결 안 됨)
+          # 확정 후 promote 워크플로우를 실행해야 version.json에 반영됨
           scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
-            /tmp/version.json \
-            "${DEPLOY_USER}@${DEPLOY_HOST}:${REAL_PATH}/version.json"
+            /tmp/version-staging.json \
+            "${DEPLOY_USER}@${DEPLOY_HOST}:${REAL_PATH}/version-staging.json"
+          echo "[STAGING] version-staging.json 배포 완료"
+          echo "테스트 후 확정하려면 promote 워크플로우를 실행하세요"
 
           # 배포 확인
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no "${DEPLOY_USER}@${DEPLOY_HOST}" \
