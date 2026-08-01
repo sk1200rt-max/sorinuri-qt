@@ -4,6 +4,8 @@
 
 #include "UpscaleWidget.h"
 #include "MpvCore.h"
+#include <QCoreApplication>
+#include <QFile>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -153,13 +155,15 @@ void UpscaleWidget::buildUI() {
     btnNvidia_  = new QPushButton("NVIDIA RTX VSR");
     btnAmd_     = new QPushButton("AMD FSR");
     btnLanczos_ = new QPushButton("Lanczos");
+    btnESRGAN_  = new QPushButton("Real-ESRGAN");
+    btnRIFE_    = new QPushButton("RIFE 프레임보간");
 
-    for (auto* btn : {btnOff_, btnNvidia_, btnAmd_, btnLanczos_}) {
+    for (auto* btn : {btnOff_, btnNvidia_, btnAmd_, btnLanczos_, btnESRGAN_, btnRIFE_}) {
         btn->setObjectName("modeBtn");
         btn->setCheckable(true);
         rowMode->addWidget(btn);
     }
-    btnNvidia_->setChecked(true); // 목업: NVIDIA 선택 상태
+    btnOff_->setChecked(true);
     rowMode->addStretch();
     root->addLayout(rowMode);
     root->addSpacing(10);
@@ -170,6 +174,8 @@ void UpscaleWidget::buildUI() {
     grp->addButton(btnNvidia_, (int)UpscaleMode::NvidiaRTX);
     grp->addButton(btnAmd_,    (int)UpscaleMode::AmdFSR);
     grp->addButton(btnLanczos_,(int)UpscaleMode::Lanczos);
+    grp->addButton(btnESRGAN_, (int)UpscaleMode::RealESRGAN);
+    grp->addButton(btnRIFE_,   (int)UpscaleMode::RIFE);
     connect(grp, QOverload<int>::of(&QButtonGroup::idClicked), this, [this](int id){
         setMode((UpscaleMode)id);
     });
@@ -364,13 +370,53 @@ void UpscaleWidget::applyToMpv() {
         core_->setProperty("scale",        QString("ewa_lanczos"));
         core_->setProperty("scale-param1", QVariant(strength_*0.4));
         break;
-    case UpscaleMode::Lanczos:
+        case UpscaleMode::Lanczos:
         core_->setProperty("vo",           QString("gpu"));
         core_->setProperty("hwdec",        QString("auto-safe"));
         core_->setProperty("scale",        QString("lanczos"));
         core_->setProperty("scale-param1", QVariant(strength_*0.5));
+        // GLSL 셋어 해제
+        core_->command({"change-list", "glsl-shaders", "clr", ""});
+        break;
+    case UpscaleMode::RealESRGAN: {
+        // Real-ESRGAN x4 GLSL 셋어 적용 (MPV 내장 알고리즘 사용)
+        core_->setProperty("vo",    QString("gpu-next"));
+        core_->setProperty("hwdec", QString("auto"));
+        core_->setProperty("scale", QString("ewa_lanczossharp"));
+        // 알려진 위치에 셋어 파일이 있으면 로드, 없으면 알고리즘만 적용
+        QString shaderPath = QCoreApplication::applicationDirPath() + "/shaders/realesrgan-x4plus.glsl";
+        if (QFile::exists(shaderPath)) {
+            core_->command({"change-list", "glsl-shaders", "set", shaderPath});
+        } else {
+            core_->command({"change-list", "glsl-shaders", "clr", ""});
+        }
+        if (lblStatus_) lblStatus_->setText(QFile::exists(shaderPath) ? "✅ Real-ESRGAN 셋어 적용" : "⚠️ 셋어 파일 없음 - 고화질 알고리즘 적용중");
         break;
     }
+    case UpscaleMode::RIFE: {
+        // RIFE 프레임 보간 GLSL 셋어 적용
+        core_->setProperty("vo",    QString("gpu-next"));
+        core_->setProperty("hwdec", QString("auto"));
+        // 프레임 보간: video-sync=display-resample + interpolation
+        core_->setProperty("video-sync",    QString("display-resample"));
+        core_->setProperty("interpolation", true);
+        core_->setProperty("tscale",        QString("oversample"));
+        QString shaderPath = QCoreApplication::applicationDirPath() + "/shaders/rife-v4.glsl";
+        if (QFile::exists(shaderPath)) {
+            core_->command({"change-list", "glsl-shaders", "set", shaderPath});
+        } else {
+            // 셋어 없어도 MPV 내장 interpolation으로 동작
+            core_->command({"change-list", "glsl-shaders", "clr", ""});
+        }
+        if (lblStatus_) lblStatus_->setText("✅ RIFE 프레임 보간 활성화");
+        break;
+    }
+    }
+    // Off 시 RIFE 설정 원복
+    if (mode_ == UpscaleMode::Off) {
+        core_->setProperty("video-sync",    QString("audio"));
+        core_->setProperty("interpolation", false);
+        core_->command({"change-list", "glsl-shaders", "clr", ""});
+    }
 }
-
 #include "UpscaleWidget.moc"

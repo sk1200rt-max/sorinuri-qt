@@ -5,8 +5,11 @@
 #include <QLabel>
 #include <QHBoxLayout>
 #include <QVBoxLayout>
+#include <QVector>
 #include "TrackSelector.h"
 #include "MpvCore.h"
+
+struct ChapterMark { double startSec; QString title; };
 
 class ControlBar : public QWidget {
     Q_OBJECT
@@ -20,6 +23,8 @@ public:
     void setMuted(bool muted);
     void embedTrackSelector(TrackSelector* selector);
     void connectMpv(MpvCore* core);
+    // 타임라인에 챕터 마커 표시
+    void setChapters(const QVector<ChapterMark>& chapters, double duration);
 
     // 모드 버튼 접근자
     QPushButton* playerModeBtn() const { return btnPlayerMode_; }
@@ -79,4 +84,5 @@ private:
     double totalDuration_ = 0;
     bool   seeking_       = false;
     bool   muted_         = false;
+    QVector<ChapterMark> chapters_;  // 타임라인 챕터 마커
 };

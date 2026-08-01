@@ -6,7 +6,7 @@ class QPushButton;
 class QSlider;
 class MpvCore;
 
-enum class UpscaleMode { Off, NvidiaRTX, AmdFSR, Lanczos };
+enum class UpscaleMode { Off, NvidiaRTX, AmdFSR, Lanczos, RealESRGAN, RIFE };
 
 class UpscaleWidget : public QWidget {
     Q_OBJECT
@@ -36,10 +36,12 @@ private:
     bool         compareMode_ = false;
 
     // UI
-    QPushButton* btnOff_      = nullptr;
-    QPushButton* btnNvidia_   = nullptr;
-    QPushButton* btnAmd_      = nullptr;
-    QPushButton* btnLanczos_  = nullptr;
+    QPushButton* btnOff_       = nullptr;
+    QPushButton* btnNvidia_    = nullptr;
+    QPushButton* btnAmd_       = nullptr;
+    QPushButton* btnLanczos_   = nullptr;
+    QPushButton* btnESRGAN_    = nullptr;
+    QPushButton* btnRIFE_      = nullptr;
     QSlider*     sldStrength_ = nullptr;
     QLabel*      lblStrVal_   = nullptr;
     QPushButton* btnCompare_  = nullptr;

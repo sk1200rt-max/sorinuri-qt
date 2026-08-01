@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(Sorinuri VERSION 6.0.0 LANGUAGES CXX)
+project(Sorinuri VERSION 6.1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -105,6 +105,8 @@ set(SOURCES
     src/OsdWidget.h
     src/MediaLibraryWidget.cpp
     src/MediaLibraryWidget.h
+    src/SubtitleEditorWidget.cpp
+    src/SubtitleEditorWidget.h
     resources/resources.qrc
 )
 

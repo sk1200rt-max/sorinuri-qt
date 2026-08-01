@@ -274,3 +274,32 @@ QString ControlBar::formatChannels(int ch) const {
     default: return ch > 0 ? QString("%1ch").arg(ch) : "";
     }
 }
+
+void ControlBar::setChapters(const QVector<ChapterMark>& chapters, double duration) {
+    chapters_ = chapters;
+    if (!seekSlider_ || chapters.isEmpty() || duration <= 0) return;
+
+    // 기존 챕터 마커 위젯 제거
+    for (auto* w : seekSlider_->findChildren<QWidget*>("chapterMarker"))
+        w->deleteLater();
+
+    // 챕터 마커 오버레이 위젯 생성
+    for (const auto& ch : chapters) {
+        double ratio = ch.startSec / duration;
+        if (ratio <= 0.0 || ratio >= 1.0) continue;
+
+        auto* marker = new QWidget(seekSlider_);
+        marker->setObjectName("chapterMarker");
+        marker->setFixedSize(2, seekSlider_->height() > 0 ? seekSlider_->height() : 16);
+        marker->setStyleSheet("background: rgba(255,255,255,0.35); border-radius: 1px;");
+        marker->setToolTip(ch.title);
+        marker->setAttribute(Qt::WA_TransparentForMouseEvents);
+
+        // 슬라이더 핸들 여백 고려한 위치 계산
+        int handleHalf = 6;
+        int usable = seekSlider_->width() - handleHalf * 2;
+        int x = static_cast<int>(handleHalf + ratio * usable) - 1;
+        marker->move(x, 0);
+        marker->show();
+    }
+}

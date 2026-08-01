@@ -37,6 +37,7 @@
 #include "NetworkBrowserWidget.h"
 #include "OsdWidget.h"
 #include "MediaLibraryWidget.h"
+#include "SubtitleEditorWidget.h"
 
 
 class MainWindow : public QMainWindow {
@@ -146,6 +147,7 @@ private:
     NetworkBrowserWidget* networkBrowserWidget_ = nullptr;  // SMB/DLNA + 360도 VR + 캐스팅
     OsdWidget*           osdWidget_            = nullptr;  // 화면 중앙 OSD
     MediaLibraryWidget*  mediaLibrary_         = nullptr;  // 스마트 미디어 라이브러리
+    SubtitleEditorWidget* subtitleEditor_      = nullptr;  // 자막 편집기
 
     bool   isFullscreen_      = false;
     bool   isOttMode_         = false;

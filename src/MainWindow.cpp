@@ -46,28 +46,36 @@ MainWindow::MainWindow(QWidget* parent)
     setAcceptDrops(true);
     setWindowFlags(Qt::FramelessWindowHint | Qt::Window);
 
-    // yt-dlp 관리자 초기화
-    ytdlp_ = new YtdlpManager(this);
-    connect(ytdlp_, &YtdlpManager::ytdlpReady,
-            this, &MainWindow::onYtdlpReady);
-    connect(ytdlp_, &YtdlpManager::downloadProgress,
-            this, &MainWindow::onYtdlpDownloadProgress);
-    connect(ytdlp_, &YtdlpManager::downloadFailed,
-            this, &MainWindow::onYtdlpDownloadFailed);
+    // yt-dlp 관리자 - 지연 초기화 (시작 직후 네트워크 요청 방지)
+    ytdlp_ = nullptr;
 
     setupUI();
     setupConnections();
     loadSettings();
 
-    // 자동 업데이트 체크 (앱 시작 3초 후)
-    auto* updater = new UpdateChecker(this);
-    connect(updater, &UpdateChecker::updateAvailable,
-            this, [this](const QString& ver, const QString& notes, const QString& url) {
-        auto* dlg = new UpdateDialog(ver, notes, url, this);
-        dlg->setAttribute(Qt::WA_DeleteOnClose);
-        dlg->exec();
+    // 무거운 초기화는 창이 완전히 표시된 후 비동기로 실행
+    QTimer::singleShot(500, this, [this]() {
+        // yt-dlp 관리자 초기화 (500ms 지연)
+        ytdlp_ = new YtdlpManager(this);
+        connect(ytdlp_, &YtdlpManager::ytdlpReady,
+                this, &MainWindow::onYtdlpReady);
+        connect(ytdlp_, &YtdlpManager::downloadProgress,
+                this, &MainWindow::onYtdlpDownloadProgress);
+        connect(ytdlp_, &YtdlpManager::downloadFailed,
+                this, &MainWindow::onYtdlpDownloadFailed);
     });
-    updater->checkForUpdates();
+
+    // 자동 업데이트 체크 (앱 시작 5초 후 - 시작 직후 부하 방지)
+    QTimer::singleShot(5000, this, [this]() {
+        auto* updater = new UpdateChecker(this);
+        connect(updater, &UpdateChecker::updateAvailable,
+                this, [this](const QString& ver, const QString& notes, const QString& url) {
+            auto* dlg = new UpdateDialog(ver, notes, url, this);
+            dlg->setAttribute(Qt::WA_DeleteOnClose);
+            dlg->exec();
+        });
+        updater->checkForUpdates();
+    });
 }
 
 MainWindow::~MainWindow() { saveSettings(); }
@@ -360,6 +368,25 @@ void MainWindow::onFileLoaded(const QString& path) {
         chapterWidget_->loadChapters();
         chapterWidget_->generateThumbnails(path);
     }
+    // 타임라인에 챕터 마커 표시 (200ms 지연 - MPV가 챕터 정보 로드하는 시점 고려)
+    QTimer::singleShot(300, this, [this]() {
+        auto* core = mpvWidget_->core();
+        QVariant chList = core->getProperty("chapter-list");
+        double dur = core->getProperty("duration").toDouble();
+        if (chList.isValid() && dur > 0) {
+            QVector<ChapterMark> marks;
+            const auto& list = chList.toList();
+            for (const auto& item : list) {
+                const auto& map = item.toMap();
+                double t = map.value("time").toDouble();
+                QString title = map.value("title").toString();
+                if (title.isEmpty()) title = QString("챕터 %1").arg(marks.size() + 1);
+                marks.append({t, title});
+            }
+            if (!marks.isEmpty())
+                controlBar_->setChapters(marks, dur);
+        }
+    });
 }
 
 void MainWindow::showUI() {
@@ -713,6 +740,10 @@ void MainWindow::keyPressEvent(QKeyEvent* e) {
     case Qt::Key_Less:     // <
         proFeatures_->setSpeed(qMax(proFeatures_->currentSpeed() - 0.25, 0.25));
         break;
+    case Qt::Key_C:  // 화면 캐치 (C)
+        core->command({"screenshot", "video"});
+        if (osdWidget_) osdWidget_->showInfo("화면 캐치 저장");
+        break;
     case Qt::Key_P:
         toggleProFeatures();
         break;
@@ -785,6 +816,10 @@ void MainWindow::toggleProFeatures() {
             proFeatures_->addTab(mediaLibrary_, "미디어 라이브러리");
             connect(mediaLibrary_, &MediaLibraryWidget::fileRequested,
                     this, [this](const QString& path) { openFiles({path}); });
+        }
+        if (!subtitleEditor_) {
+            subtitleEditor_ = new SubtitleEditorWidget(mpvWidget_->core(), this);
+            proFeatures_->addTab(subtitleEditor_, "자막 편집기");
         }
     }
 
@@ -1094,6 +1129,47 @@ void MainWindow::showContextMenu(const QPoint& globalPos) {
     // 전체화면
     QAction* actFull = menu.addAction(isFullscreen_ ? "전체화면 해제  (F)": "전체화면  (F)");
     connect(actFull, &QAction::triggered, this, &MainWindow::toggleFullscreen);
+
+    menu.addSeparator();
+
+    // 화면 캐치
+    QAction* actCapture = menu.addAction("화면 캐치  (C)");
+    connect(actCapture, &QAction::triggered, this, [core]() {
+        // MPV screenshot 명령 - 실행 파일 디렉토리에 PNG 저장
+        core->command({"screenshot", "video"});
+    });
+
+    // 구간 반복 (A-B 반복)
+    QMenu* abMenu = menu.addMenu("구간 반복 (A-B)");
+    QAction* actAbA = abMenu->addAction("A 지점 설정  (I)");
+    QAction* actAbB = abMenu->addAction("B 지점 설정  (O)");
+    QAction* actAbClear = abMenu->addAction("구간 반복 해제");
+    connect(actAbA, &QAction::triggered, [core]() { core->command({"ab-loop-a"}); });
+    connect(actAbB, &QAction::triggered, [core]() { core->command({"ab-loop-b"}); });
+    connect(actAbClear, &QAction::triggered, [core]() {
+        core->setProperty("ab-loop-a", QString("no"));
+        core->setProperty("ab-loop-b", QString("no"));
+    });
+
+    // 재생 속도 프리셋
+    QMenu* speedMenu = menu.addMenu("재생 속도");
+    struct SpeedItem { QString label; double speed; };
+    QVector<SpeedItem> speeds = {
+        {"0.25x (매우 느리게)", 0.25},
+        {"0.5x  (느리게)",           0.5},
+        {"0.75x",                            0.75},
+        {"1.0x  (정상)",                1.0},
+        {"1.25x",                            1.25},
+        {"1.5x  (빠르게)",           1.5},
+        {"2.0x  (매우 빠르게)",  2.0},
+    };
+    for (const auto& s : speeds) {
+        QAction* a = speedMenu->addAction(s.label);
+        double spd = s.speed;
+        connect(a, &QAction::triggered, [core, spd]() {
+            core->command({"set", "speed", QString::number(spd)});
+        });
+    }
 
     menu.addSeparator();
 
