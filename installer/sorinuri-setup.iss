@@ -3,7 +3,7 @@
 
 #define MyAppName "소리누리"
 #define MyAppNameEn "Sorinuri"
-#define MyAppVersion "5.1.0"
+#define MyAppVersion "6.1.1"
 #define MyAppPublisher "Sorinuri"
 #define MyAppURL "https://sorinuri.com"
 #define MyAppExeName "Sorinuri.exe"
@@ -38,6 +38,8 @@ UninstallDisplayName={#MyAppName}
 WizardStyle=modern
 WizardResizable=no
 RestartIfNeededByRun=no
+; HiDPI (고해상도 모니터) 지원 - Per-Monitor DPI Aware
+DPIAware=yes
 ; 설치 마법사 이미지 (소리누리 브랜드)
 WizardImageFile=wizard-banner.bmp
 WizardSmallImageFile=wizard-small.bmp
@@ -147,7 +149,12 @@ begin
 end;
 
 procedure InitializeWizard;
+var
+  ScaleFactor: Integer;
 begin
+  // HiDPI 스케일 팩터 적용 (96 DPI = 100%, 192 DPI = 200% 등)
+  ScaleFactor := WizardForm.Font.PixelsPerInch;
+
   DolbyPage := CreateCustomPage(
     wpSelectTasks,
     CustomMessage('DolbyPageTitle'),
@@ -158,15 +165,15 @@ begin
   DolbyInfoLabel.Left := 0;
   DolbyInfoLabel.Top := 0;
   DolbyInfoLabel.Width := DolbyPage.SurfaceWidth;
-  DolbyInfoLabel.AutoSize := False;
-  DolbyInfoLabel.Height := 260;
+  DolbyInfoLabel.AutoSize := True;  // HiDPI: 자동 크기 조정
   DolbyInfoLabel.WordWrap := True;
   DolbyInfoLabel.Caption := GetDolbyCaption();
 
   DolbyLinkLabel := TNewStaticText.Create(DolbyPage);
   DolbyLinkLabel.Parent := DolbyPage.Surface;
   DolbyLinkLabel.Left := 0;
-  DolbyLinkLabel.Top := DolbyInfoLabel.Top + DolbyInfoLabel.Height + 8;
+  // HiDPI: 라벨 위치를 ScaleFactor 기반으로 동적 계산
+  DolbyLinkLabel.Top := DolbyInfoLabel.Top + DolbyInfoLabel.Height + ScaleFactor / 12;
   DolbyLinkLabel.Width := DolbyPage.SurfaceWidth;
   DolbyLinkLabel.AutoSize := True;
   DolbyLinkLabel.Caption := CustomMessage('DolbyLinkText');
