@@ -1,0 +1,89 @@
+name: Rollback to Previous Version (긴급 롤백)
+
+# 문제 발생 시 이전 버전으로 즉시 되돌리는 워크플로우
+# GitHub Actions → Rollback → Run workflow → 버전 입력 → yes 입력
+
+on:
+  workflow_dispatch:
+    inputs:
+      rollback_to:
+        description: '롤백할 버전 (예: 5.1.0) - 서버에 해당 파일이 존재해야 함'
+        required: true
+      confirm:
+        description: '롤백 확인 (yes 입력) - 모든 사용자에게 해당 버전으로 다운그레이드 안내됨'
+        required: true
+        default: 'no'
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.confirm == 'yes'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Rollback version.json on server
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          ROLLBACK_VER: ${{ github.event.inputs.rollback_to }}
+        run: |
+          if [ -z "$SSH_KEY" ] || [ -z "$DEPLOY_HOST" ]; then
+            echo "배포 Secrets 미설정"
+            exit 1
+          fi
+          mkdir -p ~/.ssh
+          printf '%s' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+          REAL_PATH="/var/www/sorinuri/downloads"
+
+          # 롤백 대상 설치파일 존재 여부 확인
+          FILE_EXISTS=$(ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            "test -f ${REAL_PATH}/Sorinuri-Setup-${ROLLBACK_VER}.exe && echo yes || echo no")
+
+          if [ "$FILE_EXISTS" != "yes" ]; then
+            echo "오류: Sorinuri-Setup-${ROLLBACK_VER}.exe 파일이 서버에 없습니다"
+            echo "서버에 있는 파일 목록:"
+            ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+              "${DEPLOY_USER}@${DEPLOY_HOST}" \
+              "ls -lh ${REAL_PATH}/Sorinuri-Setup-*.exe"
+            exit 1
+          fi
+
+          # 현재 version.json 백업
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            "cp -f ${REAL_PATH}/version.json ${REAL_PATH}/version.json.rollback-bak 2>/dev/null || true"
+
+          # 롤백 version.json 생성 및 배포
+          ROLLBACK_DATE=$(date +%Y-%m-%d)
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            "python3 -c \"
+import json
+data = {
+    'version': '${ROLLBACK_VER}',
+    'channel': 'production',
+    'installer_url': 'https://sorinuri.com/downloads/Sorinuri-Setup-${ROLLBACK_VER}.exe',
+    'portable_url': 'https://sorinuri.com/downloads/Sorinuri-Qt-${ROLLBACK_VER}.zip',
+    'notes': '안정성 개선을 위해 v${ROLLBACK_VER}으로 롤백됐습니다.',
+    'date': '${ROLLBACK_DATE}'
+}
+json.dump(data, open('${REAL_PATH}/version.json', 'w'), indent=2, ensure_ascii=False)
+print('롤백 완료:', data)
+\""
+
+          echo ""
+          echo "========================================"
+          echo "긴급 롤백 완료: v${ROLLBACK_VER}"
+          echo "모든 사용자에게 v${ROLLBACK_VER} 업데이트 안내가 표시됩니다"
+          echo "========================================"
+
+          # 최종 확인
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            "cat ${REAL_PATH}/version.json"

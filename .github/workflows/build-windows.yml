@@ -17,6 +17,32 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # ── 버전 일치 검증 ────────────────────────────────────────────
+      # CMakeLists.txt / UpdateChecker.h / build-windows.yml 세 곳의 버전이
+      # 모두 일치하지 않으면 빌드를 즉시 중단합니다.
+      - name: Verify version consistency
+        shell: bash
+        run: |
+          CMAKE_VER=$(grep -oP '(?<=MyAppVersion\s")([0-9]+\.[0-9]+\.[0-9]+)' CMakeLists.txt | head -1)
+          CHECKER_VER=$(grep -oP '(?<=currentVersion\(\) \{ return ")[0-9]+\.[0-9]+\.[0-9]+' src/UpdateChecker.h | head -1)
+          YML_VER=$(grep -oP '(?<=APP_VERSION:\s")[0-9]+\.[0-9]+\.[0-9]+' .github/workflows/build-windows.yml | head -1)
+          echo "CMakeLists.txt : $CMAKE_VER"
+          echo "UpdateChecker.h: $CHECKER_VER"
+          echo "build-windows.yml: $YML_VER"
+          if [ "$CMAKE_VER" != "$CHECKER_VER" ] || [ "$CMAKE_VER" != "$YML_VER" ]; then
+            echo ""
+            echo "========================================"
+            echo "오류: 버전 불일치가 감지됐습니다!"
+            echo "  CMakeLists.txt  : $CMAKE_VER"
+            echo "  UpdateChecker.h : $CHECKER_VER"
+            echo "  build-windows.yml: $YML_VER"
+            echo ""
+            echo "해결 방법: python3 scripts/bump_version.py <버전> 실행 후 재커밋"
+            echo "========================================"
+            exit 1
+          fi
+          echo "버전 검증 통과: $CMAKE_VER"
+
       # ── Visual Studio 환경 설정 ────────────────────────────────────
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
