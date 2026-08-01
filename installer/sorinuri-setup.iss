@@ -27,8 +27,6 @@ AllowNoIcons=yes
 OutputDir=..\dist
 OutputBaseFilename=Sorinuri-Setup-{#MyAppVersion}
 SetupIconFile=..\resources\sorinuri.ico
-; HiDPI Per-Monitor V2 manifest - 설치 화면이 고해상도 모니터에서 선명하게 표시됨
-SetupManifestFile=setup-dpi.manifest
 Compression=lzma2/ultra64
 SolidCompression=yes
 ArchitecturesInstallIn64BitMode=x64compatible
@@ -151,9 +149,12 @@ end;
 procedure InitializeWizard;
 var
   ScaleFactor: Integer;
+  BaseFontSize: Integer;
 begin
   // HiDPI 스케일 팩터 적용 (96 DPI = 100%, 192 DPI = 200% 등)
   ScaleFactor := WizardForm.Font.PixelsPerInch;
+  // 기본 폰트 크기: 96 DPI에서 9pt, HiDPI에서 비례 확대
+  BaseFontSize := MulDiv(9, ScaleFactor, 96);
 
   DolbyPage := CreateCustomPage(
     wpSelectTasks,
@@ -165,18 +166,20 @@ begin
   DolbyInfoLabel.Left := 0;
   DolbyInfoLabel.Top := 0;
   DolbyInfoLabel.Width := DolbyPage.SurfaceWidth;
-  DolbyInfoLabel.AutoSize := True;  // HiDPI: 자동 크기 조정
+  DolbyInfoLabel.AutoSize := True;
   DolbyInfoLabel.WordWrap := True;
+  // HiDPI: 폰트 크기를 DPI에 비례하여 설정
+  DolbyInfoLabel.Font.Size := BaseFontSize;
   DolbyInfoLabel.Caption := GetDolbyCaption();
 
   DolbyLinkLabel := TNewStaticText.Create(DolbyPage);
   DolbyLinkLabel.Parent := DolbyPage.Surface;
   DolbyLinkLabel.Left := 0;
-  // HiDPI: 라벨 위치를 ScaleFactor 기반으로 동적 계산
-  DolbyLinkLabel.Top := DolbyInfoLabel.Top + DolbyInfoLabel.Height + ScaleFactor / 12;
+  DolbyLinkLabel.Top := DolbyInfoLabel.Top + DolbyInfoLabel.Height + 8;
   DolbyLinkLabel.Width := DolbyPage.SurfaceWidth;
   DolbyLinkLabel.AutoSize := True;
   DolbyLinkLabel.Caption := CustomMessage('DolbyLinkText');
+  DolbyLinkLabel.Font.Size := BaseFontSize;
   DolbyLinkLabel.Font.Color := $00CC6600;
   DolbyLinkLabel.Font.Style := [fsUnderline];
   DolbyLinkLabel.Cursor := crHand;
