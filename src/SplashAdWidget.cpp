@@ -8,6 +8,7 @@
 #include <QNetworkRequest>
 #include <QNetworkReply>
 #include <QJsonObject>
+#include <QUrlQuery>
 #include <QApplication>
 #include <QScreen>
 
