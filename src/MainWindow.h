@@ -38,6 +38,8 @@
 #include "OsdWidget.h"
 #include "MediaLibraryWidget.h"
 #include "SubtitleEditorWidget.h"
+#include "AdManager.h"
+#include "SplashAdWidget.h"
 
 
 class MainWindow : public QMainWindow {
@@ -148,6 +150,8 @@ private:
     OsdWidget*           osdWidget_            = nullptr;  // 화면 중앙 OSD
     MediaLibraryWidget*  mediaLibrary_         = nullptr;  // 스마트 미디어 라이브러리
     SubtitleEditorWidget* subtitleEditor_      = nullptr;  // 자막 편집기
+    AdManager*            adManager_            = nullptr;  // 광고 관리자
+    SplashAdWidget*       splashAdWidget_       = nullptr;  // 시작 화면 광고
 
     bool   isFullscreen_      = false;
     bool   isOttMode_         = false;

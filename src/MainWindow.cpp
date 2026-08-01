@@ -164,6 +164,24 @@ void MainWindow::setupUI() {
     // OSD 위젯 (화면 중앙 반투명 표시) - mpvWidget_ 위에 오버레이
     osdWidget_ = new OsdWidget(mpvWidget_);
     osdWidget_->hide();
+
+    // ── 광고 관리자 초기화 ──────────────────────────────────────────────
+    adManager_      = new AdManager(this);
+    splashAdWidget_ = new SplashAdWidget(this);
+    adManager_->setAppVersion("6.2.0");
+
+    // 앱 시작 5초 후 시작 화면 광고 요청 (비동기, 광고 없으면 아무것도 안 표시)
+    QTimer::singleShot(5000, this, [this]() {
+        adManager_->fetchAd("splash");
+    });
+    connect(adManager_, &AdManager::adReady, this, [this](const QString& slot, const QJsonObject& ad) {
+        if (ad.isEmpty()) return;
+        if (slot == "splash" && splashAdWidget_)
+            splashAdWidget_->showAd(ad);
+    });
+    connect(splashAdWidget_, &SplashAdWidget::clicked, this, [this](int adId, const QString& slot) {
+        adManager_->reportClick(adId, slot);
+    });
 }
 
 void MainWindow::setupConnections() {
@@ -1264,6 +1282,11 @@ void MainWindow::switchToOttMode() {
         });
     }
     mainStack_->setCurrentIndex(1);
+
+    // OTT 모드 진입 시 광고 요청 (비동기, 광고 없으면 표시 안 함)
+    if (adManager_)
+        adManager_->fetchAd("ott");
+
     controlBar_->playerModeBtn()->setProperty("active", false);
     controlBar_->ottModeBtn()->setProperty("active", true);
     controlBar_->playerModeBtn()->style()->unpolish(controlBar_->playerModeBtn());
