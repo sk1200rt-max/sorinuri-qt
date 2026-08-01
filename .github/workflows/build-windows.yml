@@ -23,7 +23,7 @@ jobs:
       - name: Verify version consistency
         shell: bash
         run: |
-          CMAKE_VER=$(grep -oP '(?<=MyAppVersion\s")([0-9]+\.[0-9]+\.[0-9]+)' CMakeLists.txt | head -1)
+          CMAKE_VER=$(grep -oP '(?<=project\(Sorinuri VERSION )[0-9]+\.[0-9]+\.[0-9]+' CMakeLists.txt | head -1)
           CHECKER_VER=$(grep -oP '(?<=currentVersion\(\) \{ return ")[0-9]+\.[0-9]+\.[0-9]+' src/UpdateChecker.h | head -1)
           YML_VER=$(grep -oP '(?<=APP_VERSION:\s")[0-9]+\.[0-9]+\.[0-9]+' .github/workflows/build-windows.yml | head -1)
           echo "CMakeLists.txt : $CMAKE_VER"
