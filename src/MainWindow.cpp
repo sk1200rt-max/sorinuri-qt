@@ -81,6 +81,9 @@ MainWindow::MainWindow(QWidget* parent)
 MainWindow::~MainWindow() { saveSettings(); }
 
 void MainWindow::setupUI() {
+    // 키 이벤트가 항상 MainWindow로 전달되도록 포커스 정책 설정
+    setFocusPolicy(Qt::StrongFocus);
+
     auto* central = new QWidget(this);
     central->setStyleSheet("QWidget { background: #0e0e0e; color: #ccc; }");
     setCentralWidget(central);
@@ -114,6 +117,8 @@ void MainWindow::setupUI() {
 
     mpvWidget_ = new MpvWidget(videoContainer);
     mpvWidget_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    // 클릭 시 MainWindow가 포커스를 유지하도록 - 키 이벤트 정상 전달
+    mpvWidget_->setFocusPolicy(Qt::ClickFocus);
     videoLayout->addWidget(mpvWidget_);
     // ── 플레이어 페이지 내부: 영상 vs 음악 스택 ────────────────────────────
     playerStack_ = new QStackedWidget(playerPage_);
@@ -643,26 +648,33 @@ void MainWindow::keyPressEvent(QKeyEvent* e) {
     case Qt::Key_Escape: if (isFullscreen_) toggleFullscreen(); break;
     // 이동: 일반 5초, Shift 60초, Ctrl 10초
     case Qt::Key_Left:
-        if (e->modifiers() & Qt::ShiftModifier)  core->seek(-60, true);
+        // 좌우 방향키: 일반 5초, Shift 60초, Ctrl 10초
+        if (e->modifiers() & Qt::ShiftModifier)       core->seek(-60, true);
         else if (e->modifiers() & Qt::ControlModifier) core->seek(-10, true);
-        else core->seek(-5, true);
+        else                                           core->seek(-5, true);
         if (osdWidget_) osdWidget_->showSeek(core->position(), totalDuration_);
         break;
     case Qt::Key_Right:
-        if (e->modifiers() & Qt::ShiftModifier)  core->seek(60, true);
+        if (e->modifiers() & Qt::ShiftModifier)       core->seek(60, true);
         else if (e->modifiers() & Qt::ControlModifier) core->seek(10, true);
-        else core->seek(5, true);
+        else                                           core->seek(5, true);
         if (osdWidget_) osdWidget_->showSeek(core->position(), totalDuration_);
         break;
-    case Qt::Key_Up:     core->setVolume(qMin(core->volume() + 5, 200)); break;
-    case Qt::Key_Down:   core->setVolume(qMax(core->volume() - 5, 0)); break;
+    case Qt::Key_Up:
+        core->setVolume(qMin(core->volume() + 5, 200));
+        if (osdWidget_) osdWidget_->showVolume(core->volume(), false);
+        break;
+    case Qt::Key_Down:
+        core->setVolume(qMax(core->volume() - 5, 0));
+        if (osdWidget_) osdWidget_->showVolume(core->volume(), false);
+        break;
     case Qt::Key_PageUp:   core->seek(-300, true); break;  // 5분 앞으로
     case Qt::Key_PageDown: core->seek(300, true);  break;  // 5분 뒤로
-    case Qt::Key_Home:   core->seek(0); break;  // 첫 장면으로
-    case Qt::Key_End:    core->seek(100, false); break;  // 마지막으로
-    case Qt::Key_M:      core->setMuted(!core->getProperty("mute").toBool()); break;
+    case Qt::Key_Home:     core->seek(0); break;           // 첫 장면으로
+    case Qt::Key_End:      core->seek(100, false); break;  // 마지막으로
+    case Qt::Key_M:        core->setMuted(!core->getProperty("mute").toBool()); break;
     // 재생목록 이전/다음
-    case Qt::Key_N:      core->command({"playlist-next"}); break;
+    case Qt::Key_N:        core->command({"playlist-next"}); break;
     case Qt::Key_BracketLeft:   // [ 이전 챕터
         core->command({"add", "chapter", "-1"});
         break;
@@ -672,8 +684,7 @@ void MainWindow::keyPressEvent(QKeyEvent* e) {
     case Qt::Key_O:
         if (e->modifiers() & Qt::ControlModifier) onOpenFile();
         break;
-    case Qt::Key_I:  // 재생 정보 토글 (stats-overlay)
-        core->command({"script-message", "osd-overlay", "0"});
+    case Qt::Key_I:  // 재생 정보 표시 (show-progress)
         core->command({"show-progress"});
         break;
     case Qt::Key_T:  // 항상 위에 토글
@@ -682,6 +693,7 @@ void MainWindow::keyPressEvent(QKeyEvent* e) {
             if (top) setWindowFlags(windowFlags() & ~Qt::WindowStaysOnTopHint);
             else     setWindowFlags(windowFlags() | Qt::WindowStaysOnTopHint);
             show();
+            if (osdWidget_) osdWidget_->showInfo(top ? "항상 위에: 해제" : "항상 위에: 활성화");
         }
         break;
     case Qt::Key_W:  // 자막 폰트 크기 증가
@@ -703,13 +715,40 @@ void MainWindow::keyPressEvent(QKeyEvent* e) {
         core->command({"set", "speed", "1.0"});
         if (osdWidget_) osdWidget_->showSpeed(1.0);
         break;
+    case Qt::Key_V:  // 자막 트랙 전환
+        core->command({"cycle", "sub"});
+        break;
     case Qt::Key_J:  // 자막 다음
         core->command({"sub-step", "1"});
         break;
     case Qt::Key_K:  // 자막 이전
         core->command({"sub-step", "-1"});
         break;
-    // ── 전문 기능 단축키 ────────────────────────────────────────────
+    case Qt::Key_R:  // 반복 모드 토글
+        {
+            QString loop = core->getProperty("loop-file").toString();
+            if (loop == "inf") {
+                core->command({"set", "loop-file", "no"});
+                if (osdWidget_) osdWidget_->showInfo("반복: 해제");
+            } else {
+                core->command({"set", "loop-file", "inf"});
+                if (osdWidget_) osdWidget_->showInfo("반복: 활성화");
+            }
+        }
+        break;
+    case Qt::Key_X:  // 셔플 토글
+        {
+            QString shuffle = core->getProperty("shuffle").toString();
+            if (shuffle == "yes") {
+                core->command({"set", "shuffle", "no"});
+                if (osdWidget_) osdWidget_->showInfo("셔플: 해제");
+            } else {
+                core->command({"set", "shuffle", "yes"});
+                if (osdWidget_) osdWidget_->showInfo("셔플: 활성화");
+            }
+        }
+        break;
+    // ── 전문 기능 단축키 ───────────────────────────────────────────────
     case Qt::Key_A:
         if (e->modifiers() & Qt::ControlModifier)
             proFeatures_->clearAbLoop();
@@ -719,30 +758,37 @@ void MainWindow::keyPressEvent(QKeyEvent* e) {
     case Qt::Key_B:
         proFeatures_->setAbPointB();
         break;
-    case Qt::Key_S:
-        proFeatures_->takeScreenshot();
+    case Qt::Key_S:  // 스크린샷
+        if (e->modifiers() & Qt::ControlModifier) {
+            core->command({"screenshot", "video"});
+            if (osdWidget_) osdWidget_->showInfo("화면 쾐치 저장");
+        } else {
+            core->command({"stop"});
+        }
         break;
-    case Qt::Key_D:
+    case Qt::Key_D:  // 오디오 딥레이
         if (e->modifiers() & Qt::ShiftModifier)
             proFeatures_->setAudioDelay(proFeatures_->audioDelay() - 100);
         else
             proFeatures_->setAudioDelay(proFeatures_->audioDelay() + 100);
         break;
-    case Qt::Key_Z:
+    case Qt::Key_Z:  // 자막 딥레이
         if (e->modifiers() & Qt::ShiftModifier)
             proFeatures_->setSubDelay(proFeatures_->subDelay() - 100);
         else
             proFeatures_->setSubDelay(proFeatures_->subDelay() + 100);
         break;
-    case Qt::Key_Greater:  // >
+    case Qt::Key_Greater:  // > 재생속도 +0.25x
         proFeatures_->setSpeed(qMin(proFeatures_->currentSpeed() + 0.25, 4.0));
+        if (osdWidget_) osdWidget_->showSpeed(proFeatures_->currentSpeed());
         break;
-    case Qt::Key_Less:     // <
+    case Qt::Key_Less:     // < 재생속도 -0.25x
         proFeatures_->setSpeed(qMax(proFeatures_->currentSpeed() - 0.25, 0.25));
+        if (osdWidget_) osdWidget_->showSpeed(proFeatures_->currentSpeed());
         break;
-    case Qt::Key_C:  // 화면 캐치 (C)
+    case Qt::Key_C:  // 화면 쾐치
         core->command({"screenshot", "video"});
-        if (osdWidget_) osdWidget_->showInfo("화면 캐치 저장");
+        if (osdWidget_) osdWidget_->showInfo("화면 쾐치 저장");
         break;
     case Qt::Key_P:
         toggleProFeatures();
@@ -897,6 +943,10 @@ void MainWindow::mousePressEvent(QMouseEvent* e) {
 
 bool MainWindow::eventFilter(QObject* obj, QEvent* event) {
     if (obj == mpvWidget_) {
+        // 클릭 시 MainWindow로 포커스 재설정 - 키 이벤트가 keyPressEvent로 정상 전달됨
+        if (event->type() == QEvent::MouseButtonPress) {
+            setFocus();
+        }
         if (event->type() == QEvent::MouseMove) {
             auto* me = static_cast<QMouseEvent*>(event);
             showUI();
