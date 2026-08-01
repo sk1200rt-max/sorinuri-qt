@@ -15,7 +15,6 @@
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QCryptographicHash>
-#include <QConcurrentRun>
 #include <QtConcurrent>
 #include <QFutureWatcher>
 
