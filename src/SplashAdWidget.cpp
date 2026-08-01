@@ -68,7 +68,9 @@ void SplashAdWidget::showAd(const QJsonObject& adObj) {
                 mediaUrl = QString("https://img.youtube.com/vi/%1/mqdefault.jpg").arg(vid);
         }
 
-        QNetworkRequest req(QUrl(mediaUrl));
+        const QUrl imgUrl(mediaUrl);
+        QNetworkRequest req;
+        req.setUrl(imgUrl);
         auto* reply = nam_->get(req);
         connect(reply, &QNetworkReply::finished, this, &SplashAdWidget::onImageLoaded);
     } else {
