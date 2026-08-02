@@ -2,7 +2,10 @@
 #include <QString>
 #include <QScreen>
 #include <QApplication>
+#include <QOpenGLContext>
+#include <QOpenGLFunctions>
 #include <QDebug>
+#include <mpv/client.h>
 
 /**
  * RenderEnvironment - 실행 환경 자동 감지 및 최적 렌더링 설정 결정
@@ -12,39 +15,65 @@
  *
  * 감지 항목:
  *   - 화면 해상도 및 DPI 배율 (HiDPI 여부)
- *   - GPU 벤더 (NVIDIA / AMD / Intel 통합)
- *   - 모니터 주사율
+ *   - GPU 벤더 및 등급 (NVIDIA RTX/GTX / AMD RDNA / Intel Arc/UHD)
+ *   - 모니터 주사율 (Hz)
  *   - 물리 픽셀 해상도 (렌더링 부하 추정)
  */
+
+// ── GPU 벤더 분류 ─────────────────────────────────────────────────
+enum class GpuVendor {
+    Unknown,
+    NvidiaRTX,      // RTX 20/30/40 시리즈 (Turing/Ampere/Ada) - 최고 성능
+    NvidiaGTX,      // GTX 900~1600 시리즈 (Maxwell~Turing) - 중상급
+    NvidiaLegacy,   // GTX 700 이하 - 구형
+    AmdRDNA2Plus,   // RX 6000/7000 시리즈 (RDNA2/3) - 최고 성능
+    AmdRDNA1,       // RX 5000 시리즈 (RDNA1) - 중상급
+    AmdGCN,         // RX 400~590 시리즈 (GCN) - 중급
+    IntelArc,       // Intel Arc A시리즈 - 중급
+    IntelIris,      // Intel Iris Xe / UHD 620~770 - 통합 GPU
+    IntelHD,        // Intel HD Graphics - 구형 통합 GPU
+};
+
+// ── GPU 성능 등급 ─────────────────────────────────────────────────
+enum class GpuTier {
+    Ultra,      // RTX 4080+, RX 7900 XT+ - 최고 성능
+    High,       // RTX 3070+, RX 6700 XT+ - 고성능
+    Medium,     // GTX 1070+, RX 580+ - 중급
+    Low,        // GTX 960~, RX 470~, Intel Arc - 저중급
+    Integrated, // Intel UHD/Iris, AMD APU - 통합 GPU
+};
+
 struct RenderEnvInfo {
     // 화면 정보
-    qreal   dpr;            // devicePixelRatio (1.0=일반, 1.5/2.0/2.5=HiDPI)
+    qreal   dpr;            // devicePixelRatio
     int     physW;          // 물리 픽셀 너비
     int     physH;          // 물리 픽셀 높이
     double  refreshRate;    // 모니터 주사율 (Hz)
     bool    isHiDPI;        // DPR >= 1.5
 
-    // 렌더링 부하 등급 (물리 픽셀 기준)
-    // Low:    1920×1080 이하 (FHD)
-    // Medium: 2560×1440 이하 (QHD)
-    // High:   3840×2160 이하 (4K)
-    // Ultra:  5120×2880 이상 (5K+)
+    // GPU 정보
+    GpuVendor gpuVendor;    // GPU 벤더 분류
+    GpuTier   gpuTier;      // GPU 성능 등급
+    QString   gpuRenderer;  // GL_RENDERER 문자열 (로그용)
+    QString   gpuVendorStr; // GL_VENDOR 문자열 (로그용)
+
+    // 물리 픽셀 부하 등급
     enum class PixelLoad { Low, Medium, High, Ultra };
     PixelLoad pixelLoad;
 
     // 자동 결정된 렌더링 설정
-    QString scaleAlgo;          // MPV scale 알고리즘
-    QString dscaleAlgo;         // MPV dscale 알고리즘
-    QString cscaleAlgo;         // MPV cscale 알고리즘
-    bool    debandEnabled;      // 디밴딩 활성화 여부
-    int     debandIterations;   // 디밴딩 반복 횟수
-    bool    sigUpscaling;       // sigmoid-upscaling
-    bool    linearUpscaling;    // linear-upscaling
-    bool    correctDownscaling; // correct-downscaling
-    bool    hdrComputePeak;     // hdr-compute-peak (HDR 동적 측정)
-    QString ditherMode;         // 디더링 모드 ("fruit" / "no")
-    QString videoSync;          // video-sync 초기값
-    QString framedrop;          // framedrop 설정
+    QString scaleAlgo;
+    QString dscaleAlgo;
+    QString cscaleAlgo;
+    bool    debandEnabled;
+    int     debandIterations;
+    bool    sigUpscaling;
+    bool    linearUpscaling;
+    bool    correctDownscaling;
+    bool    hdrComputePeak;
+    QString ditherMode;
+    QString videoSync;
+    QString framedrop;
 
     // 환경 설명 (로그용)
     QString description;
@@ -54,17 +83,15 @@ class RenderEnvironment {
 public:
     /**
      * 현재 실행 환경을 감지하고 최적 렌더링 설정을 반환한다.
-     * 이 함수는 QApplication 생성 후 호출해야 한다.
+     * QApplication 생성 후, OpenGL 컨텍스트 초기화 후 호출해야 한다.
+     * OpenGL 컨텍스트가 없으면 화면 정보만으로 결정한다.
      */
     static RenderEnvInfo detect() {
         RenderEnvInfo info;
 
         // ── 화면 정보 감지 ────────────────────────────────────────
         QScreen* screen = QApplication::primaryScreen();
-        if (!screen) {
-            // 화면 감지 실패 시 안전한 기본값
-            return safeDefault();
-        }
+        if (!screen) return safeDefault();
 
         info.dpr         = screen->devicePixelRatio();
         info.refreshRate = screen->refreshRate();
@@ -73,24 +100,36 @@ public:
         info.physH = static_cast<int>(logicalSize.height() * info.dpr);
         info.isHiDPI = (info.dpr >= 1.5);
 
-        // ── 물리 픽셀 부하 등급 결정 ─────────────────────────────
+        // ── 물리 픽셀 부하 등급 ───────────────────────────────────
         long long totalPixels = static_cast<long long>(info.physW) * info.physH;
-        if (totalPixels <= 1920LL * 1080) {
-            info.pixelLoad = RenderEnvInfo::PixelLoad::Low;
-        } else if (totalPixels <= 2560LL * 1440) {
-            info.pixelLoad = RenderEnvInfo::PixelLoad::Medium;
-        } else if (totalPixels <= 3840LL * 2160) {
-            info.pixelLoad = RenderEnvInfo::PixelLoad::High;
-        } else {
-            info.pixelLoad = RenderEnvInfo::PixelLoad::Ultra;
+        if      (totalPixels <= 1920LL * 1080) info.pixelLoad = RenderEnvInfo::PixelLoad::Low;
+        else if (totalPixels <= 2560LL * 1440) info.pixelLoad = RenderEnvInfo::PixelLoad::Medium;
+        else if (totalPixels <= 3840LL * 2160) info.pixelLoad = RenderEnvInfo::PixelLoad::High;
+        else                                   info.pixelLoad = RenderEnvInfo::PixelLoad::Ultra;
+
+        // ── GPU 벤더 감지 (OpenGL 컨텍스트 필요) ─────────────────
+        // initializeGL() 이후에 호출되면 GL_RENDERER/GL_VENDOR 읽기 가능
+        // 컨텍스트 없으면 Unknown으로 처리 (화면 해상도만으로 결정)
+        info.gpuVendor    = GpuVendor::Unknown;
+        info.gpuTier      = GpuTier::Medium;  // 안전한 기본값
+        info.gpuRenderer  = "Unknown";
+        info.gpuVendorStr = "Unknown";
+
+        QOpenGLContext* ctx = QOpenGLContext::currentContext();
+        if (ctx) {
+            QOpenGLFunctions* f = ctx->functions();
+            if (f) {
+                const char* renderer = reinterpret_cast<const char*>(
+                    f->glGetString(GL_RENDERER));
+                const char* vendor = reinterpret_cast<const char*>(
+                    f->glGetString(GL_VENDOR));
+                if (renderer) info.gpuRenderer  = QString::fromUtf8(renderer);
+                if (vendor)   info.gpuVendorStr = QString::fromUtf8(vendor);
+                classifyGpu(info);
+            }
         }
 
         // ── 환경별 최적 렌더링 설정 결정 ─────────────────────────
-        // 핵심 원칙:
-        //   1. 물리 픽셀이 많을수록 GPU 부하가 기하급수적으로 증가
-        //   2. 4K 이상에서는 고품질 필터가 오히려 끊김 유발
-        //   3. 모든 환경에서 화질보다 재생 안정성이 우선
-        //   4. 사용자가 원하면 설정창에서 수동 변경 가능
         applySettingsForEnvironment(info);
 
         // ── 로그 설명 생성 ────────────────────────────────────────
@@ -102,11 +141,13 @@ public:
         case RenderEnvInfo::PixelLoad::Ultra:  loadStr = "5K+"; break;
         }
         info.description = QString(
-            "화면: %1×%2 (DPR=%.1f, %3Hz, %4) | 렌더: scale=%5, deband=%6×%7")
+            "화면: %1×%2 (DPR=%3, %4Hz, %5) | GPU: %6 [%7] | 렌더: scale=%8, deband=%9×%10")
             .arg(info.physW).arg(info.physH)
             .arg(info.dpr, 0, 'f', 1)
             .arg(static_cast<int>(info.refreshRate))
             .arg(loadStr)
+            .arg(info.gpuRenderer)
+            .arg(gpuTierName(info.gpuTier))
             .arg(info.scaleAlgo)
             .arg(info.debandEnabled ? "ON" : "OFF")
             .arg(info.debandIterations);
@@ -115,57 +156,403 @@ public:
         return info;
     }
 
+    /**
+     * 영상 해상도와 화면 해상도를 비교하여 업스케일 알고리즘을 최적화한다.
+     * FILE_LOADED 이벤트에서 video-params/w, video-params/h 확인 후 호출.
+     *
+     * 핵심 원칙:
+     *   - 영상 해상도 >= 화면 해상도: 다운스케일만 필요 → scale 부하 최소화
+     *   - 영상 해상도 << 화면 해상도: 업스케일 효과 큼 → 고품질 알고리즘 적용
+     */
+    static void optimizeScaleForContent(mpv_handle* mpv,
+                                        int videoW, int videoH,
+                                        const RenderEnvInfo& env)
+    {
+        if (!mpv || videoW <= 0 || videoH <= 0) return;
+
+        double scaleRatioW = static_cast<double>(env.physW) / videoW;
+        double scaleRatioH = static_cast<double>(env.physH) / videoH;
+        double scaleRatio  = qMax(scaleRatioW, scaleRatioH);
+
+        // ── 업스케일 비율에 따른 알고리즘 선택 ───────────────────
+        // 비율 < 1.0: 다운스케일 (4K 영상을 FHD 화면에서 재생 등)
+        //   → scale 알고리즘 불필요, dscale만 최적화
+        // 비율 1.0~1.5: 소폭 업스케일 (1080p → 1440p 등)
+        //   → 중간 품질 알고리즘으로 충분
+        // 비율 > 1.5: 대폭 업스케일 (480p → 4K 등)
+        //   → 고품질 알고리즘 효과 극대화
+
+        QString optimalScale;
+        if (scaleRatio <= 1.0) {
+            // 다운스케일: scale 알고리즘이 거의 영향 없음 → 부하 최소화
+            optimalScale = "bilinear";
+            qInfo() << "[RenderEnv] 다운스케일 감지 (ratio=" << scaleRatio
+                    << ") → scale=bilinear (부하 최소화)";
+        } else if (scaleRatio <= 1.5) {
+            // 소폭 업스케일: spline36으로 충분
+            optimalScale = "spline36";
+            qInfo() << "[RenderEnv] 소폭 업스케일 (ratio=" << scaleRatio
+                    << ") → scale=spline36";
+        } else if (scaleRatio <= 3.0) {
+            // 중간 업스케일: GPU 등급에 따라 선택
+            if (env.gpuTier <= GpuTier::Medium) {
+                optimalScale = "ewa_lanczossharp";
+                qInfo() << "[RenderEnv] 중간 업스케일 (ratio=" << scaleRatio
+                        << ") → scale=ewa_lanczossharp (고성능 GPU)";
+            } else {
+                optimalScale = "spline36";
+                qInfo() << "[RenderEnv] 중간 업스케일 (ratio=" << scaleRatio
+                        << ") → scale=spline36 (중급 GPU)";
+            }
+        } else {
+            // 대폭 업스케일 (4배 이상): 고품질 알고리즘 효과 극대화
+            // GPU 등급 무관하게 최고 품질 적용 (업스케일 효과가 매우 큼)
+            optimalScale = "ewa_lanczossharp";
+            qInfo() << "[RenderEnv] 대폭 업스케일 (ratio=" << scaleRatio
+                    << ") → scale=ewa_lanczossharp (효과 극대화)";
+        }
+
+        mpv_set_property_string(mpv, "scale", optimalScale.toUtf8().constData());
+    }
+
+    /**
+     * 모니터 주사율과 영상 FPS의 관계를 분석하여 최적 video-sync를 선택한다.
+     * 단순 60fps 기준이 아닌, 배수 관계를 고려한 정밀 동기화.
+     *
+     * 핵심 원칙:
+     *   - 정수 배수 관계: display-resample이 완벽하게 동작
+     *   - 비정수 배수 (예: 60Hz에서 24fps = 2.5배): 저더 발생 가능
+     *   - 120Hz에서 24fps = 5배: 완벽한 3:2 풀다운 → display-resample 최적
+     */
+    static QString selectVideoSync(double fps, double refreshRate) {
+        if (fps <= 0 || refreshRate <= 0) return "audio";
+
+        // 배수 관계 계산
+        double ratio = refreshRate / fps;
+
+        // 정수 배수 여부 확인 (오차 허용: ±0.05)
+        double nearestInt = qRound(ratio);
+        bool isIntegerMultiple = (qAbs(ratio - nearestInt) < 0.05) && (nearestInt >= 1.0);
+
+        // 고프레임 영상 (60fps 초과): audio 모드가 안정적
+        if (fps > 60.0) {
+            qInfo() << "[RenderEnv] video-sync=audio (고프레임 fps=" << fps << ")";
+            return "audio";
+        }
+
+        if (isIntegerMultiple) {
+            // 정수 배수: display-resample 완벽 동작
+            qInfo() << "[RenderEnv] video-sync=display-resample"
+                    << "(fps=" << fps << ", refresh=" << refreshRate
+                    << ", ratio=" << ratio << " ≈ " << nearestInt << "배)";
+            return "display-resample";
+        } else {
+            // 비정수 배수: display-resample에서 저더 발생 가능
+            // 예: 60Hz에서 24fps (ratio=2.5) → 3:2 풀다운 패턴 불완전
+            // 120Hz 이상이면 비정수여도 display-resample이 더 좋음
+            if (refreshRate >= 120.0) {
+                qInfo() << "[RenderEnv] video-sync=display-resample"
+                        << "(fps=" << fps << ", refresh=" << refreshRate
+                        << ", ratio=" << ratio << " 비정수이나 120Hz+)";
+                return "display-resample";
+            } else {
+                qInfo() << "[RenderEnv] video-sync=audio"
+                        << "(fps=" << fps << ", refresh=" << refreshRate
+                        << ", ratio=" << ratio << " 비정수 60Hz → audio 안전)";
+                return "audio";
+            }
+        }
+    }
+
+    /**
+     * 코덱에 따른 최적 하드웨어 디코딩 방식을 반환한다.
+     * GPU 벤더와 코덱 조합으로 가장 안정적인 hwdec를 선택.
+     */
+    static QString selectHwdec(const QString& codec, GpuVendor vendor, GpuTier tier) {
+        // ── 코덱별 hwdec 선택 기준 ────────────────────────────────
+        // H.264: 모든 GPU에서 안정적 → d3d11va
+        // H.265/HEVC: GTX 900+ 지원 → d3d11va (구형은 소프트웨어)
+        // AV1: RTX 30+ / RX 6000+ 지원 → d3d11va (구형은 소프트웨어)
+        // VP9: 대부분 지원 → d3d11va
+        // MPEG-2: 레거시 → dxva2 (호환성 높음)
+        // VC-1: 레거시 → dxva2
+
+        QString codecLower = codec.toLower();
+
+        // AV1: 구형 GPU에서 소프트웨어 디코딩이 더 안정적
+        if (codecLower.contains("av1") || codecLower.contains("av01")) {
+            if (vendor == GpuVendor::NvidiaRTX ||
+                vendor == GpuVendor::AmdRDNA2Plus) {
+                return "d3d11va";  // RTX 30+, RX 6000+: AV1 하드웨어 지원
+            } else {
+                return "no";  // 구형 GPU: AV1 소프트웨어 디코딩
+            }
+        }
+
+        // H.265/HEVC: GTX 900 이상에서 지원
+        if (codecLower.contains("hevc") || codecLower.contains("h265") ||
+            codecLower.contains("h.265")) {
+            if (tier == GpuTier::Integrated && vendor == GpuVendor::IntelHD) {
+                return "no";  // 구형 Intel HD: HEVC 소프트웨어
+            }
+            return "d3d11va";
+        }
+
+        // MPEG-2, VC-1: 레거시 코덱 → dxva2 호환성 우선
+        if (codecLower.contains("mpeg2") || codecLower.contains("mpeg-2") ||
+            codecLower.contains("vc1")   || codecLower.contains("vc-1")   ||
+            codecLower.contains("wmv3")) {
+            return "dxva2";
+        }
+
+        // H.264, VP9, VP8: 모든 GPU에서 안정적
+        if (codecLower.contains("h264") || codecLower.contains("h.264") ||
+            codecLower.contains("avc")  || codecLower.contains("vp9")   ||
+            codecLower.contains("vp8")) {
+            return "d3d11va";
+        }
+
+        // 기타 코덱: auto-safe (실패 시 소프트웨어 폴백)
+        return "auto-safe";
+    }
+
+    // GPU 등급 이름 반환 (로그용)
+    static QString gpuTierName(GpuTier tier) {
+        switch (tier) {
+        case GpuTier::Ultra:      return "Ultra (RTX 4080+)";
+        case GpuTier::High:       return "High (RTX 3070+)";
+        case GpuTier::Medium:     return "Medium (GTX 1070+)";
+        case GpuTier::Low:        return "Low (GTX 960+)";
+        case GpuTier::Integrated: return "Integrated GPU";
+        }
+        return "Unknown";
+    }
+
 private:
+    // ── GPU 벤더 및 등급 분류 ─────────────────────────────────────
+    static void classifyGpu(RenderEnvInfo& info) {
+        QString renderer = info.gpuRenderer.toLower();
+        QString vendor   = info.gpuVendorStr.toLower();
+
+        if (vendor.contains("nvidia") || renderer.contains("nvidia") ||
+            renderer.contains("geforce") || renderer.contains("quadro")) {
+            classifyNvidia(info, renderer);
+        } else if (vendor.contains("ati") || vendor.contains("amd") ||
+                   renderer.contains("radeon") || renderer.contains("amd")) {
+            classifyAmd(info, renderer);
+        } else if (vendor.contains("intel") || renderer.contains("intel")) {
+            classifyIntel(info, renderer);
+        } else {
+            info.gpuVendor = GpuVendor::Unknown;
+            info.gpuTier   = GpuTier::Medium;  // 안전한 기본값
+        }
+    }
+
+    static void classifyNvidia(RenderEnvInfo& info, const QString& renderer) {
+        // RTX 시리즈 감지 (20/30/40 시리즈)
+        if (renderer.contains("rtx")) {
+            info.gpuVendor = GpuVendor::NvidiaRTX;
+            // RTX 4080+: Ultra, RTX 3070+: High, RTX 2060+: Medium
+            if (renderer.contains("rtx 40") || renderer.contains("rtx 50")) {
+                info.gpuTier = GpuTier::Ultra;
+            } else if (renderer.contains("rtx 30") ||
+                       (renderer.contains("rtx 20") && !renderer.contains("rtx 2060"))) {
+                info.gpuTier = GpuTier::High;
+            } else {
+                info.gpuTier = GpuTier::Medium;
+            }
+        }
+        // GTX 시리즈
+        else if (renderer.contains("gtx")) {
+            info.gpuVendor = GpuVendor::NvidiaGTX;
+            // GTX 1080 Ti / 1080 / 1070: Medium
+            if (renderer.contains("gtx 1080") || renderer.contains("gtx 1070") ||
+                renderer.contains("gtx 1660") || renderer.contains("gtx 1650")) {
+                info.gpuTier = GpuTier::Medium;
+            }
+            // GTX 1060 / 970 / 980: Low-Medium
+            else if (renderer.contains("gtx 1060") || renderer.contains("gtx 970") ||
+                     renderer.contains("gtx 980")  || renderer.contains("gtx 960")) {
+                info.gpuTier = GpuTier::Low;
+            }
+            // GTX 900 이하: Legacy
+            else {
+                info.gpuVendor = GpuVendor::NvidiaLegacy;
+                info.gpuTier   = GpuTier::Low;
+            }
+        }
+        // Tesla / Titan / 기타 NVIDIA
+        else {
+            info.gpuVendor = GpuVendor::NvidiaGTX;
+            info.gpuTier   = GpuTier::Medium;
+        }
+    }
+
+    static void classifyAmd(RenderEnvInfo& info, const QString& renderer) {
+        // RX 7000 시리즈 (RDNA3)
+        if (renderer.contains("rx 7")) {
+            info.gpuVendor = GpuVendor::AmdRDNA2Plus;
+            info.gpuTier   = renderer.contains("rx 7900") ? GpuTier::Ultra : GpuTier::High;
+        }
+        // RX 6000 시리즈 (RDNA2)
+        else if (renderer.contains("rx 6")) {
+            info.gpuVendor = GpuVendor::AmdRDNA2Plus;
+            info.gpuTier   = (renderer.contains("rx 6700") ||
+                              renderer.contains("rx 6800") ||
+                              renderer.contains("rx 6900")) ? GpuTier::High : GpuTier::Medium;
+        }
+        // RX 5000 시리즈 (RDNA1)
+        else if (renderer.contains("rx 5")) {
+            info.gpuVendor = GpuVendor::AmdRDNA1;
+            info.gpuTier   = GpuTier::Medium;
+        }
+        // RX 400/500/590 시리즈 (GCN)
+        else if (renderer.contains("rx 4") || renderer.contains("rx 5") ||
+                 renderer.contains("rx 580") || renderer.contains("rx 570")) {
+            info.gpuVendor = GpuVendor::AmdGCN;
+            info.gpuTier   = GpuTier::Low;
+        }
+        // 기타 AMD
+        else {
+            info.gpuVendor = GpuVendor::AmdGCN;
+            info.gpuTier   = GpuTier::Low;
+        }
+    }
+
+    static void classifyIntel(RenderEnvInfo& info, const QString& renderer) {
+        // Intel Arc (독립 GPU)
+        if (renderer.contains("arc")) {
+            info.gpuVendor = GpuVendor::IntelArc;
+            info.gpuTier   = GpuTier::Low;
+        }
+        // Intel Iris Xe / UHD 750+ (Tiger Lake+)
+        else if (renderer.contains("iris xe") || renderer.contains("iris(r) xe") ||
+                 renderer.contains("uhd 770")  || renderer.contains("uhd 750")) {
+            info.gpuVendor = GpuVendor::IntelIris;
+            info.gpuTier   = GpuTier::Integrated;
+        }
+        // Intel UHD 600~730 / Iris Plus
+        else if (renderer.contains("uhd") || renderer.contains("iris plus") ||
+                 renderer.contains("iris(r) plus")) {
+            info.gpuVendor = GpuVendor::IntelIris;
+            info.gpuTier   = GpuTier::Integrated;
+        }
+        // Intel HD Graphics (구형)
+        else {
+            info.gpuVendor = GpuVendor::IntelHD;
+            info.gpuTier   = GpuTier::Integrated;
+        }
+    }
+
+    // ── 환경별 최적 렌더링 설정 결정 ─────────────────────────────
     static void applySettingsForEnvironment(RenderEnvInfo& info) {
         // ── 공통 기본값 ───────────────────────────────────────────
-        info.dscaleAlgo         = "mitchell";   // 다운스케일: 링잉 없이 부드럽게
-        info.sigUpscaling       = true;
-        info.ditherMode         = "fruit";
-        info.framedrop          = "vo";         // 모든 환경에서 vo 드롭 허용
-        info.videoSync          = "audio";      // 초기값 audio (파일 로드 후 자동 전환)
+        info.dscaleAlgo   = "mitchell";
+        info.sigUpscaling = true;
+        info.ditherMode   = "fruit";
+        info.framedrop    = "vo";
+        info.videoSync    = "audio";
 
+        // ── GPU 등급 + 화면 해상도 조합으로 최적 설정 결정 ───────
+        // 통합 GPU는 해상도에 관계없이 Eco 설정 강제
+        if (info.gpuTier == GpuTier::Integrated) {
+            applyIntegratedGpuSettings(info);
+            return;
+        }
+
+        // 독립 GPU: 화면 해상도 × GPU 등급 조합
         switch (info.pixelLoad) {
         case RenderEnvInfo::PixelLoad::Low:
-            // FHD (1920×1080 이하): 모든 설정 최대 품질
-            // GPU 부하가 낮으므로 최고 품질 필터 사용
-            info.scaleAlgo          = "ewa_lanczossharp";
-            info.cscaleAlgo         = "sinc";
-            info.debandEnabled      = true;
-            info.debandIterations   = 2;
-            info.linearUpscaling    = true;
-            info.correctDownscaling = true;
-            info.hdrComputePeak     = true;
+            // FHD: GPU 등급에 따라 최대 품질
+            if (info.gpuTier <= GpuTier::High) {
+                // Ultra/High GPU + FHD: 최고 품질
+                info.scaleAlgo          = "ewa_lanczossharp";
+                info.cscaleAlgo         = "sinc";
+                info.debandEnabled      = true;
+                info.debandIterations   = 2;
+                info.linearUpscaling    = true;
+                info.correctDownscaling = true;
+                info.hdrComputePeak     = true;
+            } else if (info.gpuTier == GpuTier::Medium) {
+                // Medium GPU + FHD: 고품질
+                info.scaleAlgo          = "ewa_lanczossharp";
+                info.cscaleAlgo         = "sinc";
+                info.debandEnabled      = true;
+                info.debandIterations   = 1;
+                info.linearUpscaling    = true;
+                info.correctDownscaling = true;
+                info.hdrComputePeak     = true;
+            } else {
+                // Low GPU + FHD: 균형
+                info.scaleAlgo          = "spline36";
+                info.cscaleAlgo         = "spline36";
+                info.debandEnabled      = true;
+                info.debandIterations   = 1;
+                info.linearUpscaling    = false;
+                info.correctDownscaling = true;
+                info.hdrComputePeak     = false;
+            }
             break;
 
         case RenderEnvInfo::PixelLoad::Medium:
-            // QHD (2560×1440): 고품질 유지, deband 1회
-            info.scaleAlgo          = "ewa_lanczossharp";
-            info.cscaleAlgo         = "sinc";
-            info.debandEnabled      = true;
-            info.debandIterations   = 1;
-            info.linearUpscaling    = true;
-            info.correctDownscaling = true;
-            info.hdrComputePeak     = true;
+            // QHD: GPU 등급에 따라 조정
+            if (info.gpuTier <= GpuTier::High) {
+                info.scaleAlgo          = "ewa_lanczossharp";
+                info.cscaleAlgo         = "sinc";
+                info.debandEnabled      = true;
+                info.debandIterations   = 1;
+                info.linearUpscaling    = true;
+                info.correctDownscaling = true;
+                info.hdrComputePeak     = true;
+            } else {
+                // Medium/Low GPU + QHD: 균형
+                info.scaleAlgo          = "spline36";
+                info.cscaleAlgo         = "spline36";
+                info.debandEnabled      = true;
+                info.debandIterations   = 1;
+                info.linearUpscaling    = false;
+                info.correctDownscaling = true;
+                info.hdrComputePeak     = false;
+            }
             break;
 
         case RenderEnvInfo::PixelLoad::High:
-            // 4K (3840×2160): 균형 설정
-            // ewa_lanczossharp는 4K에서 GPU 부하가 매우 높음
-            // spline36으로 변경: 화질 차이 미미, 부하 대폭 감소
-            info.scaleAlgo          = "spline36";
-            info.cscaleAlgo         = "spline36";
-            info.debandEnabled      = true;
-            info.debandIterations   = 1;
-            info.linearUpscaling    = false;    // 4K에서 linear는 불필요한 부하
-            info.correctDownscaling = true;
-            info.hdrComputePeak     = false;    // 4K에서 동적 측정은 부하 큼
+            // 4K: Ultra/High GPU만 고품질 허용
+            if (info.gpuTier == GpuTier::Ultra) {
+                // RTX 4080+: 4K에서도 고품질 가능
+                info.scaleAlgo          = "ewa_lanczossharp";
+                info.cscaleAlgo         = "sinc";
+                info.debandEnabled      = true;
+                info.debandIterations   = 1;
+                info.linearUpscaling    = false;
+                info.correctDownscaling = true;
+                info.hdrComputePeak     = true;
+            } else if (info.gpuTier == GpuTier::High) {
+                // RTX 3070+: 4K 균형
+                info.scaleAlgo          = "spline36";
+                info.cscaleAlgo         = "spline36";
+                info.debandEnabled      = true;
+                info.debandIterations   = 1;
+                info.linearUpscaling    = false;
+                info.correctDownscaling = true;
+                info.hdrComputePeak     = false;
+            } else {
+                // Medium/Low GPU + 4K: 안정성 우선 (GTX 1070 등)
+                info.scaleAlgo          = "spline36";
+                info.cscaleAlgo         = "spline36";
+                info.debandEnabled      = true;
+                info.debandIterations   = 1;
+                info.linearUpscaling    = false;
+                info.correctDownscaling = false;
+                info.hdrComputePeak     = false;
+            }
             break;
 
         case RenderEnvInfo::PixelLoad::Ultra:
-            // 5K+ (5120×2880 이상): 안정성 최우선
+            // 5K+: 안정성 최우선 (GPU 등급 무관)
             info.scaleAlgo          = "lanczos";
             info.cscaleAlgo         = "lanczos";
-            info.debandEnabled      = false;    // 5K+에서 deband 비활성화
+            info.debandEnabled      = false;
             info.debandIterations   = 0;
             info.linearUpscaling    = false;
             info.correctDownscaling = false;
@@ -176,28 +563,47 @@ private:
         }
     }
 
+    static void applyIntegratedGpuSettings(RenderEnvInfo& info) {
+        // 통합 GPU: 해상도에 관계없이 최소 부하 설정
+        // Intel UHD/Iris, AMD APU 등
+        info.scaleAlgo          = "bilinear";   // 최소 부하
+        info.cscaleAlgo         = "bilinear";
+        info.dscaleAlgo         = "bilinear";
+        info.debandEnabled      = false;        // 통합 GPU에서 deband 비활성화
+        info.debandIterations   = 0;
+        info.sigUpscaling       = false;
+        info.linearUpscaling    = false;
+        info.correctDownscaling = false;
+        info.hdrComputePeak     = false;
+        info.ditherMode         = "no";
+        qInfo() << "[RenderEnv] 통합 GPU 감지 → 최소 부하 설정 적용";
+    }
+
     static RenderEnvInfo safeDefault() {
-        // 화면 감지 실패 시 가장 안전한 설정
         RenderEnvInfo info;
-        info.dpr             = 1.0;
-        info.physW           = 1920;
-        info.physH           = 1080;
-        info.refreshRate     = 60.0;
-        info.isHiDPI         = false;
-        info.pixelLoad       = RenderEnvInfo::PixelLoad::Low;
-        info.scaleAlgo       = "spline36";
-        info.dscaleAlgo      = "mitchell";
-        info.cscaleAlgo      = "spline36";
-        info.debandEnabled   = true;
+        info.dpr              = 1.0;
+        info.physW            = 1920;
+        info.physH            = 1080;
+        info.refreshRate      = 60.0;
+        info.isHiDPI          = false;
+        info.gpuVendor        = GpuVendor::Unknown;
+        info.gpuTier          = GpuTier::Medium;
+        info.gpuRenderer      = "Unknown";
+        info.gpuVendorStr     = "Unknown";
+        info.pixelLoad        = RenderEnvInfo::PixelLoad::Low;
+        info.scaleAlgo        = "spline36";
+        info.dscaleAlgo       = "mitchell";
+        info.cscaleAlgo       = "spline36";
+        info.debandEnabled    = true;
         info.debandIterations = 1;
-        info.sigUpscaling    = true;
-        info.linearUpscaling = true;
+        info.sigUpscaling     = true;
+        info.linearUpscaling  = false;
         info.correctDownscaling = true;
-        info.hdrComputePeak  = false;
-        info.ditherMode      = "fruit";
-        info.videoSync       = "audio";
-        info.framedrop       = "vo";
-        info.description     = "기본값 (화면 감지 실패)";
+        info.hdrComputePeak   = false;
+        info.ditherMode       = "fruit";
+        info.videoSync        = "audio";
+        info.framedrop        = "vo";
+        info.description      = "기본값 (화면 감지 실패)";
         return info;
     }
 };

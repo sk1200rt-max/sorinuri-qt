@@ -349,6 +349,14 @@ void MpvCore::handleEvent(mpv_event* event) {
         qInfo() << "[MPV] PLAYBACK_RESTART - 재생 시작";
         appLog("EVENT PLAYBACK_RESTART");
         emit playbackStarted();
+        // 재생 시작 시 프레임 드롭 모니터링 타이머 시작
+        if (frameDropTimer_) {
+            prevFrameDropCount_ = 0;
+            dropEventCount_     = 0;
+            normalEventCount_   = 0;
+            qualityDegraded_    = false;
+            frameDropTimer_->start();
+        }
         break;
 
     case MPV_EVENT_END_FILE: {
@@ -502,8 +510,17 @@ void MpvCore::handlePropertyChange(mpv_event_property* prop) {
         mpv_free(vcodec);
         if (w > 0 && h > 0) {
             emit videoInfoChanged(static_cast<int>(w), static_cast<int>(h), fps, vcodecStr);
-            // FPS 기반 video-sync 자동 전환 (저더 제거)
+
+            // FPS + 모니터 주사율 기반 정밀 video-sync 자동 전환
             if (fps > 0) applyVideoSyncByFps(fps);
+
+            // 영상 해상도 기반 업스케일 알고리즘 최적화
+            // (4K 영상을 FHD 화면에서 재생 시 불필요한 업스케일 제거 등)
+            optimizeScaleForContent(static_cast<int>(w), static_cast<int>(h));
+
+            // 코덱별 최적 hwdec 자동 선택
+            // (AV1: 구형 GPU에서 소프트웨어, MPEG-2: dxva2 등)
+            if (!vcodecStr.isEmpty()) applyOptimalHwdec(vcodecStr);
         }
     }
 }
@@ -954,31 +971,35 @@ void MpvCore::applyVideoSyncByFps(double fps) {
     if (!initialized_) return;
     if (fps <= 0) return;
 
+    currentFps_ = fps;
+
     // 모션 스무딩 활성화 여부 확인
     char* interpVal = mpv_get_property_string(mpv_, "interpolation");
     bool motionSmoothingOn = interpVal && QString::fromUtf8(interpVal) == "yes";
     mpv_free(interpVal);
 
     if (motionSmoothingOn) {
-        // 모션 스무딩 활성화 시: display-resample 유지 (setMotionSmoothing에서 설정)
         qInfo() << "[MPV] video-sync: 모션 스무딩 활성화 → display-resample 유지";
         return;
     }
 
-    // 60fps 이하 영상: display-resample (저더 제거)
-    // 60fps 초과 영상: audio (게임 영상 등 고프레임 → audio 모드가 더 안정적)
-    if (fps <= 60.0) {
-        mpv_set_property_string(mpv_, "video-sync",   "display-resample");
-        mpv_set_property_string(mpv_, "interpolation", "no");  // 보간 없이 동기화만
-        // display-resample 최대 드롭 허용: 5% 이내 (끊김 대신 미세 조정)
+    // ── 모니터 주사율 × 영상 FPS 정밀 동기화 ────────────────────
+    // 단순 60fps 기준이 아닌, 배수 관계를 고려한 정밀 선택
+    // RenderEnvironment::selectVideoSync()가 배수 관계 분석:
+    //   - 정수 배수 (60Hz/24fps=2.5 → 비정수): audio 모드 (저더 방지)
+    //   - 정수 배수 (120Hz/24fps=5배): display-resample (완벽한 3:2 풀다운)
+    //   - 120Hz 이상: 비정수여도 display-resample (충분한 주사율)
+    double refreshRate = renderEnv_.refreshRate > 0 ? renderEnv_.refreshRate : 60.0;
+    QString optimalSync = RenderEnvironment::selectVideoSync(fps, refreshRate);
+
+    mpv_set_property_string(mpv_, "video-sync", optimalSync.toUtf8().constData());
+
+    if (optimalSync == "display-resample") {
+        mpv_set_property_string(mpv_, "interpolation", "no");
+        // display-resample 최대 드롭 허용: 5% 이내
         mpv_set_property_string(mpv_, "video-sync-max-video-change", "5");
-        qInfo() << "[MPV] video-sync: display-resample (fps=" << fps << ")";
-    } else {
-        mpv_set_property_string(mpv_, "video-sync", "audio");
-        qInfo() << "[MPV] video-sync: audio (고프레임 fps=" << fps << ")";
     }
 }
-
 // ── gpu-next 안전 전환 ─────────────────────────────────────────────
 // gpu-next(Vulkan/D3D12 기반 차세대 렌더러) 전환 시도
 // 실패 또는 호환성 문제 발생 시 자동으로 gpu(OpenGL)로 폴백
@@ -1033,4 +1054,183 @@ void MpvCore::tryGpuNext() {
         qInfo() << "[MPV] gpu-next: 기존 셰이더 유지 (호환성 문제 시 자동 해제됨)";
     }
     mpv_free(shaders);
+}
+
+// ── GPU 벤더 재감지 및 설정 재적용 ───────────────────────────────
+// MpvWidget::initializeGL() 이후 호출 (OpenGL 컨텍스트 준비 완료 후)
+// 초기 initialize()에서는 OpenGL 컨텍스트가 없어 GPU 벤더 감지 불가.
+// 이 함수에서 GL_RENDERER/GL_VENDOR를 읽어 GPU 벤더 기반 설정 재적용.
+void MpvCore::redetectGpuAndApply() {
+    if (!initialized_) return;
+
+    RenderEnvInfo env = RenderEnvironment::detect();
+    renderEnv_ = env;
+
+    // GPU 벤더 감지 결과에 따라 설정 재적용
+    // (초기 initialize()에서는 Unknown이었던 GPU 벤더가 이제 확정됨)
+    qInfo() << "[MPV] GPU 재감지 완료:" << env.gpuRenderer
+            << "→" << RenderEnvironment::gpuTierName(env.gpuTier);
+
+    // 통합 GPU 감지 시 scale 알고리즘 재적용
+    mpv_set_property_string(mpv_, "scale",  env.scaleAlgo.toUtf8().constData());
+    mpv_set_property_string(mpv_, "dscale", env.dscaleAlgo.toUtf8().constData());
+    mpv_set_property_string(mpv_, "cscale", env.cscaleAlgo.toUtf8().constData());
+    mpv_set_property_string(mpv_, "sigmoid-upscaling",
+        env.sigUpscaling ? "yes" : "no");
+    mpv_set_property_string(mpv_, "deband",
+        env.debandEnabled ? "yes" : "no");
+    mpv_set_property_string(mpv_, "hdr-compute-peak",
+        env.hdrComputePeak ? "yes" : "no");
+    mpv_set_property_string(mpv_, "linear-upscaling",
+        env.linearUpscaling ? "yes" : "no");
+    mpv_set_property_string(mpv_, "correct-downscaling",
+        env.correctDownscaling ? "yes" : "no");
+
+    // 실시간 프레임 드롭 모니터링 시작
+    if (!frameDropTimer_) {
+        frameDropTimer_ = new QTimer(this);
+        frameDropTimer_->setInterval(3000);  // 3초 주기
+        connect(frameDropTimer_, &QTimer::timeout,
+                this, &MpvCore::onFrameDropCheck);
+    }
+    // 재생 시작 시 타이머 활성화 (현재 재생 중이면 즉시 시작)
+    char* pauseVal = mpv_get_property_string(mpv_, "pause");
+    bool isPaused = pauseVal && QString::fromUtf8(pauseVal) == "yes";
+    mpv_free(pauseVal);
+    if (!isPaused) frameDropTimer_->start();
+
+    // 원래 scale 알고리즘 저장 (품질 강등 복원용)
+    originalScale_   = env.scaleAlgo;
+    debandOriginal_  = env.debandEnabled;
+}
+
+// ── 영상 해상도 기반 업스케일 알고리즘 최적화 ────────────────────
+// FILE_LOADED 이벤트에서 호출 (video-params/w, video-params/h 확인 후)
+//
+// 핵심 원칙:
+//   - 영상 >= 화면: 다운스케일만 필요 → scale=bilinear (부하 최소화)
+//   - 영상 << 화면: 업스케일 효과 큼 → 고품질 알고리즘 적용
+void MpvCore::optimizeScaleForContent(int videoW, int videoH) {
+    if (!initialized_ || videoW <= 0 || videoH <= 0) return;
+
+    currentVideoW_ = videoW;
+    currentVideoH_ = videoH;
+
+    RenderEnvironment::optimizeScaleForContent(mpv_, videoW, videoH, renderEnv_);
+
+    // 최적화된 scale 알고리즘을 원래 알고리즘으로 업데이트 (강등 복원 기준)
+    char* currentScale = mpv_get_property_string(mpv_, "scale");
+    if (currentScale) {
+        originalScale_ = QString::fromUtf8(currentScale);
+        mpv_free(currentScale);
+    }
+}
+
+// ── 코덱 기반 최적 hwdec 자동 선택 및 적용 ──────────────────────
+// FILE_LOADED 이벤트에서 호출 (video-codec 확인 후)
+//
+// 사용자가 설정창에서 hwdec를 수동 설정한 경우 덮어쓰지 않음.
+// auto-safe 또는 기본값인 경우에만 코덱별 최적값 자동 적용.
+void MpvCore::applyOptimalHwdec(const QString& codec) {
+    if (!initialized_ || codec.isEmpty()) return;
+
+    currentCodec_ = codec;
+
+    // 사용자가 수동으로 hwdec를 설정한 경우 덮어쓰지 않음
+    // (설정창에서 "소프트웨어" 또는 특정 방식을 선택한 경우)
+    char* currentHwdec = mpv_get_property_string(mpv_, "hwdec");
+    QString hwdecStr = currentHwdec ? QString::fromUtf8(currentHwdec) : "auto-safe";
+    mpv_free(currentHwdec);
+
+    // 코덱별 최적 hwdec 선택
+    QString optimalHwdec = RenderEnvironment::selectHwdec(
+        codec, renderEnv_.gpuVendor, renderEnv_.gpuTier);
+
+    if (optimalHwdec != hwdecStr) {
+        mpv_set_property_string(mpv_, "hwdec", optimalHwdec.toUtf8().constData());
+        qInfo() << "[MPV] 코덱별 hwdec 최적화:" << codec
+                << "→ hwdec=" << optimalHwdec;
+    }
+}
+
+// ── 실시간 프레임 드롭 모니터링 및 자동 품질 강등/복원 ───────────
+// 3초 주기로 frame-drop-count를 확인하여 끊김 감지 시 품질 자동 강등.
+// 정상 복귀 후 30초(10회 정상) 유지 시 원래 품질로 복원.
+void MpvCore::onFrameDropCheck() {
+    if (!initialized_) return;
+
+    // 현재 frame-drop-count 읽기
+    int64_t dropCount = 0;
+    mpv_get_property(mpv_, "frame-drop-count", MPV_FORMAT_INT64, &dropCount);
+
+    int newDrops = static_cast<int>(dropCount) - prevFrameDropCount_;
+    prevFrameDropCount_ = static_cast<int>(dropCount);
+
+    // 일시 정지 중이면 카운터 리셋
+    char* pauseVal = mpv_get_property_string(mpv_, "pause");
+    bool isPaused = pauseVal && QString::fromUtf8(pauseVal) == "yes";
+    mpv_free(pauseVal);
+    if (isPaused) return;
+
+    if (newDrops >= 3) {
+        // 3초간 3프레임 이상 드롭: 끊김 감지
+        dropEventCount_++;
+        normalEventCount_ = 0;
+        qWarning() << "[MPV] 프레임 드롭 감지:" << newDrops
+                   << "프레임/3초 (연속" << dropEventCount_ << "회)";
+
+        if (!qualityDegraded_ && dropEventCount_ >= 2) {
+            // 연속 2회 (6초간) 드롭 → 품질 강등
+            qualityDegraded_ = true;
+
+            // 1단계: deband 비활성화 (가장 효과적인 부하 감소)
+            mpv_set_property_string(mpv_, "deband", "no");
+            qInfo() << "[MPV] 자동 품질 강등: deband 비활성화";
+            emit renderQualityDegraded("프레임 드롭 감지 → deband 비활성화");
+
+        } else if (qualityDegraded_ && dropEventCount_ >= 4) {
+            // 연속 4회 (12초간) 드롭 → 추가 강등: scale 알고리즘 단순화
+            QString currentScale;
+            char* cs = mpv_get_property_string(mpv_, "scale");
+            if (cs) { currentScale = QString::fromUtf8(cs); mpv_free(cs); }
+
+            if (currentScale == "ewa_lanczossharp") {
+                mpv_set_property_string(mpv_, "scale",  "spline36");
+                mpv_set_property_string(mpv_, "cscale", "spline36");
+                qInfo() << "[MPV] 자동 품질 강등: ewa_lanczossharp → spline36";
+                emit renderQualityDegraded("심각한 드롭 → scale=spline36");
+            } else if (currentScale == "spline36") {
+                mpv_set_property_string(mpv_, "scale",  "bilinear");
+                mpv_set_property_string(mpv_, "cscale", "bilinear");
+                qInfo() << "[MPV] 자동 품질 강등: spline36 → bilinear";
+                emit renderQualityDegraded("심각한 드롭 → scale=bilinear");
+            }
+        }
+    } else {
+        // 정상 프레임 타임
+        if (qualityDegraded_) {
+            normalEventCount_++;
+            dropEventCount_ = 0;
+
+            if (normalEventCount_ >= 10) {
+                // 30초간 정상 → 원래 품질로 복원
+                qualityDegraded_ = false;
+                normalEventCount_ = 0;
+
+                mpv_set_property_string(mpv_, "scale",
+                    originalScale_.toUtf8().constData());
+                mpv_set_property_string(mpv_, "cscale",
+                    renderEnv_.cscaleAlgo.toUtf8().constData());
+                mpv_set_property_string(mpv_, "deband",
+                    debandOriginal_ ? "yes" : "no");
+
+                qInfo() << "[MPV] 자동 품질 복원:"
+                        << "scale=" << originalScale_
+                        << ", deband=" << (debandOriginal_ ? "yes" : "no");
+                emit renderQualityRestored();
+            }
+        } else {
+            dropEventCount_ = 0;
+        }
+    }
 }

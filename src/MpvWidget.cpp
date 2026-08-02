@@ -82,6 +82,13 @@ void MpvWidget::initializeGL() {
                                            reinterpret_cast<void*>(this));
 
     qInfo() << "[MpvWidget] OpenGL render context 초기화 완료";
+
+    // ── OpenGL 컨텍스트 준비 완료 후 GPU 정보 재감지 ─────────────
+    // initialize() 시점에는 OpenGL 컨텍스트가 없어 GPU 벤더 감지 불가.
+    // initializeGL() 이후에는 GL_RENDERER/GL_VENDOR 읽기 가능.
+    // → GPU 벤더 기반 렌더링 설정 재적용 (화면 해상도만 기반이던 초기 설정 개선)
+    core_->redetectGpuAndApply();
+
     updateLogoPos();
 }
 
