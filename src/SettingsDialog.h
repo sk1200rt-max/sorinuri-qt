@@ -68,6 +68,7 @@ private:
     QCheckBox*  debandCheck_        = nullptr;
     QComboBox*  debandStrengthCombo_= nullptr;
     QCheckBox*  motionSmoothingCheck_ = nullptr;  // 모션 스무딩 (프레임 보간)
+    QComboBox*  renderProfileCombo_    = nullptr;  // GPU 렌더링 프로파일 (Eco/Balanced/Quality/HiEnd)
 
     // 자막 탭
     QLineEdit*  subApiKeyEdit_          = nullptr;  // OpenSubtitles API 키

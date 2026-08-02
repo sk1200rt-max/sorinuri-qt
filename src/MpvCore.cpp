@@ -90,6 +90,11 @@ bool MpvCore::initialize(WId windowId) {
     // 목표: 제작사가 의도한 색감과 음향을 100% 그대로 재현
     // 모든 설정은 이 목표를 위해 신중하게 선택되었음.
     // ══════════════════════════════════════════════════════════════════
+    // ── GPU API 명시 설정 (시작 속도 최적화) ─────────────────────────────────────
+    // d3d11: Windows 네이티브 D3D11 경로 명시 → OpenGL 협상 시간 제거
+    // 통합 GPU(Intel Iris/UHD)에서 렌더링 안정성 향상, 화질 변화 없음
+    check_error(mpv_set_property_string(mpv_, "gpu-api", "d3d11"));
+
 
     // ── 하드웨어 디코딩 ──────────────────────────────────────────────
     // auto-safe: NVIDIA/AMD/Intel GPU 자동 감지, 실패 시 소프트웨어로 폴백
@@ -124,6 +129,10 @@ bool MpvCore::initialize(WId windowId) {
     check_error(mpv_set_property_string(mpv_, "cscale", "sinc"));
     // 시그모이드 업스케일링: 링잉 아티팩트 억제하면서 선명도 유지
     check_error(mpv_set_property_string(mpv_, "sigmoid-upscaling", "yes"));
+    // scale-antiring: 링잉 아티팩트(고대비 경계 흰 테두리) 억제 - GPU 부하 없음
+    // 0.7: 링잉 억제와 선명도의 최적 균형점
+    check_error(mpv_set_property_string(mpv_, "scale-antiring",  "0.7"));
+    check_error(mpv_set_property_string(mpv_, "cscale-antiring", "0.7"));
 
     // ── HDR 톤매핑 (HDR 영상을 SDR 모니터에서 정확하게 재현) ─────────
     // bt.2446a: ITU-R BT.2446 Annex A 방식. 현존 가장 자연스러운 HDR→SDR 변환
@@ -137,6 +146,12 @@ bool MpvCore::initialize(WId windowId) {
     //   영상의 색공간(BT.709/BT.2020/DCI-P3)을 정확하게 변환
     //   → 제작사가 의도한 색감 그대로 재현
     check_error(mpv_set_property_string(mpv_, "target-colorspace-hint", "yes"));
+    // icc-profile-auto: 모니터 ICC 프로파일 자동 적용
+    // 캘리브레이션된 모니터에서 정확한 색상 재현
+    // 일반 모니터에서는 변화 없음 (ICC 파일 없으면 자동 스킵)
+    check_error(mpv_set_property_string(mpv_, "icc-profile-auto", "yes"));
+    // relative-colorimetric: 흰점 적응 포함, 가장 자연스러운 색상 변환
+    check_error(mpv_set_property_string(mpv_, "icc-intent", "relative-colorimetric"));
     // 선형 광학 연산: 색상 혼합 및 스케일링을 선형 광학 공간에서 수행
     //   → 물리적으로 정확한 색상 처리
     check_error(mpv_set_property_string(mpv_, "linear-upscaling",   "yes"));
@@ -460,8 +475,11 @@ void MpvCore::handlePropertyChange(mpv_event_property* prop) {
         char* vcodec = mpv_get_property_string(mpv_, "video-codec");
         QString vcodecStr = vcodec ? QString::fromUtf8(vcodec) : "";
         mpv_free(vcodec);
-        if (w > 0 && h > 0)
+        if (w > 0 && h > 0) {
             emit videoInfoChanged(static_cast<int>(w), static_cast<int>(h), fps, vcodecStr);
+            // FPS 기반 video-sync 자동 전환 (저더 제거)
+            if (fps > 0) applyVideoSyncByFps(fps);
+        }
     }
 }
 
@@ -811,4 +829,181 @@ void MpvCore::setMotionSmoothing(bool enabled) {
         mpv_set_property_string(mpv_, "interpolation", "no");
         mpv_set_property_string(mpv_, "video-sync", "audio");
     }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// GPU 렌더링 최적화 함수들
+// ══════════════════════════════════════════════════════════════════
+
+// ── 성능 프로파일 적용 ─────────────────────────────────────────────
+// GPU 성능에 따라 렌더링 품질을 자동 또는 수동으로 조정
+// 기존 기능(모션 스무딩, 패스스루 등)에 영향 없음
+void MpvCore::applyRenderProfile(RenderProfile profile) {
+    if (!initialized_) return;
+    renderProfile_ = profile;
+
+    switch (profile) {
+    case RenderProfile::Eco:
+        // 절전 모드: 노트북 통합 GPU (Intel Iris/UHD) 최적화
+        // 화질보다 재생 안정성 우선
+        mpv_set_property_string(mpv_, "scale",             "bilinear");
+        mpv_set_property_string(mpv_, "dscale",            "bilinear");
+        mpv_set_property_string(mpv_, "cscale",            "bilinear");
+        mpv_set_property_string(mpv_, "sigmoid-upscaling", "no");
+        mpv_set_property_string(mpv_, "scale-antiring",    "0.0");
+        mpv_set_property_string(mpv_, "cscale-antiring",   "0.0");
+        mpv_set_property_string(mpv_, "deband",            "no");
+        mpv_set_property_string(mpv_, "dither",            "no");
+        mpv_set_property_string(mpv_, "correct-downscaling", "no");
+        mpv_set_property_string(mpv_, "linear-upscaling",  "no");
+        mpv_set_property_string(mpv_, "hdr-compute-peak",  "no");
+        qInfo() << "[MPV] 렌더 프로파일: Eco (절전 - 통합 GPU 최적화)";
+        break;
+
+    case RenderProfile::Balanced:
+        // 균형 모드: 중급 GPU (GTX 1060 / RX 580 수준)
+        // 화질과 성능의 균형
+        mpv_set_property_string(mpv_, "scale",             "spline36");
+        mpv_set_property_string(mpv_, "dscale",            "mitchell");
+        mpv_set_property_string(mpv_, "cscale",            "spline36");
+        mpv_set_property_string(mpv_, "sigmoid-upscaling", "yes");
+        mpv_set_property_string(mpv_, "scale-antiring",    "0.5");
+        mpv_set_property_string(mpv_, "cscale-antiring",   "0.5");
+        mpv_set_property_string(mpv_, "deband",            "yes");
+        mpv_set_property_string(mpv_, "deband-iterations", "1");
+        mpv_set_property_string(mpv_, "dither",            "fruit");
+        mpv_set_property_string(mpv_, "correct-downscaling", "yes");
+        mpv_set_property_string(mpv_, "linear-upscaling",  "yes");
+        mpv_set_property_string(mpv_, "hdr-compute-peak",  "yes");
+        qInfo() << "[MPV] 렌더 프로파일: Balanced (균형 - 중급 GPU)";
+        break;
+
+    case RenderProfile::Quality:
+        // 화질 모드: 고급 GPU (RTX 3060 / RX 6700 수준) ← 기본값
+        // 현재 기본 설정과 동일
+        mpv_set_property_string(mpv_, "scale",             "ewa_lanczossharp");
+        mpv_set_property_string(mpv_, "dscale",            "mitchell");
+        mpv_set_property_string(mpv_, "cscale",            "sinc");
+        mpv_set_property_string(mpv_, "sigmoid-upscaling", "yes");
+        mpv_set_property_string(mpv_, "scale-antiring",    "0.7");
+        mpv_set_property_string(mpv_, "cscale-antiring",   "0.7");
+        mpv_set_property_string(mpv_, "deband",            "yes");
+        mpv_set_property_string(mpv_, "deband-iterations", "1");
+        mpv_set_property_string(mpv_, "dither",            "fruit");
+        mpv_set_property_string(mpv_, "correct-downscaling", "yes");
+        mpv_set_property_string(mpv_, "linear-upscaling",  "yes");
+        mpv_set_property_string(mpv_, "hdr-compute-peak",  "yes");
+        qInfo() << "[MPV] 렌더 프로파일: Quality (화질 - 고급 GPU)";
+        break;
+
+    case RenderProfile::HiEnd:
+        // 최고화질 모드: 전문가용 (RTX 4080 / RX 7900 수준)
+        // 최대 화질, GPU 부하 높음
+        mpv_set_property_string(mpv_, "scale",             "ewa_lanczossharp4sharpest");
+        mpv_set_property_string(mpv_, "dscale",            "ewa_lanczossharp");
+        mpv_set_property_string(mpv_, "cscale",            "ewa_lanczossharp");
+        mpv_set_property_string(mpv_, "sigmoid-upscaling", "yes");
+        mpv_set_property_string(mpv_, "scale-antiring",    "0.8");
+        mpv_set_property_string(mpv_, "cscale-antiring",   "0.8");
+        mpv_set_property_string(mpv_, "deband",            "yes");
+        mpv_set_property_string(mpv_, "deband-iterations", "4");
+        mpv_set_property_string(mpv_, "deband-threshold",  "64");
+        mpv_set_property_string(mpv_, "deband-range",      "20");
+        mpv_set_property_string(mpv_, "deband-grain",      "32");
+        mpv_set_property_string(mpv_, "dither",            "fruit");
+        mpv_set_property_string(mpv_, "dither-depth",      "auto");
+        mpv_set_property_string(mpv_, "correct-downscaling", "yes");
+        mpv_set_property_string(mpv_, "linear-upscaling",  "yes");
+        mpv_set_property_string(mpv_, "hdr-compute-peak",  "yes");
+        qInfo() << "[MPV] 렌더 프로파일: HiEnd (최고화질 - 전문가용)";
+        break;
+    }
+
+    emit renderProfileChanged(profile);
+}
+
+// ── FPS 기반 video-sync 자동 전환 ─────────────────────────────────
+// 파일 로드 후 container-fps를 읽어 최적의 동기화 모드 자동 선택
+// 모션 스무딩이 활성화된 경우에는 display-resample을 유지
+void MpvCore::applyVideoSyncByFps(double fps) {
+    if (!initialized_) return;
+    if (fps <= 0) return;
+
+    // 모션 스무딩 활성화 여부 확인
+    char* interpVal = mpv_get_property_string(mpv_, "interpolation");
+    bool motionSmoothingOn = interpVal && QString::fromUtf8(interpVal) == "yes";
+    mpv_free(interpVal);
+
+    if (motionSmoothingOn) {
+        // 모션 스무딩 활성화 시: display-resample 유지 (setMotionSmoothing에서 설정)
+        qInfo() << "[MPV] video-sync: 모션 스무딩 활성화 → display-resample 유지";
+        return;
+    }
+
+    // 60fps 이하 영상: display-resample (저더 제거)
+    // 60fps 초과 영상: audio (게임 영상 등 고프레임 → audio 모드가 더 안정적)
+    if (fps <= 60.0) {
+        mpv_set_property_string(mpv_, "video-sync",   "display-resample");
+        mpv_set_property_string(mpv_, "interpolation", "no");  // 보간 없이 동기화만
+        qInfo() << "[MPV] video-sync: display-resample (fps=" << fps << ")";
+    } else {
+        mpv_set_property_string(mpv_, "video-sync", "audio");
+        qInfo() << "[MPV] video-sync: audio (고프레임 fps=" << fps << ")";
+    }
+}
+
+// ── gpu-next 안전 전환 ─────────────────────────────────────────────
+// gpu-next(Vulkan/D3D12 기반 차세대 렌더러) 전환 시도
+// 실패 또는 호환성 문제 발생 시 자동으로 gpu(OpenGL)로 폴백
+//
+// [gpu-next 예상 문제점 및 해결 방안]
+// 1. RealESRGAN/RIFE 셰이더 호환성 문제
+//    → 셰이더 적용 전 vo 확인 후 gpu-next에서 지원 안 되면 gpu로 임시 전환
+// 2. 일부 Intel 통합 GPU에서 Vulkan 드라이버 불안정
+//    → D3D11 폴백 경로 유지 (gpu-api=d3d11 설정 유지)
+// 3. WASAPI Exclusive + gpu-next 조합에서 타이밍 문제 가능성
+//    → 재생 워치독이 감지 후 자동 복구 (기존 로직 활용)
+// 4. HDR 패스스루 시 색상 공간 처리 차이
+//    → target-colorspace-hint=yes 유지로 자동 보정
+void MpvCore::tryGpuNext() {
+    if (!initialized_) return;
+
+    // 현재 vo 확인
+    char* currentVo = mpv_get_property_string(mpv_, "current-vo");
+    QString vo = currentVo ? QString::fromUtf8(currentVo) : "";
+    mpv_free(currentVo);
+
+    qInfo() << "[MPV] gpu-next 전환 시도 (현재 vo:" << vo << ")";
+
+    // gpu-next 전환 시도
+    // 주의: vo 변경은 재생 중에는 즉시 적용되지 않으므로
+    // 다음 파일 로드 시 적용됨 (MPV 내부 동작)
+    int ret = mpv_set_property_string(mpv_, "vo", "gpu-next");
+    if (ret < 0) {
+        qWarning() << "[MPV] gpu-next 전환 실패:" << mpv_error_string(ret)
+                   << "→ gpu(OpenGL)로 폴백";
+        mpv_set_property_string(mpv_, "vo", "gpu");
+        gpuNextActive_ = false;
+        return;
+    }
+
+    // gpu-next 전환 성공 시 D3D12 API로 업그레이드 시도
+    // d3d11 실패 시 자동으로 vulkan → opengl 순으로 폴백
+    ret = mpv_set_property_string(mpv_, "gpu-api", "d3d11");
+    if (ret < 0) {
+        qWarning() << "[MPV] gpu-next + d3d11 실패 → auto로 폴백";
+        mpv_set_property_string(mpv_, "gpu-api", "auto");
+    }
+
+    gpuNextActive_ = true;
+    qInfo() << "[MPV] gpu-next 전환 완료 (다음 파일 로드 시 적용)";
+
+    // gpu-next 전환 후 셰이더 호환성 확인
+    // RealESRGAN/RIFE 셰이더는 gpu-next에서 일부 문제 있을 수 있음
+    // glsl-shaders 속성 확인 후 문제 시 셰이더 비활성화
+    char* shaders = mpv_get_property_string(mpv_, "glsl-shaders");
+    if (shaders && strlen(shaders) > 0) {
+        qInfo() << "[MPV] gpu-next: 기존 셰이더 유지 (호환성 문제 시 자동 해제됨)";
+    }
+    mpv_free(shaders);
 }

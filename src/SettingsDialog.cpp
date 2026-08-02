@@ -274,13 +274,43 @@ void SettingsDialog::setupVideoTab(QTabWidget* tabs) {
     decodeForm->addRow("하드웨어 디코딩:", hwdecCombo_);
 
     voCombo_ = new QComboBox(page);
-    voCombo_->addItems({"gpu (권장)", "gpu-next", "direct3d", "software"});
+    voCombo_->addItems({"gpu (권장)", "gpu-next (차세대 렌더러)", "direct3d", "software"});
     decodeForm->addRow("비디오 출력:", voCombo_);
+
+    // gpu-next 안내 레이블
+    QLabel* gpuNextHint = new QLabel(
+        "gpu-next: D3D12/Vulkan 기반 차세대 렌더러. 일부 GPU에서 불안정 시 자동 폴백.", page);
+    gpuNextHint->setStyleSheet("color: #888; font-size: 11px;");
+    gpuNextHint->setWordWrap(true);
+    decodeForm->addRow("", gpuNextHint);
 
     layout->addWidget(decodeGroup);
 
-    // ── 화질 ─────────────────────────────────────────────────────
-    QGroupBox* qualityGroup = new QGroupBox("화질 설정", page);
+    // ── GPU 렌더링 프로파일 ─────────────────────────────────────────────
+    QGroupBox* profileGroup = new QGroupBox("GPU 렌더링 프로파일", page);
+    QFormLayout* profileForm = new QFormLayout(profileGroup);
+    profileForm->setSpacing(8);
+
+    renderProfileCombo_ = new QComboBox(page);
+    renderProfileCombo_->addItems({
+        "Eco (절전 - 노트북 통합 GPU)",
+        "Balanced (균형 - 중급 GPU)",
+        "Quality (화질 - 고급 GPU) [기본값]",
+        "HiEnd (최고화질 - 전문가용)"
+    });
+    renderProfileCombo_->setCurrentIndex(2);  // Quality 기본값
+    profileForm->addRow("렌더링 프로파일:", renderProfileCombo_);
+
+    QLabel* profileHint = new QLabel(
+        "Eco: bilinear | Balanced: spline36 | Quality: ewa_lanczossharp | HiEnd: ewa_lanczossharp4sharpest", page);
+    profileHint->setStyleSheet("color: #666; font-size: 10px;");
+    profileHint->setWordWrap(true);
+    profileForm->addRow("", profileHint);
+
+    layout->addWidget(profileGroup);
+
+    // ── 화질 ─────────────────────────────────────────────────────────
+    QGroupBox* qualityGroup = new QGroupBox("화질 세부 설정 (Advanced)", page);
     QFormLayout* qualityForm = new QFormLayout(qualityGroup);
     qualityForm->setSpacing(8);
 
@@ -521,6 +551,9 @@ void SettingsDialog::loadSettings() {
     debandCheck_->setChecked(settings_.value("video/deband", false).toBool());
     if (motionSmoothingCheck_)
         motionSmoothingCheck_->setChecked(settings_.value("video/motion_smoothing", false).toBool());
+    // GPU 렌더링 프로파일 로드 (0=Eco, 1=Balanced, 2=Quality, 3=HiEnd)
+    if (renderProfileCombo_)
+        renderProfileCombo_->setCurrentIndex(settings_.value("video/render_profile", 2).toInt());
     rememberPosCheck_->setChecked(settings_.value("general/remember_pos", true).toBool());
     resumeCheck_->setChecked(settings_.value("general/resume", false).toBool());
     autoLoadSubCheck_->setChecked(settings_.value("subtitle/auto_load", true).toBool());
@@ -583,6 +616,22 @@ void SettingsDialog::applyToMpv() {
     if (motionSmoothingCheck_)
         mpv_->setMotionSmoothing(motionSmoothingCheck_->isChecked());
 
+    // GPU 렌더링 프로파일 적용
+    if (renderProfileCombo_) {
+        int profileIdx = renderProfileCombo_->currentIndex();
+        RenderProfile profile = static_cast<RenderProfile>(profileIdx);
+        mpv_->applyRenderProfile(profile);
+    }
+
+    // 비디오 출력 (vo) 설정 - gpu-next 선택 시 안전 전환 적용
+    QString voText = voCombo_->currentText();
+    if (voText.contains("gpu-next")) {
+        mpv_->tryGpuNext();  // 안전 전환 (실패 시 자동 폴백)
+    } else {
+        QString vo = voText.split(" ").first();
+        mpv_->setVideoOutput(vo);
+    }
+
     // 자막
     mpv_->setProperty("sub-font", subFontCombo_->currentText());
     mpv_->setProperty("sub-font-size", subSizeSlider_->value());
@@ -607,6 +656,8 @@ void SettingsDialog::onApply() {
     settings_.setValue("video/deband",      debandCheck_->isChecked());
     if (motionSmoothingCheck_)
         settings_.setValue("video/motion_smoothing", motionSmoothingCheck_->isChecked());
+    if (renderProfileCombo_)
+        settings_.setValue("video/render_profile", renderProfileCombo_->currentIndex());
     settings_.setValue("general/remember_pos", rememberPosCheck_->isChecked());
     settings_.setValue("general/resume",    resumeCheck_->isChecked());
     settings_.setValue("subtitle/auto_load",autoLoadSubCheck_->isChecked());

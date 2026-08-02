@@ -14,6 +14,17 @@
  * libmpv를 Qt 시그널/슬롯 시스템과 연동합니다.
  * 비디오 렌더링은 MpvWidget이 담당합니다.
  */
+
+// ── GPU 렌더링 성능 프로파일 ──────────────────────────────────────
+// GPU 성능에 따라 자동 또는 수동으로 선택
+// Eco: 노트북 통합 GPU / Balanced: 중급 GPU / Quality: 고급 GPU / HiEnd: 전문가
+enum class RenderProfile {
+    Eco,        // 절전 - 노트북 통합 GPU (Intel Iris/UHD)
+    Balanced,   // 균형 - 중급 GPU (GTX 1060 / RX 580 수준)
+    Quality,    // 화질 - 고급 GPU (RTX 3060 / RX 6700 수준) ← 기본값
+    HiEnd       // 최고화질 - 전문가용 (RTX 4080 / RX 7900 수준)
+};
+
 class MpvCore : public QObject {
     Q_OBJECT
 
@@ -54,6 +65,12 @@ public:
     void setVideoOutput(const QString& vo);
     void setMotionSmoothing(bool enabled);  // 모션 스무딩 (프레임 보간)
 
+    // ── GPU 렌더링 최적화 ────────────────────────────────────────
+    void applyRenderProfile(RenderProfile profile);  // 성능 프로파일 적용
+    RenderProfile currentRenderProfile() const { return renderProfile_; }
+    void applyVideoSyncByFps(double fps);  // FPS 기반 video-sync 자동 전환
+    void tryGpuNext();                     // gpu-next 안전 전환 (실패 시 gpu 폴백)
+
     // 상태 조회
     double duration() const;
     double position() const;
@@ -88,6 +105,7 @@ signals:
     void audioFormatChanged(const QString& codec, int channels, int sampleRate, const QString& output);
     void videoInfoChanged(int width, int height, double fps, const QString& codec);
     void errorOccurred(const QString& message);
+    void renderProfileChanged(RenderProfile profile);  // 프로파일 변경 알림
 
 private slots:
     void onMpvEvents();
@@ -103,4 +121,8 @@ private:
     // 사용자 패스스루 설정 상태 (장치 사전 감지 시 복원용)
     bool    passthroughEnabled_ = true;
     QString spdifCodecs_ = QStringLiteral("ac3,eac3,dts,dts-hd,truehd");
+
+    // GPU 렌더링 상태
+    RenderProfile renderProfile_ = RenderProfile::Quality;  // 기본값: Quality
+    bool          gpuNextActive_ = false;  // gpu-next 활성화 여부
 };
