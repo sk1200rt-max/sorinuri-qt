@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(Sorinuri VERSION 6.3.4 LANGUAGES CXX)
+project(Sorinuri VERSION 6.3.5 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -111,6 +111,7 @@ set(SOURCES
     src/AdManager.h
     src/SplashAdWidget.cpp
     src/SplashAdWidget.h
+    src/RenderEnvironment.h
     resources/resources.qrc
 )
 

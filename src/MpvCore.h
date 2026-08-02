@@ -1,5 +1,4 @@
 #pragma once
-
 #include <QObject>
 #include <QString>
 #include <QStringList>
@@ -7,6 +6,7 @@
 #include <QTimer>
 #include <QWindow>
 #include <mpv/client.h>
+#include "RenderEnvironment.h"
 
 /**
  * MpvCore - libmpv 래퍼
@@ -125,4 +125,5 @@ private:
     // GPU 렌더링 상태
     RenderProfile renderProfile_ = RenderProfile::Quality;  // 기본값: Quality
     bool          gpuNextActive_ = false;  // gpu-next 활성화 여부
+    RenderEnvInfo renderEnv_;              // 실행 시 감지된 환경 정보
 };
