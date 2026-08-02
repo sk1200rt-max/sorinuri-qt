@@ -197,15 +197,17 @@ bool MpvCore::initialize(WId windowId) {
             env.ditherMode.toUtf8().constData()));
     }
 
-    // ── 오디오: WASAPI Exclusive (기본) ──────────────────────────────
-    // Exclusive: Windows 믹서 완전 우회 → Bit-Perfect, 패스스루 가능
+    // ── 오디오: WASAPI 공유 모드 (기본) ──────────────────────────────
+    // 기본값: 공유 모드 (no) - 다른 앱과 동시 소리 재생 가능
+    // 독점 모드는 설정 → 오디오 탭 → WASAPI Exclusive Mode 체크시만 활성화
+    // Dolby Atmos/DTS:X 패스스루 및 Bit-Perfect 필요 시만 독점 모드 사용
     check_error(mpv_set_property_string(mpv_, "ao", "wasapi"));
-    check_error(mpv_set_property_string(mpv_, "audio-exclusive", "yes"));
+    check_error(mpv_set_property_string(mpv_, "audio-exclusive", "no"));
     // 패스스루: 돌비 애트모스/DTS:X 원본 비트스트림 리시버로 전송
+    // (독점 모드에서만 실질적으로 동작)
     check_error(mpv_set_property_string(mpv_, "audio-spdif",
         "ac3,eac3,dts,dts-hd,truehd"));
     // 오디오 초기화 실패 시 영상은 계속 재생 (null 오디오 폴백)
-    // → Exclusive 실패해도 영상/타임라인/트랙 정보 모두 정상 동작
     check_error(mpv_set_property_string(mpv_, "audio-fallback-to-null", "yes"));
     // 오디오 필터 초기화
     check_error(mpv_set_property_string(mpv_, "af", ""));

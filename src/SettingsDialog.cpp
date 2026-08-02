@@ -182,9 +182,36 @@ void SettingsDialog::setupAudioTab(QTabWidget* tabs) {
     exclusiveModeCheck_ = new QCheckBox("WASAPI Exclusive Mode (독점 모드)", page);
     deviceForm->addRow("", exclusiveModeCheck_);
 
-    QLabel* exclusiveHint = new QLabel("독점 모드: AV 리시버에 비트스트림 패스스루 필수", page);
-    exclusiveHint->setStyleSheet("color: #666; font-size: 11px;");
-    deviceForm->addRow("", exclusiveHint);
+    // 독점 모드 활성화 시 안내 (노란 배경)
+    exclusiveHintLabel_ = new QLabel(page);
+    exclusiveHintLabel_->setWordWrap(true);
+    exclusiveHintLabel_->setStyleSheet(
+        "background:#1a1200;border:1px solid #4a3800;border-radius:6px;"
+        "color:#e8c84a;font-size:11px;padding:8px 12px;margin-top:2px;");
+    exclusiveHintLabel_->setText(
+        "⚠️  독점 모드 활성화 시 다른 앱의 소리가 일시적으로 차단될 수 있습니다.\n"
+        "Dolby Atmos / DTS:X 패스스루 및 Bit-Perfect 재생에는 이 모드가 필요합니다.");
+    exclusiveHintLabel_->setVisible(false);
+    deviceForm->addRow("", exclusiveHintLabel_);
+
+    // 공유 모드 안내 (녹색 배경)
+    sharedHintLabel_ = new QLabel(page);
+    sharedHintLabel_->setWordWrap(true);
+    sharedHintLabel_->setStyleSheet(
+        "background:#001a0e;border:1px solid #004d22;border-radius:6px;"
+        "color:#4ade80;font-size:11px;padding:8px 12px;margin-top:2px;");
+    sharedHintLabel_->setText(
+        "✅  공유 모드: 다른 앱과 동시에 소리를 재생할 수 있습니다.\n"
+        "5.1 / 7.1 서라운드는 Windows 사운드 설정에서 치널 수를 설정하면 지원됩니다.\n"
+        "⚠️  Dolby Atmos / DTS:X 패스스루는 지원되지 않습니다. (독점 모드 필요)");
+    sharedHintLabel_->setVisible(true);
+    deviceForm->addRow("", sharedHintLabel_);
+
+    // 체크박스 토글 시 안내 전환
+    connect(exclusiveModeCheck_, &QCheckBox::toggled, this, [this](bool on) {
+        exclusiveHintLabel_->setVisible(on);
+        sharedHintLabel_->setVisible(!on);
+    });
 
     layout->addWidget(deviceGroup);
 
@@ -245,8 +272,8 @@ void SettingsDialog::setupAudioTab(QTabWidget* tabs) {
 
     tabs->addTab(page, "오디오");
 
-    // 기본값 설정
-    exclusiveModeCheck_->setChecked(true);
+    // 기본값 설정: 공유 모드 (false)
+    exclusiveModeCheck_->setChecked(false);
     passthroughCheck_->setChecked(true);
     ptAC3_->setChecked(true);
     ptEAC3_->setChecked(true);
@@ -533,7 +560,8 @@ void SettingsDialog::refreshAudioDevices() {
 }
 
 void SettingsDialog::loadSettings() {
-    exclusiveModeCheck_->setChecked(settings_.value("audio/exclusive", true).toBool());
+    // 기본값: 공유 모드 (false) - 독점 모드는 사용자가 명시적으로 선택할 때만 활성화
+    exclusiveModeCheck_->setChecked(settings_.value("audio/exclusive", false).toBool());
     passthroughCheck_->setChecked(settings_.value("audio/passthrough", true).toBool());
     ptAC3_->setChecked(settings_.value("audio/pt_ac3", true).toBool());
     ptEAC3_->setChecked(settings_.value("audio/pt_eac3", true).toBool());

@@ -50,7 +50,9 @@ private:
 
     // 오디오 탭
     QComboBox*  audioDeviceCombo_   = nullptr;
-    QCheckBox*  exclusiveModeCheck_ = nullptr;
+    QCheckBox*  exclusiveModeCheck_  = nullptr;
+    QLabel*     exclusiveHintLabel_  = nullptr;   // 독점 모드 활성화 시 안내 (노란)
+    QLabel*     sharedHintLabel_     = nullptr;   // 공유 모드 안내 (녹색, 기본 표시)
     QCheckBox*  passthroughCheck_   = nullptr;
     QCheckBox*  ptAC3_   = nullptr;
     QCheckBox*  ptEAC3_  = nullptr;
