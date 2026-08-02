@@ -93,16 +93,15 @@ void MpvWidget::initializeGL() {
     // 소리누리 창을 다른 모니터로 이동 시 해상도/주사율/DPI가 바뀜
     // QWindow::screenChanged 시그널 → redetectGpuAndApply() 재호출
     // 예: FHD 모니터(ewa_lanczossharp) → 4K 모니터(spline36) 자동 전환
+    //
+    // 폴백: initializeGL() 시점에 windowHandle()이 nullptr일 수 있음
+    // (위젯이 최상위 윈도우에 완전히 연결되기 전)
+    // → showEvent()에서 screenChangedConnected_ 확인 후 재시도
     if (QWindow* win = window()->windowHandle()) {
-        connect(win, &QWindow::screenChanged, this, [this](QScreen* newScreen) {
-            Q_UNUSED(newScreen)
-            qInfo() << "[MpvWidget] 모니터 변경 감지 → 렌더링 설정 재적용";
-            // 약간의 지연 후 재감지 (모니터 전환 완료 대기)
-            QTimer::singleShot(500, this, [this]() {
-                core_->redetectGpuAndApply();
-            });
-        });
-        qInfo() << "[MpvWidget] 멀티모니터 이동 감지 활성화";
+        connectScreenChanged(win);
+    } else {
+        screenChangedConnected_ = false;
+        qInfo() << "[MpvWidget] windowHandle 없음 → showEvent에서 멀티모니터 감지 연결 재시도";
     }
 
     updateLogoPos();
@@ -213,6 +212,28 @@ void MpvWidget::resizeEvent(QResizeEvent* event) {
 void MpvWidget::showEvent(QShowEvent* event) {
     QOpenGLWidget::showEvent(event);
     QTimer::singleShot(0, this, [this]() { updateLogoPos(); });
+
+    // initializeGL()  시점에 windowHandle()이 없었던 경우 여기서 재시도
+    if (!screenChangedConnected_) {
+        if (QWindow* win = window()->windowHandle()) {
+            connectScreenChanged(win);
+            qInfo() << "[MpvWidget] showEvent: 멀티모니터 감지 연결 성공 (폴백)";
+        }
+    }
+}
+
+void MpvWidget::connectScreenChanged(QWindow* win) {
+    if (!win || screenChangedConnected_) return;
+    connect(win, &QWindow::screenChanged, this, [this](QScreen* newScreen) {
+        Q_UNUSED(newScreen)
+        qInfo() << "[MpvWidget] 모니터 변경 감지 → 렌더링 설정 재적용";
+        // 500ms 지연 후 재감지 (모니터 전환 완료 대기)
+        QTimer::singleShot(500, this, [this]() {
+            core_->redetectGpuAndApply();
+        });
+    });
+    screenChangedConnected_ = true;
+    qInfo() << "[MpvWidget] 멀티모니터 이동 감지 활성화";
 }
 
 void MpvWidget::updateLogoPos() {

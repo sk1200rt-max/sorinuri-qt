@@ -7,6 +7,7 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QFile>
+#include <QFileInfo>
 
 // 업데이트 다운로드 및 설치 다이얼로그
 class UpdateDialog : public QDialog {

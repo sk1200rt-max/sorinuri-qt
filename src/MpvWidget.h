@@ -37,6 +37,8 @@ private:
 
     MpvCore*             core_       = nullptr;
     mpv_render_context*  renderCtx_  = nullptr;
+    bool  screenChangedConnected_ = false;  // 멀티모니터 감지 연결 여부
+    void  connectScreenChanged(QWindow* win);  // 멀티모니터 시그널 연결 헬퍼
 
     QLabel*  logoLabel_  = nullptr;
     void     updateLogoPos();

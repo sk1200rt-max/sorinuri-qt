@@ -138,21 +138,58 @@ void UpdateDialog::onDownloadFinished(QNetworkReply* reply) {
     reply->deleteLater();
 
     if (reply->error() != QNetworkReply::NoError) {
-        QMessageBox::warning(this, "다운로드 실패",
-            QString("업데이트 다운로드에 실패했습니다.\n%1").arg(reply->errorString()));
+        // 다운로드 실패: 임시파일 정리 후 재시도 가능 상태로 복원
+        QFile::remove(localInstallerPath_);  // 부분 다운로드 임시파일 정리
         downloading_ = false;
         updateBtn_->setEnabled(true);
         skipBtn_->setEnabled(true);
+        progressBar_->setValue(0);
         progressBar_->setVisible(false);
-        statusLabel_->setText("다운로드 실패. 다시 시도해 주세요.");
+        statusLabel_->setText(
+            QString("⚠ 다운로드 실패: %1\n'지금 업데이트' 버튼을 다시 눌러 재시도하세요.")
+                .arg(reply->errorString()));
+        qWarning() << "[UpdateDialog] 다운로드 실패:" << reply->errorString();
         return;
     }
 
     // 파일 저장
+    QByteArray data = reply->readAll();
+    if (data.isEmpty()) {
+        // 빈 응답: 다운로드 실패로 처리
+        downloading_ = false;
+        updateBtn_->setEnabled(true);
+        skipBtn_->setEnabled(true);
+        progressBar_->setVisible(false);
+        statusLabel_->setText("⚠ 서버에서 빈 응답을 받았습니다. 다시 시도해 주세요.");
+        return;
+    }
+
     QFile file(localInstallerPath_);
-    if (file.open(QIODevice::WriteOnly)) {
-        file.write(reply->readAll());
-        file.close();
+    if (!file.open(QIODevice::WriteOnly)) {
+        // 파일 쓰기 실패: 디스크 공간 부족 또는 권한 문제
+        downloading_ = false;
+        updateBtn_->setEnabled(true);
+        skipBtn_->setEnabled(true);
+        progressBar_->setVisible(false);
+        statusLabel_->setText(
+            QString("⚠ 파일 저장 실패: %1\n디스크 공간을 확인하세요.").arg(file.errorString()));
+        qWarning() << "[UpdateDialog] 파일 저장 실패:" << file.errorString();
+        return;
+    }
+    file.write(data);
+    file.close();
+
+    // 다운로드 완료 확인: 파일 크기 검증 (10KB 미만이면 손상된 파일)
+    QFileInfo fi(localInstallerPath_);
+    if (fi.size() < 10240) {
+        QFile::remove(localInstallerPath_);
+        downloading_ = false;
+        updateBtn_->setEnabled(true);
+        skipBtn_->setEnabled(true);
+        progressBar_->setVisible(false);
+        statusLabel_->setText("⚠ 다운로드된 파일이 손상된 것 같습니다. 다시 시도해 주세요.");
+        qWarning() << "[UpdateDialog] 파일 크기 이상:" << fi.size() << "bytes";
+        return;
     }
 
     statusLabel_->setText("설치 중...");

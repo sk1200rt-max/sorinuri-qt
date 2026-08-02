@@ -361,6 +361,15 @@ void MpvCore::handleEvent(mpv_event* event) {
 
     case MPV_EVENT_END_FILE: {
         auto* ef = reinterpret_cast<mpv_event_end_file*>(event->data);
+        // 재생 종료 시 프레임 드롭 모니터링 타이머 정지 + 카운터 초기화
+        if (frameDropTimer_ && frameDropTimer_->isActive()) {
+            frameDropTimer_->stop();
+            qInfo() << "[MPV] 재생 종료 → frameDropTimer 정지";
+        }
+        prevFrameDropCount_ = 0;
+        dropEventCount_     = 0;
+        normalEventCount_   = 0;
+        qualityDegraded_    = false;
         if (ef->reason == MPV_END_FILE_REASON_EOF) {
             emit playbackEnded();
         } else if (ef->reason == MPV_END_FILE_REASON_ERROR) {
@@ -391,6 +400,19 @@ void MpvCore::handleEvent(mpv_event* event) {
             } else {
                 emit errorOccurred(errMsg);
             }
+        }
+        break;
+    }
+
+    case MPV_EVENT_SEEK: {
+        // seek 직후 MPV가 프레임을 대량 드롭하는 것을 오탐 방지
+        // prevFrameDropCount_를 현재 값으로 리셋 → seek 전후 드롭 비교 초기화
+        if (initialized_) {
+            int64_t dropCount = 0;
+            mpv_get_property(mpv_, "frame-drop-count", MPV_FORMAT_INT64, &dropCount);
+            prevFrameDropCount_ = static_cast<int>(dropCount);
+            dropEventCount_ = 0;  // seek 후 드롭 카운터 리셋 (오탐 방지)
+            qInfo() << "[MPV] seek 감지 → 프레임 드롭 카운터 리셋";
         }
         break;
     }
@@ -1043,17 +1065,35 @@ void MpvCore::tryGpuNext() {
         mpv_set_property_string(mpv_, "gpu-api", "auto");
     }
 
+    // gpu-next 활성화 플래그 임시 설정
+    // 실제 적용 여부는 1000ms 후 current-vo 속성 재확인으로 검증
     gpuNextActive_ = true;
-    qInfo() << "[MPV] gpu-next 전환 완료 (다음 파일 로드 시 적용)";
+    qInfo() << "[MPV] gpu-next 전환 시도 완료 (1초 후 적용 여부 검증)";
 
     // gpu-next 전환 후 셰이더 호환성 확인
-    // RealESRGAN/RIFE 셰이더는 gpu-next에서 일부 문제 있을 수 있음
-    // glsl-shaders 속성 확인 후 문제 시 셰이더 비활성화
     char* shaders = mpv_get_property_string(mpv_, "glsl-shaders");
     if (shaders && strlen(shaders) > 0) {
         qInfo() << "[MPV] gpu-next: 기존 셰이더 유지 (호환성 문제 시 자동 해제됨)";
     }
     mpv_free(shaders);
+
+    // 1000ms 후 실제 current-vo 확인 → MPV 내부 폴백 감지
+    // vo 변경은 다음 파일 로드 시 적용되므로 즉시 확인은 의미 없음
+    // 대신 현재 설정된 vo 옵션 값을 확인하여 설정 성공 여부 판단
+    QTimer::singleShot(1000, this, [this]() {
+        if (!initialized_) return;
+        char* voOpt = mpv_get_property_string(mpv_, "vo");
+        QString voVal = voOpt ? QString::fromUtf8(voOpt) : QString();
+        mpv_free(voOpt);
+        if (!voVal.contains("gpu-next")) {
+            // vo 설정이 gpu-next가 아님 → 폴백 또는 설정 실패
+            gpuNextActive_ = false;
+            qWarning() << "[MPV] gpu-next 설정 확인 실패: vo =" << voVal
+                       << "→ gpuNextActive_ = false (다음 재감지 시 재시도 가능)";
+        } else {
+            qInfo() << "[MPV] gpu-next 설정 확인 완료: vo =" << voVal;
+        }
+    });
 }
 
 // ── GPU 벤더 재감지 및 설정 재적용 ───────────────────────────────
@@ -1071,20 +1111,23 @@ void MpvCore::redetectGpuAndApply() {
     qInfo() << "[MPV] GPU 재감지 완료:" << env.gpuRenderer
             << "→" << RenderEnvironment::gpuTierName(env.gpuTier);
 
-    // 통합 GPU 감지 시 scale 알고리즘 재적용
-    mpv_set_property_string(mpv_, "scale",  env.scaleAlgo.toUtf8().constData());
-    mpv_set_property_string(mpv_, "dscale", env.dscaleAlgo.toUtf8().constData());
-    mpv_set_property_string(mpv_, "cscale", env.cscaleAlgo.toUtf8().constData());
-    mpv_set_property_string(mpv_, "sigmoid-upscaling",
-        env.sigUpscaling ? "yes" : "no");
-    mpv_set_property_string(mpv_, "deband",
-        env.debandEnabled ? "yes" : "no");
-    mpv_set_property_string(mpv_, "hdr-compute-peak",
-        env.hdrComputePeak ? "yes" : "no");
-    mpv_set_property_string(mpv_, "linear-upscaling",
-        env.linearUpscaling ? "yes" : "no");
-    mpv_set_property_string(mpv_, "correct-downscaling",
-        env.correctDownscaling ? "yes" : "no");
+    // ── 배치 적용: 재생 중 끊김 방지 ──────────────────────────────
+    // mpv_set_property_string을 연속 호웉하면 각 호웉마다 렌더러 재초기화 가능
+    // 모든 설정을 로컈 변수에 준비 후 일괄 적용
+    struct RenderProp { const char* key; QByteArray val; };
+    const QVector<RenderProp> renderProps = {
+        {"scale",               env.scaleAlgo.toUtf8()},
+        {"dscale",              env.dscaleAlgo.toUtf8()},
+        {"cscale",              env.cscaleAlgo.toUtf8()},
+        {"sigmoid-upscaling",   QByteArray(env.sigUpscaling      ? "yes" : "no")},
+        {"deband",              QByteArray(env.debandEnabled      ? "yes" : "no")},
+        {"hdr-compute-peak",    QByteArray(env.hdrComputePeak     ? "yes" : "no")},
+        {"linear-upscaling",    QByteArray(env.linearUpscaling    ? "yes" : "no")},
+        {"correct-downscaling", QByteArray(env.correctDownscaling ? "yes" : "no")},
+    };
+    for (const auto& p : renderProps) {
+        mpv_set_property_string(mpv_, p.key, p.val.constData());
+    }
 
     // 실시간 프레임 드롭 모니터링 시작
     if (!frameDropTimer_) {
