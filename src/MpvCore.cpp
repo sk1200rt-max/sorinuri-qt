@@ -1030,79 +1030,9 @@ void MpvCore::applyVideoSyncByFps(double fps) {
         mpv_set_property_string(mpv_, "video-sync-max-video-change", "5");
     }
 }
-// ── gpu-next 안전 전환 ─────────────────────────────────────────────
-// gpu-next(Vulkan/D3D12 기반 차세대 렌더러) 전환 시도
-// 실패 또는 호환성 문제 발생 시 자동으로 gpu(OpenGL)로 폴백
-//
-// [gpu-next 예상 문제점 및 해결 방안]
-// 1. RealESRGAN/RIFE 셰이더 호환성 문제
-//    → 셰이더 적용 전 vo 확인 후 gpu-next에서 지원 안 되면 gpu로 임시 전환
-// 2. 일부 Intel 통합 GPU에서 Vulkan 드라이버 불안정
-//    → D3D11 폴백 경로 유지 (gpu-api=d3d11 설정 유지)
-// 3. WASAPI Exclusive + gpu-next 조합에서 타이밍 문제 가능성
-//    → 재생 워치독이 감지 후 자동 복구 (기존 로직 활용)
-// 4. HDR 패스스루 시 색상 공간 처리 차이
-//    → target-colorspace-hint=yes 유지로 자동 보정
-void MpvCore::tryGpuNext() {
-    if (!initialized_) return;
-
-    // 현재 vo 확인
-    char* currentVo = mpv_get_property_string(mpv_, "current-vo");
-    QString vo = currentVo ? QString::fromUtf8(currentVo) : "";
-    mpv_free(currentVo);
-
-    qInfo() << "[MPV] gpu-next 전환 시도 (현재 vo:" << vo << ")";
-
-    // gpu-next 전환 시도
-    // 주의: vo 변경은 재생 중에는 즉시 적용되지 않으므로
-    // 다음 파일 로드 시 적용됨 (MPV 내부 동작)
-    int ret = mpv_set_property_string(mpv_, "vo", "gpu-next");
-    if (ret < 0) {
-        qWarning() << "[MPV] gpu-next 전환 실패:" << mpv_error_string(ret)
-                   << "→ gpu(OpenGL)로 폴백";
-        mpv_set_property_string(mpv_, "vo", "gpu");
-        gpuNextActive_ = false;
-        return;
-    }
-
-    // gpu-next 전환 성공 시 D3D12 API로 업그레이드 시도
-    // d3d11 실패 시 자동으로 vulkan → opengl 순으로 폴백
-    ret = mpv_set_property_string(mpv_, "gpu-api", "d3d11");
-    if (ret < 0) {
-        qWarning() << "[MPV] gpu-next + d3d11 실패 → auto로 폴백";
-        mpv_set_property_string(mpv_, "gpu-api", "auto");
-    }
-
-    // gpu-next 활성화 플래그 임시 설정
-    // 실제 적용 여부는 1000ms 후 current-vo 속성 재확인으로 검증
-    gpuNextActive_ = true;
-    qInfo() << "[MPV] gpu-next 전환 시도 완료 (1초 후 적용 여부 검증)";
-
-    // gpu-next 전환 후 셰이더 호환성 확인
-    char* shaders = mpv_get_property_string(mpv_, "glsl-shaders");
-    if (shaders && strlen(shaders) > 0) {
-        qInfo() << "[MPV] gpu-next: 기존 셰이더 유지 (호환성 문제 시 자동 해제됨)";
-    }
-    mpv_free(shaders);
-
-    // 1000ms 후 실제 current-vo 확인 → MPV 내부 폴백 감지
-    // vo 변경은 다음 파일 로드 시 적용되므로 즉시 확인은 의미 없음
-    // 대신 현재 설정된 vo 옵션 값을 확인하여 설정 성공 여부 판단
-    QTimer::singleShot(1000, this, [this]() {
-        if (!initialized_) return;
-        char* voOpt = mpv_get_property_string(mpv_, "vo");
-        QString voVal = voOpt ? QString::fromUtf8(voOpt) : QString();
-        mpv_free(voOpt);
-        if (!voVal.contains("gpu-next")) {
-            // vo 설정이 gpu-next가 아님 → 폴백 또는 설정 실패
-            gpuNextActive_ = false;
-            qWarning() << "[MPV] gpu-next 설정 확인 실패: vo =" << voVal
-                       << "→ gpuNextActive_ = false (다음 재감지 시 재시도 가능)";
-        } else {
-            qInfo() << "[MPV] gpu-next 설정 확인 완료: vo =" << voVal;
-        }
-    });
-}
+// tryGpuNext: DISABLED
+// vo 변경은 libmpv 렌더 컨텍스트와 충돌하여 영상이 별도 창으로 분리되는 문제가 발생함.
+// vo=libmpv는 초기화 시 한 번만 설정하며 이후 절대 변경하지 않음.
 
 // ── GPU 벤더 재감지 및 설정 재적용 ───────────────────────────────
 // MpvWidget::initializeGL() 이후 호출 (OpenGL 컨텍스트 준비 완료 후)
