@@ -921,6 +921,8 @@ void MpvCore::applyRenderProfile(RenderProfile profile) {
         mpv_set_property_string(mpv_, "correct-downscaling", "no");
         mpv_set_property_string(mpv_, "linear-upscaling",  "no");
         mpv_set_property_string(mpv_, "hdr-compute-peak",  "no");
+        mpv_set_property_string(mpv_, "keepaspect",        "yes");
+        mpv_set_property_string(mpv_, "keepaspect-window", "no");
         qInfo() << "[MPV] 렌더 프로파일: Eco (절전 - 통합 GPU 최적화)";
         break;
 
@@ -939,6 +941,8 @@ void MpvCore::applyRenderProfile(RenderProfile profile) {
         mpv_set_property_string(mpv_, "correct-downscaling", "yes");
         mpv_set_property_string(mpv_, "linear-upscaling",  "yes");
         mpv_set_property_string(mpv_, "hdr-compute-peak",  "yes");
+        mpv_set_property_string(mpv_, "keepaspect",        "yes");
+        mpv_set_property_string(mpv_, "keepaspect-window", "no");
         qInfo() << "[MPV] 렌더 프로파일: Balanced (균형 - 중급 GPU)";
         break;
 
@@ -957,6 +961,8 @@ void MpvCore::applyRenderProfile(RenderProfile profile) {
         mpv_set_property_string(mpv_, "correct-downscaling", "yes");
         mpv_set_property_string(mpv_, "linear-upscaling",  "yes");
         mpv_set_property_string(mpv_, "hdr-compute-peak",  "yes");
+        mpv_set_property_string(mpv_, "keepaspect",        "yes");
+        mpv_set_property_string(mpv_, "keepaspect-window", "no");
         qInfo() << "[MPV] 렌더 프로파일: Quality (화질 - 고급 GPU)";
         break;
 
@@ -979,6 +985,8 @@ void MpvCore::applyRenderProfile(RenderProfile profile) {
         mpv_set_property_string(mpv_, "correct-downscaling", "yes");
         mpv_set_property_string(mpv_, "linear-upscaling",  "yes");
         mpv_set_property_string(mpv_, "hdr-compute-peak",  "yes");
+        mpv_set_property_string(mpv_, "keepaspect",        "yes");
+        mpv_set_property_string(mpv_, "keepaspect-window", "no");
         qInfo() << "[MPV] 렌더 프로파일: HiEnd (최고화질 - 전문가용)";
         break;
     }
@@ -1124,6 +1132,11 @@ void MpvCore::redetectGpuAndApply() {
         {"hdr-compute-peak",    QByteArray(env.hdrComputePeak     ? "yes" : "no")},
         {"linear-upscaling",    QByteArray(env.linearUpscaling    ? "yes" : "no")},
         {"correct-downscaling", QByteArray(env.correctDownscaling ? "yes" : "no")},
+        // keepaspect-window=no: 영상이 FBO(위젯) 크기에 맞게 꽉 채움
+        // redetectGpuAndApply 호출 시 MPV 렌더러 파라미터 재계산으로
+        // 이 값이 초기화될 수 있어 명시적 재설정 필요
+        {"keepaspect",          QByteArray("yes")},
+        {"keepaspect-window",   QByteArray("no")},
     };
     for (const auto& p : renderProps) {
         mpv_set_property_string(mpv_, p.key, p.val.constData());
