@@ -91,7 +91,7 @@ CompactPlayerWidget::CompactPlayerWidget(QWidget* parent)
 
     // 화면 우측 하단에 배치
     if (QScreen* scr = QApplication::primaryScreen()) {
-        QRect sg = scr.availableGeometry();
+        QRect sg = scr->availableGeometry();
         move(sg.right() - width() - 24, sg.bottom() - height() - 48);
     }
 }
