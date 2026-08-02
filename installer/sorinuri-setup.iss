@@ -3,7 +3,7 @@
 
 #define MyAppName "소리누리"
 #define MyAppNameEn "Sorinuri"
-#define MyAppVersion "6.3.8"
+#define MyAppVersion "6.3.9"
 #define MyAppPublisher "Sorinuri"
 #define MyAppURL "https://sorinuri.com"
 #define MyAppExeName "Sorinuri.exe"
@@ -233,13 +233,35 @@ begin
   if CurStep = ssInstall then begin
     Exec('taskkill.exe', '/F /IM Sorinuri.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   end;
-  // 설치 완료 후 쉘 아이콘 캐시 강제 갱신
-  // 바탕화면 아이콘이 이전 버전 아이콘으로 표시되는 문제 해결
+  // 설치 완료 후 아이콘 캐시 강제 삭제 + 갱신
+  // Windows 10/11에서 ie4uinit만으로는 부족 → IconCache.db 직접 삭제 필요
   if CurStep = ssPostInstall then begin
-    // ie4uinit: 쉘 아이콘 캐시 초기화 (관리자 권한 필요 없음)
+    // 1단계: Explorer 종료 (아이콘 캐시 파일 잠금 해제)
+    Exec('taskkill.exe', '/F /IM explorer.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+
+    // 2단계: IconCache.db 직접 삭제 (Windows 10/11 아이콘 캐시 DB)
+    Exec(ExpandConstant('{sys}\cmd.exe'),
+         '/C del /F /Q "%LocalAppData%\IconCache.db" 2>nul',
+         '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    // Windows 10/11: Explorer 아이콘 캐시 DB (모든 크기)
+    Exec(ExpandConstant('{sys}\cmd.exe'),
+         '/C del /F /Q "%LocalAppData%\Microsoft\Windows\Explorer\iconcache*.db" 2>nul',
+         '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    // 바탕화면 썸네일 캐시도 함께 삭제
+    Exec(ExpandConstant('{sys}\cmd.exe'),
+         '/C del /F /Q "%LocalAppData%\Microsoft\Windows\Explorer\thumbcache*.db" 2>nul',
+         '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+
+    // 3단계: ie4uinit으로 쉘 아이콘 캐시 재초기화
     Exec(ExpandConstant('{sys}\ie4uinit.exe'), '-show', '',
          SW_HIDE, ewWaitUntilTerminated, ResultCode);
-    // 추가 방어라인: RunDll32로 쉘 아이콘 캐시 갱신
+
+    // 4단계: Explorer 재시작 (탐색기 + 바탕화면 새로고침)
+    Exec(ExpandConstant('{sys}\cmd.exe'),
+         '/C start explorer.exe', '',
+         SW_HIDE, ewNoWait, ResultCode);
+
+    // 5단계: SHChangeNotify로 쉘에 아이콘 변경 알림
     Exec(ExpandConstant('{sys}\RunDll32.exe'),
          'shell32.dll,SHChangeNotify 0x8000000 0 0 0', '',
          SW_HIDE, ewWaitUntilTerminated, ResultCode);
