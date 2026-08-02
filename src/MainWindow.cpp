@@ -389,6 +389,8 @@ void MainWindow::onFileLoaded(const QString& path) {
         saveResumePosition();
     currentFilePath_ = path;
     lastPosition_ = 0.0;
+    // 새 파일 로드 시 멀티체널 안내 상태 초기화 (파일마다 한 번씩 감지)
+    multichannelPromptShown_ = false;
     updateWindowTitle(QFileInfo(path).fileName());
     addToRecentFiles(path);
     tryResumePosition(path);
@@ -602,8 +604,83 @@ void MainWindow::onVolumeChanged(int v) {
     }
 }
 
-void MainWindow::onAudioFormatChanged(const QString& codec, int, int, const QString&) {
+void MainWindow::onAudioFormatChanged(const QString& codec, int channelCount, int, const QString&) {
     titleBar_->setAudioBadge(codec.toUpper());
+
+    // 멀티체널 파일 감지: 공유 모드에서 5.1 이상인 경우 안내
+    if (channelCount >= 6 && !multichannelPromptShown_) {
+        QSettings s("Sorinuri", "SorinuriPlayer");
+        const bool isExclusive = s.value("audio/exclusive", false).toBool();
+        if (!isExclusive) {
+            multichannelPromptShown_ = true;
+            QMetaObject::invokeMethod(this, [this, channelCount]() {
+                showMultichannelPrompt(channelCount);
+            }, Qt::QueuedConnection);
+        }
+    }
+}
+
+void MainWindow::showMultichannelPrompt(int channelCount) {
+    const QString chStr = (channelCount == 6) ? "5.1" :
+                          (channelCount == 8) ? "7.1" :
+                          QString("%1ch").arg(channelCount);
+
+    QDialog dlg(this);
+    dlg.setWindowTitle("멀티체널 오디오 감지");
+    dlg.setFixedSize(460, 230);
+    dlg.setStyleSheet(
+        "QDialog { background:#1a1a1a; color:#e0e0e0; "
+        "font-family:'Segoe UI','Malgun Gothic',sans-serif; font-size:13px; }"
+        "QLabel { color:#e0e0e0; }"
+        "QPushButton { background:#252525; border:1px solid #444; border-radius:5px; "
+        "  padding:8px 18px; color:#e0e0e0; font-size:13px; min-width:100px; }"
+        "QPushButton:hover { background:#2a2a2a; }"
+        "QPushButton#btnExclusive { background:#00443a; border-color:#00c8b4; "
+        "  color:#00c8b4; font-weight:bold; }"
+        "QPushButton#btnExclusive:hover { background:#005a4d; }");
+
+    QVBoxLayout* vl = new QVBoxLayout(&dlg);
+    vl->setContentsMargins(24, 20, 24, 20);
+    vl->setSpacing(12);
+
+    QLabel* title = new QLabel(
+        QString("🔊  %1 서라운드 파일이 감지되었습니다").arg(chStr), &dlg);
+    title->setStyleSheet("font-size:15px; font-weight:bold; color:#00c8b4;");
+    vl->addWidget(title);
+
+    QLabel* msg = new QLabel(
+        QString("현재 <b>공유 모드</b>로 재생 중입니다.<br>"
+                "%1 서라운드를 완벽하게 듣려면 <b>독점 모드</b>로 전환하세요.<br>"
+                "<span style='color:#888;font-size:11px;'>"
+                "⚠️ 독점 모드 전환 시 다른 앱의 소리가 일시적으로 차단될 수 있습니다."
+                "</span>").arg(chStr), &dlg);
+    msg->setWordWrap(true);
+    msg->setTextFormat(Qt::RichText);
+    vl->addWidget(msg);
+
+    vl->addStretch();
+
+    QHBoxLayout* hl = new QHBoxLayout();
+    hl->setSpacing(10);
+    QPushButton* btnKeep      = new QPushButton("공유 모드 유지", &dlg);
+    QPushButton* btnExclusive = new QPushButton("🔊  독점 모드로 전환", &dlg);
+    btnExclusive->setObjectName("btnExclusive");
+    hl->addStretch();
+    hl->addWidget(btnKeep);
+    hl->addWidget(btnExclusive);
+    vl->addLayout(hl);
+
+    // 독점 모드 전환: QSettings 저장 + MPV 즉시 적용 (재시작 불필요)
+    connect(btnExclusive, &QPushButton::clicked, &dlg, [this, &dlg]() {
+        QSettings s("Sorinuri", "SorinuriPlayer");
+        s.setValue("audio/exclusive", true);
+        s.sync();
+        mpvWidget_->core()->setAudioExclusive(true);
+        dlg.accept();
+    });
+    connect(btnKeep, &QPushButton::clicked, &dlg, &QDialog::reject);
+
+    dlg.exec();
 }
 
 void MainWindow::onVideoInfoChanged(int, int, double, const QString&) {}

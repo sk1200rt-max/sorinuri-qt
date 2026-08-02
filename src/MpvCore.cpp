@@ -1,6 +1,7 @@
 #include "MpvCore.h"
 #include "RenderEnvironment.h"
 #include <QDebug>
+#include <QSettings>
 #include <QMetaObject>
 #include <QFile>
 #include <QDateTime>
@@ -197,12 +198,18 @@ bool MpvCore::initialize(WId windowId) {
             env.ditherMode.toUtf8().constData()));
     }
 
-    // ── 오디오: WASAPI 공유 모드 (기본) ──────────────────────────────
-    // 기본값: 공유 모드 (no) - 다른 앱과 동시 소리 재생 가능
-    // 독점 모드는 설정 → 오디오 탭 → WASAPI Exclusive Mode 체크시만 활성화
-    // Dolby Atmos/DTS:X 패스스루 및 Bit-Perfect 필요 시만 독점 모드 사용
-    check_error(mpv_set_property_string(mpv_, "ao", "wasapi"));
-    check_error(mpv_set_property_string(mpv_, "audio-exclusive", "no"));
+    // ── 오디오: WASAPI (저장된 모드 적용) ──────────────────────────────
+    // QSettings에서 저장된 독점 모드 값을 읽어 적용 (기본값: false = 공유 모드)
+    // 이렇게 해야 설정에서 독점 모드를 활성화한 사용자가 다음 실행 시도 유지됨
+    {
+        QSettings s("Sorinuri", "SorinuriPlayer");
+        const bool savedExclusive = s.value("audio/exclusive", false).toBool();
+        check_error(mpv_set_property_string(mpv_, "ao", "wasapi"));
+        check_error(mpv_set_property_string(mpv_, "audio-exclusive",
+            savedExclusive ? "yes" : "no"));
+        qInfo() << "[MPV] 오디오 모드:"
+                << (savedExclusive ? "독점 (Exclusive)" : "공유 (Shared)");
+    }
     // 패스스루: 돌비 애트모스/DTS:X 원본 비트스트림 리시버로 전송
     // (독점 모드에서만 실질적으로 동작)
     check_error(mpv_set_property_string(mpv_, "audio-spdif",

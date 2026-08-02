@@ -156,6 +156,10 @@ private:
     AdManager*            adManager_            = nullptr;  // 광고 관리자
     SplashAdWidget*       splashAdWidget_       = nullptr;  // 시작 화면 광고
 
+    // 멀티체널 안내 상태 (파일당 한 번만 표시)
+    bool   multichannelPromptShown_ = false;
+    void   showMultichannelPrompt(int channelCount);
+
     bool   isFullscreen_      = false;
     bool   isOttMode_         = false;
     bool   isMusicMode_       = false;
