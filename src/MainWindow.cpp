@@ -315,7 +315,14 @@ void MainWindow::switchToMusicMode() {
     isMusicMode_ = true;
     playerStack_->setCurrentIndex(1);
     controlBar_->hide();
-    // 음악 모드: 갭리스 재생 항상 활성화 (앨범 연속 재생 시 공백 제거)
+    // 음악 모드: 타이틀바는 항상 표시 (상단고정/최소화/종료 버튼 보여야 함)
+    titleBar_->show();
+    // uiVisible_ 재설정: 타이틀바가 보이는 상태로 시작
+    uiVisible_ = true;
+    // 커서 복원: 이전 모드에서 BlankCursor가 남아있으면 제거
+    if (cursor().shape() == Qt::BlankCursor) unsetCursor();
+    if (musicPage_) musicPage_->unsetCursor();
+    // 음악 모드: 걪리스 재생 항상 활성화 (앨범 연속 재생 시 공백 제거)
     mpvWidget_->core()->setProperty("gapless-audio", QString("yes"));
 }
 
@@ -423,57 +430,65 @@ void MainWindow::onFileLoaded(const QString& path) {
 
 void MainWindow::showUI() {
     if (!uiVisible_) {
-        // 전체화면/창 모드 모두 UI 표시
-        if (isFullscreen_) {
-            // 전체화면에서는 타이틀바 숨김 유지, 컨트롤바만 표시
+        if (isMusicMode_) {
+            // 음악 모드: 타이틀바만 표시, ControlBar는 절대 표시하지 않음
+            // (MusicWidget 내부에 자체 시크바가 있으므로 중복 방지)
+            titleBar_->show();
+        } else if (isFullscreen_) {
+            // 영상 전체화면: 타이틀바 숨김 유지, 컨트롤바만 표시
             controlBar_->show();
         } else {
+            // 영상 창 모드: 타이틀바+컨트롤바 모두 표시
             titleBar_->show();
             controlBar_->show();
         }
         uiVisible_ = true;
     }
-    // 마우스 커서 복원
+    // 마우스 커서 복원 (음악 모드 포함 항상 복원)
     if (cursor().shape() == Qt::BlankCursor)
         unsetCursor();
     mpvWidget_->unsetCursor();
+    if (musicPage_) musicPage_->unsetCursor();
     // 재생 중 마우스 움직임이 있으면 3초 후 숨김 타이머 재시작
-    if (isPlaying_ && uiHideTimer_) {
+    // 음악 모드에서는 타이머 비활성화 (커서/타이틀바 숨기지 않음)
+    if (isPlaying_ && !isMusicMode_ && uiHideTimer_) {
         uiHideTimer_->start(3000);
     }
 }
 
 void MainWindow::hideUI() {
-    // 버그 수정: !isFullscreen_ 조건 제거 → 전체화면에서도 자동 숨김 동작
+    // 음악 모드에서는 타이틀바/커서를 절대 숨기지 않음
+    // (음악 청취 중 타이틀바와 마우스 커서는 항상 보여야 함)
+    if (isMusicMode_) return;
+
     if (uiVisible_ && isPlaying_) {
         if (isFullscreen_) {
-            // 전체화면: 컨트롤바만 숨김 (타이틀바는 이미 숨겨져 있음)
+            // 영상 전체화면: 컨트롤바만 숨김
             controlBar_->hide();
         } else {
-            // 창 모드: 타이틀바+컨트롤바 모두 숨김
+            // 영상 창 모드: 타이틀바+컨트롤바 모두 숨김
             titleBar_->hide();
             controlBar_->hide();
         }
         uiVisible_ = false;
-        // 마우스 커서 숨김
+        // 마우스 커서 숨김 (영상 모드에서만)
         setCursor(Qt::BlankCursor);
         mpvWidget_->setCursor(Qt::BlankCursor);
     }
 }
 
 void MainWindow::onPlaybackStarted() {
-    controlBar_->setPlaying(true);
-    // UI 자동 숨김 타이머 설정
+    if (!isMusicMode_) controlBar_->setPlaying(true);
+    // UI 자동 숨김 타이머 설정 (영상 모드에서만 사용)
     if (!uiHideTimer_) {
         uiHideTimer_ = new QTimer(this);
         uiHideTimer_->setSingleShot(true);
         connect(uiHideTimer_, &QTimer::timeout, this, &MainWindow::hideUI);
     }
-    // isPlaying_ 먼저 설정 → showUI에서 타이머 즉시 시작
     isPlaying_ = true;
     showUI();
-    // 재생 시작 즉시 3초 후 자동 숨김 타이머 시작
-    uiHideTimer_->start(3000);
+    // 자동 숨김 타이머: 영상 모드에서만 시작
+    if (!isMusicMode_) uiHideTimer_->start(3000);
 #ifdef Q_OS_WIN
     SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED);
 #endif
@@ -490,12 +505,15 @@ void MainWindow::onPlaybackPaused() {
 }
 void MainWindow::onPlaybackEnded() {
     isPlaying_ = false;
-    // 끝까지 재생 완료 → 저장된 이어보기 위치 삭제
     clearResumePosition(currentFilePath_);
     if (uiHideTimer_) uiHideTimer_->stop();
     showUI();
-    controlBar_->setPlaying(false);
-    mpvWidget_->showLogo(true);
+    if (!isMusicMode_) {
+        controlBar_->setPlaying(false);
+        mpvWidget_->showLogo(true);
+    } else {
+        musicPage_->setPlaying(false);
+    }
 #ifdef Q_OS_WIN
     SetThreadExecutionState(ES_CONTINUOUS);
 #endif
@@ -504,9 +522,13 @@ void MainWindow::onPlaybackStopped() {
     isPlaying_ = false;
     if (uiHideTimer_) uiHideTimer_->stop();
     showUI();
-    controlBar_->setPlaying(false);
+    if (!isMusicMode_) {
+        controlBar_->setPlaying(false);
+        mpvWidget_->showLogo(true);
+    } else {
+        musicPage_->setPlaying(false);
+    }
     updateWindowTitle();
-    mpvWidget_->showLogo(true);
 #ifdef Q_OS_WIN
     SetThreadExecutionState(ES_CONTINUOUS);
 #endif

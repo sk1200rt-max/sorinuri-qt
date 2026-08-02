@@ -2,6 +2,7 @@
 #include "LyricsWidget.h"
 #include "MpvCore.h"
 #include <QPainter>
+#include <QApplication>
 #include <QSettings>
 #include <QTimer>
 #include <QPainterPath>
@@ -201,6 +202,8 @@ void PlaylistPanel::setCurrentIndex(int idx){
 // MusicWidget
 MusicWidget::MusicWidget(MpvCore* core, QWidget* parent):QWidget(parent),core_(core){
     setAutoFillBackground(false);
+    // 마우스 이동 이벤트를 MainWindow까지 전달하여 커서 숨김 방지
+    setMouseTracking(true);
     dominantColor_=kTeal;
     specBins_.fill(0.0f,64);specPeak_.fill(0.0f,64);
     peakTimer_=new QTimer(this);peakTimer_->setInterval(50);
@@ -213,6 +216,18 @@ MusicWidget::MusicWidget(MpvCore* core, QWidget* parent):QWidget(parent),core_(c
     rotationTimer_=new QTimer(this);rotationTimer_->setInterval(33);
     connect(rotationTimer_,&QTimer::timeout,this,&MusicWidget::onRotationTick);
     setupUI();setupConnections();
+}
+
+void MusicWidget::mouseMoveEvent(QMouseEvent* e) {
+    // 마우스 이동 이벤트를 부모(MainWindow)까지 전달
+    // → MainWindow::mouseMoveEvent에서 showUI() 호출 → 커서 복원
+    QWidget::mouseMoveEvent(e);
+    if (parent()) {
+        QMouseEvent* parentEvent = new QMouseEvent(
+            e->type(), e->position(), e->globalPosition(),
+            e->button(), e->buttons(), e->modifiers());
+        QApplication::postEvent(parent(), parentEvent);
+    }
 }
 
 void MusicWidget::setupUI(){

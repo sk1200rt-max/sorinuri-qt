@@ -11,6 +11,7 @@
 #include <QPropertyAnimation>
 #include <QListWidget>
 #include <QLineEdit>
+#include <QMouseEvent>
 
 class LyricsWidget;
 class MpvCore;
@@ -95,6 +96,7 @@ signals:
 protected:
     void paintEvent(QPaintEvent* e) override;
     void resizeEvent(QResizeEvent* e) override;
+    void mouseMoveEvent(QMouseEvent* e) override;  // 커서 숨김 방지: 이벤트를 MainWindow에 전달
 
 private slots:
     void onRotationTick();

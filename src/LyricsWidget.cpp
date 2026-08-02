@@ -18,6 +18,8 @@
 LyricsWidget::LyricsWidget(QWidget* parent) : QWidget(parent) {
     setAutoFillBackground(false);
     setAttribute(Qt::WA_OpaquePaintEvent, false);
+    // 마우스 이동 이벤트를 MainWindow까지 전달하여 커서 숨김 방지
+    setMouseTracking(true);
 
     nam_ = new QNetworkAccessManager(this);
     connect(nam_, &QNetworkAccessManager::finished,
