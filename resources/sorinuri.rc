@@ -1,12 +1,12 @@
-IDI_ICON1 ICON "icons/sorinuri.ico"
+IDI_ICON1 ICON "sorinuri.ico"
 
 // Per-Monitor V2 DPI manifest
 // CREATEPROCESS_MANIFEST_RESOURCE_ID = 1
 1 24 "sorinuri.manifest"
 
 VS_VERSION_INFO VERSIONINFO
-FILEVERSION 6,3,6,0
-PRODUCTVERSION 6,3,6,0
+FILEVERSION 6,3,7,0
+PRODUCTVERSION 6,3,7,0
 BEGIN
     BLOCK "StringFileInfo"
     BEGIN
@@ -14,12 +14,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName",      "Sorinuri"
             VALUE "FileDescription",  "Sorinuri Media Player"
-            VALUE "FileVersion",      "6.3.6.0"
+            VALUE "FileVersion",      "6.3.7.0"
             VALUE "InternalName",     "Sorinuri"
             VALUE "LegalCopyright",   "Copyright (C) 2026 Sorinuri"
             VALUE "OriginalFilename", "Sorinuri.exe"
             VALUE "ProductName",      "Sorinuri"
-            VALUE "ProductVersion",   "6.3.6.0"
+            VALUE "ProductVersion",   "6.3.7.0"
         END
     END
     BLOCK "VarFileInfo"

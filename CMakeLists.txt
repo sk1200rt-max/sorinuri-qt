@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(Sorinuri VERSION 6.3.6 LANGUAGES CXX)
+project(Sorinuri VERSION 6.3.7 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -119,9 +119,12 @@ set(SOURCES
 if(WIN32)
     set(SOURCES ${SOURCES} resources/sorinuri.rc)
     add_executable(Sorinuri WIN32 ${SOURCES})
-    # RC 컴파일러가 manifest 파일을 찾을 수 있도록 resources 디렉토리 추가
+    # RC 컴파일러가 아이콘/manifest 파일을 찾을 수 있도록 include 경로 추가
+    # - resources/ : manifest(sorinuri.manifest) 위치
+    # - resources/icons/ : 아이콘(sorinuri.ico) 위치
+    # - ${CMAKE_SOURCE_DIR} : 소스 루트 (절대 경로 기준점)
     set_source_files_properties(resources/sorinuri.rc PROPERTIES
-        COMPILE_FLAGS "/I\"${CMAKE_SOURCE_DIR}/resources\""
+        COMPILE_FLAGS "/I\"${CMAKE_SOURCE_DIR}/resources\" /I\"${CMAKE_SOURCE_DIR}/resources/icons\" /I\"${CMAKE_SOURCE_DIR}\""
     )
     # MSVC 링커의 자동 manifest 삽입 비활성화
     # (RC 파일에 이미 Per-Monitor V2 manifest가 포함되어 있으므로 중복 방지)

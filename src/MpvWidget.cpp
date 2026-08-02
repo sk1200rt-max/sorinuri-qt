@@ -89,6 +89,22 @@ void MpvWidget::initializeGL() {
     // → GPU 벤더 기반 렌더링 설정 재적용 (화면 해상도만 기반이던 초기 설정 개선)
     core_->redetectGpuAndApply();
 
+    // ── 멀티모니터 이동 감지 ─────────────────────────────────────
+    // 소리누리 창을 다른 모니터로 이동 시 해상도/주사율/DPI가 바뀜
+    // QWindow::screenChanged 시그널 → redetectGpuAndApply() 재호출
+    // 예: FHD 모니터(ewa_lanczossharp) → 4K 모니터(spline36) 자동 전환
+    if (QWindow* win = window()->windowHandle()) {
+        connect(win, &QWindow::screenChanged, this, [this](QScreen* newScreen) {
+            Q_UNUSED(newScreen)
+            qInfo() << "[MpvWidget] 모니터 변경 감지 → 렌더링 설정 재적용";
+            // 약간의 지연 후 재감지 (모니터 전환 완료 대기)
+            QTimer::singleShot(500, this, [this]() {
+                core_->redetectGpuAndApply();
+            });
+        });
+        qInfo() << "[MpvWidget] 멀티모니터 이동 감지 활성화";
+    }
+
     updateLogoPos();
 }
 

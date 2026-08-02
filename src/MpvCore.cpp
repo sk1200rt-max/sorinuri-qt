@@ -1102,6 +1102,58 @@ void MpvCore::redetectGpuAndApply() {
     // 원래 scale 알고리즘 저장 (품질 강등 복원용)
     originalScale_   = env.scaleAlgo;
     debandOriginal_  = env.debandEnabled;
+
+    // ── VRAM 기반 셰이더 캐시 설정 ───────────────────────────────
+    // VRAM 4GB 이상: 셰이더 캐시 활성화 → 파일 로드 시간 단축
+    // VRAM 2GB 미만: 캐시 비활성화 → VRAM 절약
+    if (env.vramMb >= 4096) {
+        // 셰이더 캐시 디렉토리 설정 (MPV 기본 캐시 경로 사용)
+        mpv_set_property_string(mpv_, "gpu-shader-cache-dir", "~~/.cache/mpv/shaders");
+        // Direct Memory Access: VRAM 8GB 이상에서 직접 렌더링 활성화
+        if (env.vramMb >= 8192) {
+            mpv_set_property_string(mpv_, "vd-lavc-dr", "yes");
+            qInfo() << "[MPV] VRAM 8GB+ → vd-lavc-dr=yes (직접 렌더링 활성화)";
+        }
+        qInfo() << "[MPV] VRAM" << env.vramMb << "MB → 셰이더 캐시 활성화";
+    } else if (env.vramMb > 0 && env.vramMb < 2048) {
+        // VRAM 2GB 미만: 셰이더 캐시 비활성화
+        mpv_set_property_string(mpv_, "gpu-shader-cache-dir", "");
+        qInfo() << "[MPV] VRAM" << env.vramMb << "MB 미만 → 셰이더 캐시 비활성화";
+    }
+
+    // ── HDR 디스플레이 감지 시 tone-mapping 자동 전환 ────────────
+    // Windows HDR 활성화된 디스플레이: tone-mapping=auto (패스스루)
+    // SDR 디스플레이: bt.2446a 유지 (HDR→SDR 변환)
+    if (env.hdrEnabled) {
+        mpv_set_property_string(mpv_, "tone-mapping",          "auto");
+        mpv_set_property_string(mpv_, "target-colorspace-hint", "yes");
+        mpv_set_property_string(mpv_, "target-peak",            "auto");
+        qInfo() << "[MPV] HDR 디스플레이 감지 → tone-mapping=auto (패스스루 모드)";
+    } else {
+        // SDR 디스플레이: BT.2446a 톤매핑 유지
+        mpv_set_property_string(mpv_, "tone-mapping", "bt.2446a");
+        qInfo() << "[MPV] SDR 디스플레이 → tone-mapping=bt.2446a";
+    }
+
+    // ── 디코딩 스레드 수 GPU 부하 연동 ───────────────────────────
+    // 4K 환경 또는 통합 GPU에서 스레드 수 제한 → CPU-GPU 대역폭 경합 감소
+    if (env.lavcThreads > 0) {
+        mpv_set_property_string(mpv_, "vd-lavc-threads",
+            QString::number(env.lavcThreads).toUtf8().constData());
+        qInfo() << "[MPV] lavc-threads=" << env.lavcThreads
+                << "(GPU 부하 연동, 자동=0)";
+    } else {
+        mpv_set_property_string(mpv_, "vd-lavc-threads", "0");  // 자동
+    }
+
+    // ── gpu-next 자동 전환 ────────────────────────────────────────
+    // NVIDIA RTX / AMD RDNA2+에서 조건 충족 시 gpu-next 자동 활성화
+    // gpu-next(libplacebo): Vulkan 경로, 4K 부하 20~30% 감소
+    if (env.gpuNextReady && !gpuNextActive_) {
+        qInfo() << "[MPV] gpu-next 조건 충족 (" << env.gpuRenderer
+                << ") → 자동 전환 시도";
+        tryGpuNext();
+    }
 }
 
 // ── 영상 해상도 기반 업스케일 알고리즘 최적화 ────────────────────

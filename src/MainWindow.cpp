@@ -203,6 +203,15 @@ void MainWindow::setupConnections() {
     connect(core, &MpvCore::videoInfoChanged,   this, &MainWindow::onVideoInfoChanged);
     connect(core, &MpvCore::tracksChanged,      this, &MainWindow::onTracksChanged);
 
+    // 실시간 렌더링 품질 강등/복원 시그널 → OSD로 사용자에게 알림
+    // 프레임 드롭 감지 시 자동으로 deband/scale 강등하면 OSD로 표시
+    connect(core, &MpvCore::renderQualityDegraded, this, [this](const QString& reason) {
+        if (osdWidget_) osdWidget_->showInfo("⚠ 렌더링 자동 최적화: " + reason, 4000);
+    });
+    connect(core, &MpvCore::renderQualityRestored, this, [this]() {
+        if (osdWidget_) osdWidget_->showInfo("✅ 렌더링 품질 복원됨", 3000);
+    });
+
     controlBar_->connectMpv(core);  // AudioInfoBar 대체 - 인라인 오디오 정보
     trackSelector_->connectMpv(core);
 

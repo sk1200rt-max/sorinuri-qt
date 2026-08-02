@@ -75,6 +75,12 @@ struct RenderEnvInfo {
     QString videoSync;
     QString framedrop;
 
+    // 확장 환경 정보
+    int     vramMb       = 0;      // VRAM 용량 (MB), 0=감지 불가
+    bool    hdrEnabled   = false;  // Windows HDR 활성 여부
+    bool    gpuNextReady = false;  // gpu-next 사용 가능 여부
+    int     lavcThreads  = 0;      // 최적 디코딩 스레드 수 (0=자동)
+
     // 환경 설명 (로그용)
     QString description;
 };
@@ -152,7 +158,34 @@ public:
             .arg(info.debandEnabled ? "ON" : "OFF")
             .arg(info.debandIterations);
 
+        // ── 확장 환경 정보 감지 ──────────────────────────────────
+        info.vramMb       = detectVramMb();
+        info.hdrEnabled   = detectHdrEnabled(screen);
+        info.gpuNextReady = canUseGpuNext(info.gpuVendor, info.gpuTier);
+        info.lavcThreads  = optimalLavcThreads(info.pixelLoad, info.gpuTier);
+
+        // VRAM 기반 GPU 등급 보정
+        // GPU 이름만으로는 VRAM 용량을 알 수 없음 (GTX 1070 4GB vs 8GB 등)
+        // VRAM이 충분하면 등급 상향 허용
+        if (info.vramMb >= 8192 && info.gpuTier == GpuTier::Medium) {
+            info.gpuTier = GpuTier::High;
+            qInfo() << "[RenderEnv] VRAM 8GB+ 감지 → GPU 등급 Medium→High 상향";
+            // 등급 상향에 따라 설정 재적용
+            applySettingsForEnvironment(info);
+        } else if (info.vramMb > 0 && info.vramMb < 2048 &&
+                   info.gpuTier <= GpuTier::Medium) {
+            // VRAM 2GB 미만: 고품질 필터 제한
+            info.gpuTier = GpuTier::Low;
+            qInfo() << "[RenderEnv] VRAM 2GB 미만 감지 → GPU 등급 Low 강등";
+            applySettingsForEnvironment(info);
+        }
+
         qInfo() << "[RenderEnv]" << info.description;
+        if (info.vramMb > 0)
+            qInfo() << "[RenderEnv] VRAM:" << info.vramMb << "MB"
+                    << "| HDR:" << (info.hdrEnabled ? "ON" : "OFF")
+                    << "| gpu-next:" << (info.gpuNextReady ? "가능" : "불가")
+                    << "| lavc-threads:" << (info.lavcThreads == 0 ? "자동" : QString::number(info.lavcThreads));
         return info;
     }
 
@@ -327,6 +360,112 @@ public:
         }
         return "Unknown";
     }
+
+    // ── VRAM 용량 감지 ────────────────────────────────────────────
+    // GL_NVX_gpu_memory_info (NVIDIA) 또는 GL_ATI_meminfo (AMD) 확장 사용
+    // 컨텍스트 없거나 확장 미지원 시 0 반환 (안전 기본값 사용)
+    static int detectVramMb() {
+        QOpenGLContext* ctx = QOpenGLContext::currentContext();
+        if (!ctx) return 0;
+
+        // NVIDIA: GL_NVX_gpu_memory_info
+        // GL_GPU_MEMORY_INFO_TOTAL_AVAILABLE_MEMORY_NVX = 0x9048
+        if (ctx->hasExtension("GL_NVX_gpu_memory_info")) {
+            QOpenGLFunctions* f = ctx->functions();
+            if (f) {
+                GLint totalKb = 0;
+                f->glGetIntegerv(0x9048, &totalKb);
+                if (totalKb > 0) {
+                    int vramMb = totalKb / 1024;
+                    qInfo() << "[RenderEnv] NVIDIA VRAM:" << vramMb << "MB";
+                    return vramMb;
+                }
+            }
+        }
+
+        // AMD: GL_ATI_meminfo
+        // GL_TEXTURE_FREE_MEMORY_ATI = 0x87FC
+        if (ctx->hasExtension("GL_ATI_meminfo")) {
+            QOpenGLFunctions* f = ctx->functions();
+            if (f) {
+                GLint memInfo[4] = {0};
+                f->glGetIntegerv(0x87FC, memInfo);
+                if (memInfo[0] > 0) {
+                    int vramMb = memInfo[0] / 1024;
+                    qInfo() << "[RenderEnv] AMD VRAM (free):" << vramMb << "MB";
+                    return vramMb;  // 여유 VRAM (전체보다 작을 수 있음)
+                }
+            }
+        }
+
+        qInfo() << "[RenderEnv] VRAM 감지 불가 (확장 미지원)";
+        return 0;
+    }
+
+    // ── HDR 디스플레이 감지 (Windows HDR 활성 여부) ───────────────
+    // Qt 6.6+ QScreen::hdrEnabled() 사용
+    // 구버전 Qt에서는 항상 false 반환 (안전)
+    static bool detectHdrEnabled(QScreen* screen = nullptr) {
+        if (!screen) screen = QApplication::primaryScreen();
+        if (!screen) return false;
+
+#if QT_VERSION >= QT_VERSION_CHECK(6, 6, 0)
+        bool hdr = screen->hdrEnabled();
+        if (hdr) qInfo() << "[RenderEnv] HDR 디스플레이 감지: 활성화됨";
+        return hdr;
+#else
+        // Qt 6.5 이하: Windows API로 직접 확인
+        // DISPLAYCONFIG_PATH_INFO를 통해 HDR 상태 확인
+        // 복잡한 API이므로 기본값 false 반환
+        Q_UNUSED(screen)
+        return false;
+#endif
+    }
+
+    // ── gpu-next 자동 전환 조건 판단 ─────────────────────────────
+    // GPU 등급과 OpenGL 버전을 확인하여 gpu-next 사용 가능 여부 판단
+    // NVIDIA RTX / AMD RDNA2+ / Intel Arc에서 안정적
+    static bool canUseGpuNext(GpuVendor vendor, GpuTier tier) {
+        // 통합 GPU: gpu-next 불필요 (bilinear 사용 중)
+        if (tier == GpuTier::Integrated) return false;
+
+        // NVIDIA RTX (Turing+): Vulkan 드라이버 안정적
+        if (vendor == GpuVendor::NvidiaRTX) return true;
+
+        // NVIDIA GTX: OpenGL 경로가 더 안정적
+        if (vendor == GpuVendor::NvidiaGTX ||
+            vendor == GpuVendor::NvidiaLegacy) return false;
+
+        // AMD RDNA2+: Vulkan 드라이버 안정적
+        if (vendor == GpuVendor::AmdRDNA2Plus) return true;
+
+        // AMD RDNA1/GCN: 아직 불안정 케이스 있음
+        if (vendor == GpuVendor::AmdRDNA1 ||
+            vendor == GpuVendor::AmdGCN) return false;
+
+        // Intel Arc: 드라이버 개선 중, 조건부 허용
+        if (vendor == GpuVendor::IntelArc) return false;  // 아직 비활성
+
+        return false;
+    }
+
+    // ── 디코딩 스레드 수 GPU 부하 연동 최적화 ────────────────────
+    // GPU 렌더링 부하가 높은 환경에서 CPU 스레드를 제한하여
+    // CPU-GPU 메모리 대역폭 경합 감소
+    static int optimalLavcThreads(PixelLoad pixelLoad, GpuTier gpuTier) {
+        if (gpuTier == GpuTier::Integrated) {
+            // 통합 GPU: CPU와 메모리 공유 → 스레드 제한
+            return 2;
+        }
+        switch (pixelLoad) {
+        case PixelLoad::Low:    return 0;  // FHD: 자동 (제한 없음)
+        case PixelLoad::Medium: return 0;  // QHD: 자동
+        case PixelLoad::High:   return 4;  // 4K: 4스레드 제한 (대역폭 경합 감소)
+        case PixelLoad::Ultra:  return 4;  // 5K+: 4스레드 제한
+        }
+        return 0;
+    }
+
 
 private:
     // ── GPU 벤더 및 등급 분류 ─────────────────────────────────────

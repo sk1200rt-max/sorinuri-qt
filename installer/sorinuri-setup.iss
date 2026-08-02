@@ -3,7 +3,7 @@
 
 #define MyAppName "소리누리"
 #define MyAppNameEn "Sorinuri"
-#define MyAppVersion "6.3.6"
+#define MyAppVersion "6.3.7"
 #define MyAppPublisher "Sorinuri"
 #define MyAppURL "https://sorinuri.com"
 #define MyAppExeName "Sorinuri.exe"
@@ -123,7 +123,7 @@ Type: filesandordirs; Name: "{app}"
 // ============================================================================
 var
   DolbyPage: TWizardPage;
-  DolbyInfoLabel: TLabel;
+  DolbyInfoMemo: TNewMemo;
   DolbyLinkLabel: TNewStaticText;
 
 function GetDolbyCaption(): String;
@@ -163,21 +163,25 @@ begin
     CustomMessage('DolbyPageTitle'),
     CustomMessage('DolbyPageDesc'));
 
-  DolbyInfoLabel := TLabel.Create(DolbyPage);
-  DolbyInfoLabel.Parent := DolbyPage.Surface;
-  DolbyInfoLabel.Left := 0;
-  DolbyInfoLabel.Top := 0;
-  DolbyInfoLabel.Width := DolbyPage.SurfaceWidth;
-  DolbyInfoLabel.AutoSize := True;
-  DolbyInfoLabel.WordWrap := True;
-  // HiDPI: 폰트 크기를 DPI에 비례하여 설정
-  DolbyInfoLabel.Font.Size := BaseFontSize;
-  DolbyInfoLabel.Caption := GetDolbyCaption();
+  // TNewMemo: 세로 스크롤바 자동 표시 → 내용이 길어도 잘리지 않음
+  // 기존 TLabel은 페이지 높이를 초과하면 내용이 잘리는 문제가 있었음
+  DolbyInfoMemo := TNewMemo.Create(DolbyPage);
+  DolbyInfoMemo.Parent := DolbyPage.Surface;
+  DolbyInfoMemo.Left := 0;
+  DolbyInfoMemo.Top := 0;
+  DolbyInfoMemo.Width := DolbyPage.SurfaceWidth;
+  // 링크 레이블(약 20px) + 여백(12px) 제외한 나머지 전체 사용
+  DolbyInfoMemo.Height := DolbyPage.SurfaceHeight - 32;
+  DolbyInfoMemo.ScrollBars := ssVertical;
+  DolbyInfoMemo.ReadOnly := True;
+  DolbyInfoMemo.WantReturns := False;
+  DolbyInfoMemo.Font.Size := BaseFontSize;
+  DolbyInfoMemo.Lines.Text := GetDolbyCaption();
 
   DolbyLinkLabel := TNewStaticText.Create(DolbyPage);
   DolbyLinkLabel.Parent := DolbyPage.Surface;
   DolbyLinkLabel.Left := 0;
-  DolbyLinkLabel.Top := DolbyInfoLabel.Top + DolbyInfoLabel.Height + 8;
+  DolbyLinkLabel.Top := DolbyInfoMemo.Top + DolbyInfoMemo.Height + 4;
   DolbyLinkLabel.Width := DolbyPage.SurfaceWidth;
   DolbyLinkLabel.AutoSize := True;
   DolbyLinkLabel.Caption := CustomMessage('DolbyLinkText');
