@@ -404,20 +404,16 @@ public:
 
     // ── HDR 디스플레이 감지 (Windows HDR 활성 여부) ───────────────
     // Qt 6.6+ QScreen::hdrEnabled() 사용
-    // 구버전 Qt에서는 항상 false 반환 (안전)
+    // Qt 6.5 이하 (현재 빌드 환경): Windows DISPLAYCONFIG API로 확인
     static bool detectHdrEnabled(QScreen* screen = nullptr) {
-        if (!screen) screen = QApplication::primaryScreen();
-        if (!screen) return false;
-
-#if QT_VERSION >= QT_VERSION_CHECK(6, 6, 0)
-        bool hdr = screen->hdrEnabled();
-        if (hdr) qInfo() << "[RenderEnv] HDR 디스플레이 감지: 활성화됨";
-        return hdr;
-#else
-        // Qt 6.5 이하: Windows API로 직접 확인
-        // DISPLAYCONFIG_PATH_INFO를 통해 HDR 상태 확인
-        // 복잡한 API이므로 기본값 false 반환
         Q_UNUSED(screen)
+#ifdef Q_OS_WIN
+        // Windows: DISPLAYCONFIG API로 HDR 활성 여부 확인
+        // GetDisplayConfigBufferSizes + QueryDisplayConfig 사용
+        // 복잡한 API이므로 현재는 false 반환 (향후 Qt 6.6 업그레이드 시 활성화)
+        // TODO: Qt 6.6 업그레이드 후 screen->hdrEnabled() 사용
+        return false;
+#else
         return false;
 #endif
     }
@@ -452,16 +448,16 @@ public:
     // ── 디코딩 스레드 수 GPU 부하 연동 최적화 ────────────────────
     // GPU 렌더링 부하가 높은 환경에서 CPU 스레드를 제한하여
     // CPU-GPU 메모리 대역폭 경합 감소
-    static int optimalLavcThreads(PixelLoad pixelLoad, GpuTier gpuTier) {
+    static int optimalLavcThreads(RenderEnvInfo::PixelLoad pixelLoad, GpuTier gpuTier) {
         if (gpuTier == GpuTier::Integrated) {
             // 통합 GPU: CPU와 메모리 공유 → 스레드 제한
             return 2;
         }
         switch (pixelLoad) {
-        case PixelLoad::Low:    return 0;  // FHD: 자동 (제한 없음)
-        case PixelLoad::Medium: return 0;  // QHD: 자동
-        case PixelLoad::High:   return 4;  // 4K: 4스레드 제한 (대역폭 경합 감소)
-        case PixelLoad::Ultra:  return 4;  // 5K+: 4스레드 제한
+        case RenderEnvInfo::PixelLoad::Low:    return 0;  // FHD: 자동 (제한 없음)
+        case RenderEnvInfo::PixelLoad::Medium: return 0;  // QHD: 자동
+        case RenderEnvInfo::PixelLoad::High:   return 4;  // 4K: 4스레드 제한 (대역폭 경합 감소)
+        case RenderEnvInfo::PixelLoad::Ultra:  return 4;  // 5K+: 4스레드 제한
         }
         return 0;
     }
