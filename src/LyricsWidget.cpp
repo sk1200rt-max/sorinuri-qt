@@ -333,8 +333,11 @@ void LyricsWidget::setPosition(double posSecs) {
     if (newIdx != currentIdx_) {
         currentIdx_ = newIdx;
         if (currentIdx_ >= 0) {
+            // targetOffset_: 현재 라인의 절대 Y 위치 (lineH 단위)
+            // paintEvent에서 startY = centerY - scrollOffset_ 로 계산하면
+            // 현재 라인이 contentRect 중앙에 정확히 위치함
             const int lineH = 36;
-            targetOffset_ = currentIdx_ * lineH - height() / 2 + lineH / 2;
+            targetOffset_ = currentIdx_ * lineH + lineH / 2;
             if (!scrollTimer_->isActive())
                 scrollTimer_->start();
         }
@@ -396,9 +399,16 @@ void LyricsWidget::paintEvent(QPaintEvent* /*e*/) {
     p.setClipRect(contentRect);
 
     const int lineH   = 36;
+    // centerY: contentRect 중앙 Y 좌표
+    // scrollOffset_은 현재 라인의 중앙점 Y 위치 (lineH 단위)
+    // startY = centerY - scrollOffset_: 이렇게 하면 라인 0의 Y = centerY - scrollOffset_
+    // 현재 라인 i의 Y = startY + i * lineH
+    // 현재 라인(currentIdx_)의 Y = startY + currentIdx_ * lineH
+    //   = centerY - scrollOffset_ + currentIdx_ * lineH
+    //   = centerY - (currentIdx_ * lineH + lineH/2) + currentIdx_ * lineH
+    //   = centerY - lineH/2  (중앙에 정확히 위치)
     const int centerY = contentRect.top() + contentRect.height() / 2;
-    const int startY  = centerY - static_cast<int>(scrollOffset_)
-                        - currentIdx_ * lineH;
+    const int startY  = centerY - static_cast<int>(scrollOffset_);
 
     for (int i = 0; i < lines_.size(); ++i) {
         int y = startY + i * lineH;

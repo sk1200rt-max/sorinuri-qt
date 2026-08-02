@@ -73,12 +73,11 @@ private:
     // ── 상단 플레이어 섹션 ──────────────────────────────────────────
     QWidget*     playerSection_   = nullptr;
 
-    // 앨범아트 (원형 회전)
+    // 앨범아트
     QPixmap      albumArtPixmap_;
     QPixmap      blurBg_;
     QColor       dominantColor_   = QColor(0, 200, 180);
-    qreal        rotationAngle_   = 0.0;
-    QTimer*      rotationTimer_   = nullptr;
+    QRect        artRect_;          // resizeEvent에서 계산되는 앨범아트 영역
 
     // 트랙 정보
     QLabel*      titleLabel_      = nullptr;
