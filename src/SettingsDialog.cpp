@@ -542,6 +542,12 @@ void SettingsDialog::loadSettings() {
     ptTrueHD_->setChecked(settings_.value("audio/pt_truehd", true).toBool());
     volumeSlider_->setValue(settings_.value("audio/volume", 100).toInt());
 
+    // voCombo_ 로드 (다음 실행 시 적용)
+    if (voCombo_) {
+        int voIdx = settings_.value("video/vo_index", 0).toInt();
+        if (voIdx >= 0 && voIdx < voCombo_->count())
+            voCombo_->setCurrentIndex(voIdx);
+    }
     int hwdecIdx = hwdecCombo_->findText(settings_.value("video/hwdec", "d3d11va (DirectX 11)").toString());
     if (hwdecIdx >= 0) hwdecCombo_->setCurrentIndex(hwdecIdx);
 
@@ -626,7 +632,7 @@ void SettingsDialog::applyToMpv() {
     // NOTE: vo(Video Output) 변경은 libmpv 렌더 컨텍스트와 충돌하여
     // 영상이 별도 창으로 분리되는 문제가 발생함.
     // vo=libmpv는 초기화 시 한 번만 설정하며 이후 절대 변경하지 않음.
-    // (voCombo_ 선택값은 다음 실행 시 적용되도록 향후 개선 예정)
+    // voCombo_ 선택값은 QSettings에 저장하고 다음 실행 시 initialize()에서 적용됨.
 
     // 자막
     mpv_->setProperty("sub-font", subFontCombo_->currentText());
@@ -647,6 +653,8 @@ void SettingsDialog::onApply() {
     settings_.setValue("audio/pt_dtshd",    ptDTSHD_->isChecked());
     settings_.setValue("audio/pt_truehd",   ptTrueHD_->isChecked());
     settings_.setValue("audio/volume",      volumeSlider_->value());
+    // voCombo_ 저장 (다음 실행 시 initialize()에서 적용)
+    if (voCombo_) settings_.setValue("video/vo_index", voCombo_->currentIndex());
     settings_.setValue("video/hwdec",       hwdecCombo_->currentText());
     settings_.setValue("video/scaling",     scalingCombo_->currentText());
     settings_.setValue("video/deband",      debandCheck_->isChecked());

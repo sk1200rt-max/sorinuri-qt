@@ -27,6 +27,7 @@
 #include "MusicWidget.h"
 #include "HiFiEngine.h"
 #include "MiniPlayerWidget.h"
+#include "CompactPlayerWidget.h"
 #include "WhisperWidget.h"
 #include "UpscaleWidget.h"
 #include "ChapterWidget.h"
@@ -91,6 +92,7 @@ private slots:
     void onMusicSeekRequested(double pos);
     void onMusicVolumeChanged(int vol);
     void toggleMiniPlayer();
+    void toggleCompactPlayer();   // 소형 모드 (AIMP 스타일 세로 창)
     void toggleWhisper(bool on);
     void onChapterBookmark();
     void toggleMultiView(MultiViewLayout l);
@@ -140,6 +142,7 @@ private:
     // HiFi 엔진
     HiFiEngine*        hifiEngine_      = nullptr;
     MiniPlayerWidget*  miniPlayer_      = nullptr;
+    CompactPlayerWidget* compactPlayer_ = nullptr;  // 소형 모드 창
     WhisperWidget*     whisperWidget_   = nullptr;
     UpscaleWidget*     upscaleWidget_   = nullptr;
     ChapterWidget*     chapterWidget_   = nullptr;

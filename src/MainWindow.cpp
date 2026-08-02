@@ -282,6 +282,8 @@ void MainWindow::setupConnections() {
     });
     // 미니 플레이어 연결
     connect(musicPage_, &MusicWidget::miniModeRequested, this, &MainWindow::toggleMiniPlayer);
+    // 소형 모드 (코팩트 플레이어) 연결
+    connect(musicPage_, &MusicWidget::compactModeRequested, this, &MainWindow::toggleCompactPlayer);
     // miniPlayer_, whisperWidget_, chapterWidget_ 연결은 지연 초기화
     // (toggleMiniPlayer, onProFeaturesRequested에서 처음 생성 시 연결)
 }
@@ -352,6 +354,11 @@ void MainWindow::loadMusicMeta(const QString& path) {
     meta.album      = core->getProperty("metadata/by-key/album").toString();
     meta.year       = core->getProperty("metadata/by-key/date").toString();
     meta.filePath   = path;  // LRC 가사 탐색용
+    // AI 가사 검색에 필요한 duration (LRCLIB /api/get 정확 매칭용)
+    // totalDuration_이 아직 0이면 MPV에서 직접 읽음
+    double dur = totalDuration_ > 0 ? totalDuration_
+                                    : core->getProperty("duration").toDouble();
+    if (dur > 0) totalDuration_ = dur;
     // 1) 파일 내장 앨범 아트 추출 (ID3v2 APIC / FLAC PICTURE / MP4 covr)
     meta.albumArt = AlbumArtExtractor::extract(path);
     // 2) 없으면 폴더 내 커버 이미지 탐색
@@ -363,9 +370,11 @@ void MainWindow::loadMusicMeta(const QString& path) {
             if (dir.exists(name)) { meta.albumArt = QPixmap(dir.filePath(name)); break; }
         }
     }
+        // MusicWidget에서 loadForTrack에 duration을 전달하기 위해
+    // MusicWidget::loadMeta 호출 전에 duration_을 설정
+    musicPage_->updatePosition(0, dur);  // duration 먼저 설정
     musicPage_->loadMeta(meta);
 }
-
 void MainWindow::onMusicSeekRequested(double pos) {
     mpvWidget_->core()->seek(pos);
 }
@@ -1524,7 +1533,85 @@ void MainWindow::toggleMiniPlayer() {
         }
         hide();
         miniPlayer_->show();
-        miniPlayer_->raise();
+                miniPlayer_->raise();
+    }
+}
+
+void MainWindow::toggleCompactPlayer() {
+    if (!isMusicMode_) return;
+
+    // 첫 호출 시 지연 초기화
+    if (!compactPlayer_) {
+        compactPlayer_ = new CompactPlayerWidget(nullptr);
+        auto* core = mpvWidget_->core();
+
+        // 컨트롤 시그널 연결
+        connect(compactPlayer_, &CompactPlayerWidget::playPauseRequested,
+                core, &MpvCore::togglePause);
+        connect(compactPlayer_, &CompactPlayerWidget::prevRequested,
+                core, [core]() { core->command({"playlist-prev"}); });
+        connect(compactPlayer_, &CompactPlayerWidget::nextRequested,
+                core, [core]() { core->command({"playlist-next"}); });
+        connect(compactPlayer_, &CompactPlayerWidget::seekRequested,
+                core, [core](double pos) { core->seek(pos); });
+        connect(compactPlayer_, &CompactPlayerWidget::volumeChanged,
+                core, [core](int v) { core->setVolume(v); });
+        connect(compactPlayer_, &CompactPlayerWidget::expandRequested,
+                this, &MainWindow::toggleCompactPlayer);
+        connect(compactPlayer_, &CompactPlayerWidget::trackSelected,
+                core, [core](int idx) {
+            core->command({"playlist-play-index", QString::number(idx)});
+        });
+
+        // MPV 상태 → 콤팩트 플레이어 업데이트
+        connect(core, &MpvCore::positionChanged,
+                compactPlayer_, [this](double pos) {
+            if (compactPlayer_) compactPlayer_->updatePosition(pos, totalDuration_);
+        });
+        connect(core, &MpvCore::playbackStarted,
+                compactPlayer_, [this]() {
+            if (compactPlayer_) compactPlayer_->setPlaying(true);
+        });
+        connect(core, &MpvCore::playbackPaused,
+                compactPlayer_, [this]() {
+            if (compactPlayer_) compactPlayer_->setPlaying(false);
+        });
+    }
+
+    if (compactPlayer_->isVisible()) {
+        // 콤팩트 모드 종료 → 메인 창 복구
+        compactPlayer_->hide();
+        show();
+        activateWindow();
+    } else {
+        // 코드 정보 전달
+        if (musicPage_) {
+            const auto& meta = musicPage_->currentMeta();
+            compactPlayer_->setMeta(
+                meta.title, meta.artist, meta.album,
+                meta.albumArt, meta.codec,
+                meta.bitDepth, meta.sampleRate,
+                meta.channels, false);
+            compactPlayer_->updatePosition(
+                mpvWidget_->core()->position(), totalDuration_);
+            compactPlayer_->setPlaying(!mpvWidget_->core()->isPaused());
+
+            // 재생목록 전달
+            QStringList paths;
+            int cur = 0;
+            auto* core = mpvWidget_->core();
+            int count = core->getProperty("playlist-count").toInt();
+            int curIdx = core->getProperty("playlist-pos").toInt();
+            for (int i = 0; i < count; ++i) {
+                paths << core->getProperty(
+                    QString("playlist/%1/filename").arg(i)).toString();
+            }
+            compactPlayer_->setPlaylist(paths, curIdx);
+        }
+        hide();
+        compactPlayer_->show();
+        compactPlayer_->raise();
+        compactPlayer_->activateWindow();
     }
 }
 

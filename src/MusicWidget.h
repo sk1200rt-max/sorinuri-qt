@@ -72,6 +72,7 @@ public:
     explicit MusicWidget(MpvCore* core, QWidget* parent = nullptr);
 
     void loadMeta(const MusicMeta& meta);
+    const MusicMeta& currentMeta() const { return currentMeta_; }
     void updatePosition(double pos, double duration);
     void setPlaying(bool playing);
     void updateSpectrum(const QVector<float>& bins);
@@ -92,6 +93,7 @@ signals:
     void eqRequested();
     void settingsRequested();
     void miniModeRequested();
+    void compactModeRequested();   // 소형 모드 (코팩트 플레이어)
 
 protected:
     void paintEvent(QPaintEvent* e) override;
@@ -167,6 +169,7 @@ private:
     QPushButton*  btnVolume_    = nullptr;
     QSlider*      volSlider_    = nullptr;
     QPushButton*  btnMini_      = nullptr;
+    QPushButton*  btnCompact_   = nullptr;   // 소형 모드 버튼
     QPushButton*  btnSettings_  = nullptr;
 
     // 하단 상태바

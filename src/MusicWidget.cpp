@@ -305,11 +305,15 @@ void MusicWidget::setupUI(){
                               "QSlider::sub-page:horizontal{background:#666;border-radius:2px;}");
     btnMini_=new QPushButton("⊟",this);btnMini_->setFixedSize(28,28);btnMini_->setToolTip("미니 플레이어 (M)");
     btnMini_->setStyleSheet("QPushButton{background:transparent;border:none;font-size:14px;color:#888;}QPushButton:hover{color:white;}");
+    // 소형 모드 버튼 (코팩트 플레이어)
+    btnCompact_=new QPushButton("⬜",this);btnCompact_->setFixedSize(28,28);
+    btnCompact_->setToolTip("소형 모드 전환 (세로형 독립 창)");
+    btnCompact_->setStyleSheet("QPushButton{background:transparent;border:none;font-size:11px;color:#888;font-family:'Segoe UI';}QPushButton:hover{color:#00c8b4;}");
     btnSettings_=new QPushButton("⚙",this);btnSettings_->setFixedSize(28,28);
     btnSettings_->setStyleSheet("QPushButton{background:transparent;border:none;font-size:14px;color:#888;}QPushButton:hover{color:white;}");
     bottomRow->addWidget(speedLabel_);bottomRow->addStretch();
     bottomRow->addWidget(btnVolume_);bottomRow->addWidget(volSlider_);bottomRow->addSpacing(8);
-    bottomRow->addWidget(btnMini_);bottomRow->addWidget(btnSettings_);root->addLayout(bottomRow);
+    bottomRow->addWidget(btnCompact_);bottomRow->addWidget(btnMini_);bottomRow->addWidget(btnSettings_);root->addLayout(bottomRow);
     statusBar_=new QLabel("FLAC  ·  DECODE  ·  2.0  ·  192kHz  ·  24bit  ·  BIT-PERFECT",this);
     statusBar_->setAlignment(Qt::AlignCenter);
     statusBar_->setStyleSheet("font-size:10px;color:#555;font-family:'Consolas';background:#0a0a0a;padding:4px 0;");
@@ -339,6 +343,7 @@ void MusicWidget::setupConnections(){
     });
     connect(volSlider_,&QSlider::valueChanged,this,&MusicWidget::volumeChanged);
     connect(btnMini_,&QPushButton::clicked,this,&MusicWidget::miniModeRequested);
+    connect(btnCompact_,&QPushButton::clicked,this,&MusicWidget::compactModeRequested);
     connect(btnSettings_,&QPushButton::clicked,this,&MusicWidget::settingsRequested);
     connect(btnShowLyrics_,&QPushButton::clicked,this,[this](){onRightPanelToggle(0);});
     connect(btnShowEq_,&QPushButton::clicked,this,[this](){onRightPanelToggle(1);});
@@ -390,7 +395,12 @@ void MusicWidget::loadMeta(const MusicMeta& meta){
         .arg(rateBadge_->text()).arg(bitBadge_->text());
     if(meta.hasReplayGain) status+=QString("  ·  ReplayGain: %1dB").arg(meta.replayGain,0,'f',1);
     statusBar_->setText(status);
-    if(lyricsWidget_) lyricsWidget_->loadForTrack(meta.title,meta.artist,meta.filePath);
+    // AI 가사 검색: duration과 album을 함께 전달하여 /api/get 정확 매칭 시도
+    if(lyricsWidget_) lyricsWidget_->loadForTrack(
+        meta.title, meta.artist, meta.filePath,
+        duration_,  // 현재 알려진 duration (없으면 0)
+        meta.album
+    );
     update();
 }
 
