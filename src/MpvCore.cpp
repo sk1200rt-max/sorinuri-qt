@@ -95,6 +95,13 @@ bool MpvCore::initialize(WId windowId) {
     // auto-safe: NVIDIA/AMD/Intel GPU 자동 감지, 실패 시 소프트웨어로 폴백
     check_error(mpv_set_property_string(mpv_, "hwdec", "auto-safe"));
 
+    // ── 프레임 드롭 설정 (노트북 GPU 끊김 방지) ──────────────────────────
+    // vo: GPU가 디코딩보다 느릴 때 프레임 스킵 허용 → 끊김 대신 일부 프레임 스킵
+    // 노트북 통합 GPU(Intel Iris/UHD)에서 가장 효과적
+    check_error(mpv_set_property_string(mpv_, "framedrop", "vo"));
+    // 디코딩 스레드: 0=자동 (코어 수 기준 자동 선택)
+    check_error(mpv_set_property_string(mpv_, "vd-lavc-threads", "0"));
+
     // ── 비디오 동기화 ────────────────────────────────────────────────
     // audio: 오디오 타이밍 기준으로 동기화 → OpenGL 렌더 컨텍스트와 충돌 없음
     // display-resample은 모니터 주사율 재샘플링으로 끊김 발생 가능
@@ -137,9 +144,9 @@ bool MpvCore::initialize(WId windowId) {
 
     // ── 디밴딩 (Color Banding 제거) ──────────────────────────────────
     // 어두운 장면, 하늘, 그라데이션에서 발생하는 등고선 노이즈 제거
-    // iterations=2: 2회 반복으로 강한 밴딩도 제거
+    // iterations=1: 노트북 통합 GPU 부하 최소화 (2→1, 화질 차이 미미)
     check_error(mpv_set_property_string(mpv_, "deband",            "yes"));
-    check_error(mpv_set_property_string(mpv_, "deband-iterations", "2"));
+    check_error(mpv_set_property_string(mpv_, "deband-iterations", "1"));
     check_error(mpv_set_property_string(mpv_, "deband-threshold",  "48"));
     check_error(mpv_set_property_string(mpv_, "deband-range",      "16"));
     check_error(mpv_set_property_string(mpv_, "deband-grain",      "24"));

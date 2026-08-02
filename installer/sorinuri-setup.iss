@@ -3,7 +3,7 @@
 
 #define MyAppName "소리누리"
 #define MyAppNameEn "Sorinuri"
-#define MyAppVersion "6.3.1"
+#define MyAppVersion "6.3.2"
 #define MyAppPublisher "Sorinuri"
 #define MyAppURL "https://sorinuri.com"
 #define MyAppExeName "Sorinuri.exe"
@@ -74,7 +74,7 @@ english.DolbyLine5=  [!]  Dolby Access is OPTIONAL.
 english.DolbyLine6=       Local file playback and passthrough work without it.
 
 [Tasks]
-Name: "desktopicon"; Description: "바탕화면에 아이콘 만들기(&D)"; GroupDescription: "추가 아이콘:"; Flags: unchecked
+Name: "desktopicon"; Description: "바탕화면에 아이콘 만들기(&D)"; GroupDescription: "추가 아이콘:"
 Name: "quicklaunchicon"; Description: "빠른 실행에 아이콘 만들기(&Q)"; GroupDescription: "추가 아이콘:"; Flags: unchecked; OnlyBelowVersion: 6.1; Check: not IsAdminInstallMode
 Name: "installdolby"; Description: "{cm:DolbyTaskDesc}"; GroupDescription: "Dolby 오디오 지원:"; Flags: unchecked
 
@@ -228,6 +228,17 @@ var
 begin
   if CurStep = ssInstall then begin
     Exec('taskkill.exe', '/F /IM Sorinuri.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  end;
+  // 설치 완료 후 쉘 아이콘 캐시 강제 갱신
+  // 바탕화면 아이콘이 이전 버전 아이콘으로 표시되는 문제 해결
+  if CurStep = ssPostInstall then begin
+    // ie4uinit: 쉘 아이콘 캐시 초기화 (관리자 권한 필요 없음)
+    Exec(ExpandConstant('{sys}\ie4uinit.exe'), '-show', '',
+         SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    // 추가 방어라인: RunDll32로 쉘 아이콘 캐시 갱신
+    Exec(ExpandConstant('{sys}\RunDll32.exe'),
+         'shell32.dll,SHChangeNotify 0x8000000 0 0 0', '',
+         SW_HIDE, ewWaitUntilTerminated, ResultCode);
   end;
 end;
 

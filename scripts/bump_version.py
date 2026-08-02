@@ -8,6 +8,8 @@
   2. src/UpdateChecker.h - currentVersion()
   3. .github/workflows/build-windows.yml - APP_VERSION (2곳)
   4. installer/sorinuri-setup.iss - AppVersion (있는 경우)
+  5. resources/sorinuri.rc - FILEVERSION, PRODUCTVERSION, FileVersion, ProductVersion
+  6. src/main.cpp - app.setApplicationVersion()
 """
 import sys, re, os
 
@@ -54,12 +56,37 @@ def bump(new_ver):
             open(path, 'w').write(c2)
             changed.append('installer/sorinuri-setup.iss')
 
+    # 5. resources/sorinuri.rc - FILEVERSION, PRODUCTVERSION, FileVersion, ProductVersion
+    path = os.path.join(root, 'resources', 'sorinuri.rc')
+    if os.path.exists(path):
+        c = open(path).read()
+        # FILEVERSION 6,3,1,0 형식
+        rc_ver = new_ver.replace('.', ',') + ',0'
+        c2 = re.sub(r'(FILEVERSION\s+)[\d,]+', lambda m: m.group(1) + rc_ver, c)
+        c2 = re.sub(r'(PRODUCTVERSION\s+)[\d,]+', lambda m: m.group(1) + rc_ver, c2)
+        # "FileVersion" "6.3.1.0" 형식
+        str_ver = new_ver + '.0'
+        c2 = re.sub(r'(VALUE "FileVersion",\s+")[\d\.]+', lambda m: m.group(1) + str_ver, c2)
+        c2 = re.sub(r'(VALUE "ProductVersion",\s+")[\d\.]+', lambda m: m.group(1) + str_ver, c2)
+        if c2 != c:
+            open(path, 'w').write(c2)
+            changed.append('resources/sorinuri.rc')
+
+    # 6. src/main.cpp - app.setApplicationVersion()
+    path = os.path.join(root, 'src', 'main.cpp')
+    if os.path.exists(path):
+        c = open(path).read()
+        c2 = re.sub(r'(app\.setApplicationVersion\(")[\d\.]+"', lambda m: m.group(1) + new_ver + '"', c)
+        if c2 != c:
+            open(path, 'w').write(c2)
+            changed.append('src/main.cpp')
+
     if changed:
         print(f'✅ 버전 {new_ver}으로 업데이트 완료:')
         for f in changed:
             print(f'   - {f}')
     else:
-        print('변경된 파일 없음 (이미 해당 버전이거나 패턴 불일치)')
+        print('변경된 파일 업음 (이미 해당 버전이거나 패턴 불일치)')
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
