@@ -36,8 +36,8 @@ int main(int argc, char* argv[])
     QSurfaceFormat fmt;
     fmt.setVersion(3, 3);
     fmt.setProfile(QSurfaceFormat::CoreProfile);
-    fmt.setSwapBehavior(QSurfaceFormat::DoubleBuffer);
-    fmt.setSwapInterval(0);   // MPV가 자체적으로 VSync 제어
+    fmt.setSwapBehavior(QSurfaceFormat::TripleBuffer);  // 프레임 대기 제거 (4K HiDPI 끊김 방지)
+    fmt.setSwapInterval(1);  // Qt VSync만 사용 (이중 VSync 충돌 방지)
     QSurfaceFormat::setDefaultFormat(fmt);
 
     // ── Qt 플러그인 경로 고정 (포터블 실행 속도 핵심) ─────────────
@@ -48,7 +48,7 @@ int main(int argc, char* argv[])
     QApplication app(argc, argv);
     app.setApplicationName("Sorinuri");
     app.setApplicationDisplayName("소리누리");
-    app.setApplicationVersion("6.3.3");
+    app.setApplicationVersion("6.3.4");
     app.setOrganizationName("Sorinuri");
     app.setWindowIcon(QIcon(":/icons/sorinuri.ico"));
 

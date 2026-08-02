@@ -90,10 +90,12 @@ bool MpvCore::initialize(WId windowId) {
     // 목표: 제작사가 의도한 색감과 음향을 100% 그대로 재현
     // 모든 설정은 이 목표를 위해 신중하게 선택되었음.
     // ══════════════════════════════════════════════════════════════════
-    // ── GPU API 명시 설정 (시작 속도 최적화) ─────────────────────────────────────
-    // d3d11: Windows 네이티브 D3D11 경로 명시 → OpenGL 협상 시간 제거
-    // 통합 GPU(Intel Iris/UHD)에서 렌더링 안정성 향상, 화질 변화 없음
-    check_error(mpv_set_property_string(mpv_, "gpu-api", "d3d11"));
+    // ── VSync 제어 원칙 ─────────────────────────────────────────────────────────
+    // Qt(QOpenGLWidget)이 swapInterval=1로 VSync를 제어함.
+    // MPV는 opengl-swapinterval=0으로 자체 VSync를 비활성화.
+    // 이중 VSync 충돌 시 4K HiDPI에서 프레임 타이밍 불규칙 발생.
+    // → MPV VSync 비활성화, Qt만 VSync 사용 = 이중 VSync 제거.
+    check_error(mpv_set_property_string(mpv_, "opengl-swapinterval", "0"));
 
 
     // ── 하드웨어 디코딩 ──────────────────────────────────────────────
@@ -108,8 +110,11 @@ bool MpvCore::initialize(WId windowId) {
     check_error(mpv_set_property_string(mpv_, "vd-lavc-threads", "0"));
 
     // ── 비디오 동기화 ────────────────────────────────────────────────
-    // audio: 오디오 타이밍 기준으로 동기화 → OpenGL 렌더 컨텍스트와 충돌 없음
-    // display-resample은 모니터 주사율 재샘플링으로 끊김 발생 가능
+    // audio: 초기값은 audio 모드 (안전한 기본값)
+    // 파일 로드 후 applyVideoSyncByFps()가 FPS에 따라 자동 전환:
+    //   - 60fps 이하: display-resample (저더 제거, 24fps 영화 최적)
+    //   - 60fps 초과: audio (고프레임 게임 영상 안정성)
+    // Qt swapInterval=1 + opengl-swapinterval=0 조합으로 이중 VSync 없음
     check_error(mpv_set_property_string(mpv_, "video-sync", "audio"));
 
     // ── 영상 크기/비율 ────────────────────────────────────────────────
@@ -945,6 +950,8 @@ void MpvCore::applyVideoSyncByFps(double fps) {
     if (fps <= 60.0) {
         mpv_set_property_string(mpv_, "video-sync",   "display-resample");
         mpv_set_property_string(mpv_, "interpolation", "no");  // 보간 없이 동기화만
+        // display-resample 최대 드롭 허용: 5% 이내 (끊김 대신 미세 조정)
+        mpv_set_property_string(mpv_, "video-sync-max-video-change", "5");
         qInfo() << "[MPV] video-sync: display-resample (fps=" << fps << ")";
     } else {
         mpv_set_property_string(mpv_, "video-sync", "audio");

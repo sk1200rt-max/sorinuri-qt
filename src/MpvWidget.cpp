@@ -218,8 +218,8 @@ void MpvWidget::appendFile(const QString& path) {
 }
 
 void MpvWidget::onUpdate(void* ctx) {
-    // DirectConnection: MPV 렌더 스레드에서 직접 호출 → 프레임 지연 없음
-    // QueuedConnection은 이벤트 루프 한 사이클 대기 → 프레임 빠짐 발생
+    // MPV 렌더 스레드 → Qt 메인 스레드로 안전하게 전달
+    // QueuedConnection: 이벤트 루프를 통해 메인 스레드에서 실행 (스레드 안전)
     MpvWidget* w = reinterpret_cast<MpvWidget*>(ctx);
     QMetaObject::invokeMethod(w, "maybeUpdate", Qt::QueuedConnection);
 }
