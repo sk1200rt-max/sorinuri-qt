@@ -1189,14 +1189,9 @@ void MpvCore::redetectGpuAndApply() {
         mpv_set_property_string(mpv_, "vd-lavc-threads", "0");  // 자동
     }
 
-    // ── gpu-next 자동 전환 ────────────────────────────────────────
-    // NVIDIA RTX / AMD RDNA2+에서 조건 충족 시 gpu-next 자동 활성화
-    // gpu-next(libplacebo): Vulkan 경로, 4K 부하 20~30% 감소
-    if (env.gpuNextReady && !gpuNextActive_) {
-        qInfo() << "[MPV] gpu-next 조건 충족 (" << env.gpuRenderer
-                << ") → 자동 전환 시도";
-        tryGpuNext();
-    }
+    // NOTE: gpu-next(vo 변경)는 libmpv 렌더 컨텍스트와 충돌하여
+    // 영상이 별도 창으로 분리되는 문제가 발생함.
+    // vo=libmpv는 초기화 시 한 번만 설정하며 이후 절대 변경하지 않음.
 }
 
 // ── 영상 해상도 기반 업스케일 알고리즘 최적화 ────────────────────

@@ -623,14 +623,10 @@ void SettingsDialog::applyToMpv() {
         mpv_->applyRenderProfile(profile);
     }
 
-    // 비디오 출력 (vo) 설정 - gpu-next 선택 시 안전 전환 적용
-    QString voText = voCombo_->currentText();
-    if (voText.contains("gpu-next")) {
-        mpv_->tryGpuNext();  // 안전 전환 (실패 시 자동 폴백)
-    } else {
-        QString vo = voText.split(" ").first();
-        mpv_->setVideoOutput(vo);
-    }
+    // NOTE: vo(Video Output) 변경은 libmpv 렌더 컨텍스트와 충돌하여
+    // 영상이 별도 창으로 분리되는 문제가 발생함.
+    // vo=libmpv는 초기화 시 한 번만 설정하며 이후 절대 변경하지 않음.
+    // (voCombo_ 선택값은 다음 실행 시 적용되도록 향후 개선 예정)
 
     // 자막
     mpv_->setProperty("sub-font", subFontCombo_->currentText());

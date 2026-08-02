@@ -64,7 +64,9 @@ public:
 
     // 비디오 설정
     void setHwdec(const QString& method);
-    void setVideoOutput(const QString& vo);
+    // setVideoOutput/tryGpuNext 사용 금지: vo 변경 시 영상이 별도 창으로 분리됨
+    // vo=libmpv는 초기화 시 한 번만 설정하며 이후 절대 변경하지 않음
+    void setVideoOutput(const QString& vo);  // 내부 호환성 유지용 (외부 호출 금지)
     void setMotionSmoothing(bool enabled);
 
     // ── GPU 렌더링 최적화 ────────────────────────────────────────
@@ -78,8 +80,8 @@ public:
     // MpvWidget::initializeGL()에서 호출
     void redetectGpuAndApply();
 
-    // gpu-next 안전 전환 (실패 시 gpu 폴백)
-    void tryGpuNext();
+    // tryGpuNext: 사용 금지 (vo 변경으로 인한 창 분리 문제)
+    // void tryGpuNext();  // DISABLED
 
     // 영상 해상도 기반 업스케일 알고리즘 최적화
     // FILE_LOADED 이벤트에서 video-params/w, video-params/h 확인 후 호출
