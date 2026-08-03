@@ -422,7 +422,7 @@ void NetworkBrowserWidget::onCastStart()
     req.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
     QString body = QString("v=%1").arg(QUrl::toPercentEncoding(streamUrl));
     auto* reply = mgr->post(req, body.toUtf8());
-    connect(reply, &QNetworkReply::finished, this, [this, reply, ip]() {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, ip, streamUrl, mgr]() {
         if (reply->error() == QNetworkReply::NoError) {
             castStatusLabel_->setText(
                 QString("캐스팅 시작됨: %1\n크롬캐스트 기기에서 재생 중입니다.").arg(ip));

@@ -321,8 +321,7 @@ void SettingsDialog::setupVideoTab(QTabWidget* tabs) {
 
     // gpu-api 안내 레이블
     QLabel* gpuNextHint = new QLabel(
-        "D3D12/libplacebo: 4K 환경에서 GPU 부하 20~30% 감소. NVIDIA RTX/AMD RDNA2+ 권장.
-"
+        "D3D12/libplacebo: 4K 환경에서 GPU 부하 20~30% 감소. NVIDIA RTX/AMD RDNA2+ 권장.\n"
         "변경은 다음 실행 시 적용됩니다.", page);
     gpuNextHint->setStyleSheet("color: #888; font-size: 11px;");
     gpuNextHint->setWordWrap(true);
