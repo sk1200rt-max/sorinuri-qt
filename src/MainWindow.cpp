@@ -311,12 +311,12 @@ void MainWindow::openFiles(const QStringList& paths) {
                 switchToVideoMode();
             }
             // switchToVideoMode/MusicMode에서 QOpenGLWidget 컨텍스트가 재배치될 수 있음.
-            // QTimer::singleShot(50)으로 다음 이벤트 루프 사이클에서 loadFile 호출.
+            // QTimer::singleShot(100)으로 다음 이벤트 루프 사이클에서 loadFile 호출.
             // → 컨텍스트 메뉴/다이얼로그 닫힘 처리가 완전히 끝난 후 실행 보장.
-            // HiDPI 250% 환경에서 컨텍스트 메뉴 닫힘 타이밍 문제 해결을 위해 50ms 지연.
-            // processEvents()만으로는 부족한 경우(우클릭 메뉴에서 파일 열기 등) 해결.
+            // HiDPI 250% 환경에서 컨텍스트 메뉴 닫힘 타이밍 문제 해결.
+            // 100ms: 저사양 PC / 비정수 DPR(125%, 150%, 175%, 250%) 환경 안전 마진.
             const QString pathCopy = path;
-            QTimer::singleShot(50, this, [this, pathCopy]() {
+            QTimer::singleShot(100, this, [this, pathCopy]() {
                 mpvWidget_->loadFile(pathCopy);
             });
             first = false;

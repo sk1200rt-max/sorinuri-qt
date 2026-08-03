@@ -24,31 +24,11 @@ public:
     explicit ClickSeekSlider(Qt::Orientation o, QWidget* parent = nullptr)
         : QSlider(o, parent) {}
 protected:
+    // 클릭한 위치로 즉시 이동 (HiDPI 모든 배율 안전)
+    // Qt6 PerMonitorV2: e->pos()는 항상 논리 픽셀 → DPR 무관하게 정확
     void mousePressEvent(QMouseEvent* e) override {
         if (e->button() == Qt::LeftButton) {
-            // QStyleOptionSlider로 정확한 슬라이더 값 계산 (HiDPI 안전)
-            QStyleOptionSlider opt;
-            initStyleOption(&opt);
-            QRect groove = style()->subControlRect(QStyle::CC_Slider, &opt,
-                                                    QStyle::SC_SliderGroove, this);
-            QRect handle = style()->subControlRect(QStyle::CC_Slider, &opt,
-                                                    QStyle::SC_SliderHandle, this);
-            int sliderMin, sliderMax, sliderLength;
-            if (orientation() == Qt::Horizontal) {
-                sliderLength = handle.width();
-                sliderMin = groove.x();
-                sliderMax = groove.right() - sliderLength + 1;
-            } else {
-                sliderLength = handle.height();
-                sliderMin = groove.y();
-                sliderMax = groove.bottom() - sliderLength + 1;
-            }
-            int pos = orientation() == Qt::Horizontal
-                      ? e->pos().x() - sliderLength / 2
-                      : e->pos().y() - sliderLength / 2;
-            int val = QStyle::sliderValueFromPosition(
-                minimum(), maximum(), pos - sliderMin,
-                sliderMax - sliderMin, opt.upsideDown);
+            int val = valueAtPos(e->pos());
             setValue(val);
             emit sliderMoved(val);
             emit sliderPressed();
@@ -56,6 +36,55 @@ protected:
             return;
         }
         QSlider::mousePressEvent(e);
+    }
+    // 드래그 중 실시간 업데이트
+    void mouseMoveEvent(QMouseEvent* e) override {
+        if (e->buttons() & Qt::LeftButton) {
+            int val = valueAtPos(e->pos());
+            setValue(val);
+            emit sliderMoved(val);
+            e->accept();
+            return;
+        }
+        QSlider::mouseMoveEvent(e);
+    }
+    // 릴리즈 시 최종 값 확정
+    void mouseReleaseEvent(QMouseEvent* e) override {
+        if (e->button() == Qt::LeftButton) {
+            int val = valueAtPos(e->pos());
+            setValue(val);
+            emit sliderMoved(val);
+            emit sliderReleased();
+            e->accept();
+            return;
+        }
+        QSlider::mouseReleaseEvent(e);
+    }
+private:
+    // 마우스 위치 → 슬라이더 값 변환 (논리 픽셀 기준, HiDPI 안전)
+    int valueAtPos(const QPoint& pos) const {
+        QStyleOptionSlider opt;
+        initStyleOption(&opt);
+        QRect groove = style()->subControlRect(QStyle::CC_Slider, &opt,
+                                                QStyle::SC_SliderGroove, this);
+        QRect handle = style()->subControlRect(QStyle::CC_Slider, &opt,
+                                                QStyle::SC_SliderHandle, this);
+        int sliderMin, sliderMax, sliderLength;
+        if (orientation() == Qt::Horizontal) {
+            sliderLength = handle.width();
+            sliderMin = groove.x();
+            sliderMax = groove.right() - sliderLength + 1;
+        } else {
+            sliderLength = handle.height();
+            sliderMin = groove.y();
+            sliderMax = groove.bottom() - sliderLength + 1;
+        }
+        int p = orientation() == Qt::Horizontal
+                ? pos.x() - sliderLength / 2
+                : pos.y() - sliderLength / 2;
+        return QStyle::sliderValueFromPosition(
+            minimum(), maximum(), p - sliderMin,
+            sliderMax - sliderMin, opt.upsideDown);
     }
 };
 
