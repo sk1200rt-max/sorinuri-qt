@@ -301,8 +301,13 @@ void SettingsDialog::setupVideoTab(QTabWidget* tabs) {
     decodeForm->addRow("하드웨어 디코딩:", hwdecCombo_);
 
     voCombo_ = new QComboBox(page);
-    voCombo_->addItems({"gpu (권장)", "gpu-next (차세대 렌더러)", "direct3d", "software"});
-    decodeForm->addRow("비디오 출력:", voCombo_);
+    voCombo_->addItems({
+        "D3D11 (기본, 안정적)",
+        "D3D12 / libplacebo (차세대, 4K GPU 부하 20~30% 감소)",
+        "OpenGL (호환성)",
+        "Vulkan (실험적)"
+    });
+    decodeForm->addRow("GPU API:", voCombo_);
 
     // 재시작 필요 항목 안내 (주황색 배너)
     QLabel* restartHint = new QLabel(
@@ -314,9 +319,11 @@ void SettingsDialog::setupVideoTab(QTabWidget* tabs) {
     restartHint->setTextFormat(Qt::RichText);
     decodeForm->addRow("", restartHint);
 
-    // gpu-next 안내 레이블
+    // gpu-api 안내 레이블
     QLabel* gpuNextHint = new QLabel(
-        "gpu-next: D3D12/Vulkan 기반 차세대 렌더러. 일부 GPU에서 불안정 시 자동 폴백.", page);
+        "D3D12/libplacebo: 4K 환경에서 GPU 부하 20~30% 감소. NVIDIA RTX/AMD RDNA2+ 권장.
+"
+        "변경은 다음 실행 시 적용됩니다.", page);
     gpuNextHint->setStyleSheet("color: #888; font-size: 11px;");
     gpuNextHint->setWordWrap(true);
     decodeForm->addRow("", gpuNextHint);
@@ -580,9 +587,12 @@ void SettingsDialog::loadSettings() {
     ptTrueHD_->setChecked(settings_.value("audio/pt_truehd", true).toBool());
     volumeSlider_->setValue(settings_.value("audio/volume", 100).toInt());
 
-    // voCombo_ 로드 (다음 실행 시 적용)
+    // GPU API 로드 (다음 실행 시 적용)
     if (voCombo_) {
-        int voIdx = settings_.value("video/vo_index", 0).toInt();
+        static const QStringList gpuApis = {"d3d11", "d3d12", "opengl", "vulkan"};
+        QString savedApi = settings_.value("video/gpu_api", "d3d11").toString();
+        int voIdx = gpuApis.indexOf(savedApi);
+        if (voIdx < 0) voIdx = settings_.value("video/vo_index", 0).toInt();
         if (voIdx >= 0 && voIdx < voCombo_->count())
             voCombo_->setCurrentIndex(voIdx);
     }
@@ -691,8 +701,14 @@ void SettingsDialog::onApply() {
     settings_.setValue("audio/pt_dtshd",    ptDTSHD_->isChecked());
     settings_.setValue("audio/pt_truehd",   ptTrueHD_->isChecked());
     settings_.setValue("audio/volume",      volumeSlider_->value());
-    // voCombo_ 저장 (다음 실행 시 initialize()에서 적용)
-    if (voCombo_) settings_.setValue("video/vo_index", voCombo_->currentIndex());
+    // GPU API 저장 (다음 실행 시 initialize()에서 적용)
+    if (voCombo_) {
+        static const QStringList gpuApis = {"d3d11", "d3d12", "opengl", "vulkan"};
+        int idx = voCombo_->currentIndex();
+        if (idx >= 0 && idx < gpuApis.size())
+            settings_.setValue("video/gpu_api", gpuApis[idx]);
+        settings_.setValue("video/vo_index", idx);
+    }
     settings_.setValue("video/hwdec",       hwdecCombo_->currentText());
     settings_.setValue("video/scaling",     scalingCombo_->currentText());
     settings_.setValue("video/deband",      debandCheck_->isChecked());
