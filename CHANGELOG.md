@@ -1,5 +1,84 @@
 # 소리누리 변경 이력 (Changelog)
 
+## [v6.7.0] - 2026-08-03
+### 🎬 비디오 렌더러 (Video Renderer)
+- **vo=gpu-next 안전 재도입**: 재생 중 vo 변경 절대 금지 원칙 유지, 설정 저장 후 다음 실행 시 적용
+- **D3D12/libplacebo 렌더러**: GPU API 설정으로 D3D12 선택 시 libplacebo 고품질 렌더링 활성화
+- **4K GPU 부하 20~30% 감소**: NVIDIA RTX/AMD RDNA2+ 환경에서 효과적
+- **설정창 GPU API 선택 UI**: D3D11(기본)/D3D12(libplacebo)/OpenGL/Vulkan 선택 가능
+
+---
+
+## [v6.6.0] - 2026-08-03
+### 🎵 오디오 (Audio)
+- **VST3 플러그인 호스팅**: MPV af=ladspa 방식으로 VST3 실시간 오디오 체인 적용
+- **VST 체인 활성화 토글**: '지금 적용' 버튼으로 재생 중 즉시 적용 지원
+- **.dll/.vst3 파일 지원**: Windows 전용 VST2/VST3 플러그인 등록 및 체인 구성
+
+### 📡 네트워크 (Network)
+- **크롬캐스트 네이티브 지원**: Cast v2 프로토콜로 미디어 URL 직접 전송
+- **자동 검색**: 서브넷 스캔 + Eureka API(포트 8008) 기반 크롬캐스트 기기 자동 감지
+- **HTTP POST 캐스팅**: /apps/ChromeCast 엔드포인트로 미디어 URL 전송
+
+---
+
+## [v6.5.1] - 2026-08-03
+### 🖥️ HDR 디스플레이 (HDR Display)
+- **Qt 6.7.3 QScreen::hdrEnabled() 활성화**: HDR 모니터 자동 감지 (Qt 6.6+ 조건부 컴파일)
+- **HDR 디스플레이 시 tone-mapping=auto**: 패스스루 모드 자동 적용
+- **SDR 모니터는 bt.2446a 유지**: 기존 동작 보장
+
+### ⚙️ 설정창 UI (Settings UI)
+- **재시작 필요 항목 명확히 구분**: 하드웨어 디코딩/비디오 출력 변경 시 주황색 배너 표시
+- **'다음 실행 시 적용' 안내**: 사용자 혼란 방지
+
+---
+
+## [v6.5.0] - 2026-08-03
+### 🖼️ 멀티뷰 (Multi-View)
+- **2분할/4분할 동시 재생**: toggleMultiView() 실제 구현 완료
+- **playerStack_ index 2**: MultiViewWidget 지연 초기화 (처음 사용 시 생성)
+- **우클릭 컨텍스트 메뉴**: 단일/2분할 좌우/상하/PIP/4분할 서브메뉴 추가
+
+### 🎵 미디어 라이브러리 (Media Library)
+- **앨범아트 비동기 썸네일 로드**: QtConcurrent + AlbumArtExtractor 활용
+- **썸네일 캐시**: 재스캔 시 즉시 표시 (thumbCache_)
+- **라운드 코너 썸네일**: QPainterPath 기반 렌더링
+
+### 📋 재생목록 (Playlist)
+- **아이콘 크기 48x48**: 썸네일 표시 지원
+- **음악/영상 파일 구분 아이콘**: 파일 유형별 기본 아이콘
+- **음악 파일 앨범아트 비동기 로드**: 재생목록에서 앨범아트 표시
+
+---
+
+## [v6.4.6] - 2026-08-03
+### 🔊 멀티채널 자동 인식 수정 (Multichannel Fix)
+- **WASAPI 독점 모드 기본값 통일**: MpvCore/SettingsDialog/MainWindow 모두 true로 통일
+- **audio-channels=auto 명시적 설정**: 초기화 시 및 파일 로드마다 재설정
+- **MPV audio-exclusive 속성 직접 확인**: QSettings 대신 실제 MPV 상태 기반 판단
+- **근본 원인 수정**: v6.4.2에서 공유 모드 기본값 변경으로 인한 멀티채널 PCM 다운믹스 문제
+
+---
+
+## [v6.4.5] - 2026-08-03
+### 🖥️ HiDPI 250% 전체 수정 (HiDPI Fix)
+- **타임라인 클릭 즉시 이동**: ClickSeekSlider 서브클래스 구현 (mousePressEvent 오버라이드)
+- **파일열기 재생 지연 조정**: QTimer::singleShot 50ms로 컨텍스트 메뉴 닫힘 처리 시간 확보
+- **버튼 포커스 정책 NoFocus**: ControlBar/TitleBar/MusicWidget 전체 버튼 NoFocus 적용
+- **단축키 포커스 유지**: 버튼 클릭 후 MainWindow 포커스 유지로 키보드 단축키 정상 동작
+
+---
+
+## [v6.4.4] - 2026-08-03
+### 🎵 음악 플레이어 완성도 (Music Player)
+- **볼륨 위치 변경**: 컨트롤 버튼 우측 하단 → 시크바 우측 인라인 배치
+- **A-B 반복 구현**: A 지점/B 지점 지정 후 구간 반복 기능
+- **우클릭 컨텍스트 메뉴**: 재생/정지/다음/이전/재생목록 추가/파일 정보
+- **버튼 툴팁**: 마우스 오버 시 기능 설명 표시
+- **셔플/반복 MPV 연결**: shuffleToggled/repeatToggled 시그널 MPV 실제 연결
+
+
 ## [v4.2.0] - 2026-07-30
 ### 🌟 주요 기능 (Major Features)
 - **AI 실시간 자막**: Whisper AI(faster-whisper)를 내장하여 자막 없는 영상에 실시간 한국어 번역 자막 생성
