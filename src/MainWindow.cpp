@@ -190,6 +190,20 @@ void MainWindow::setupConnections() {
     mpvWidget_->setMouseTracking(true);
     mpvWidget_->installEventFilter(this);
     setMouseTracking(true);
+
+    // HiDPI 근본 수정: mpvInitialized 시그널 연결
+    // initializeGL() 완료 후 pendingStartupFiles_ 자동 처리
+    // window.show() 직후 openFiles() 호출 시 initialized_=false로 무시되던 문제 근본 해결
+    // Qt::SingleShotConnection: 한 번만 실행 (initializeGL은 한 번만 호출됨)
+    connect(mpvWidget_, &MpvWidget::mpvInitialized, this, [this]() {
+        if (!pendingStartupFiles_.isEmpty()) {
+            qInfo() << "[MainWindow] mpvInitialized: pendingStartupFiles_ 처리" << pendingStartupFiles_;
+            QStringList files = pendingStartupFiles_;
+            pendingStartupFiles_.clear();
+            openFiles(files);
+        }
+    }, Qt::SingleShotConnection);
+
     auto* core = mpvWidget_->core();
 
     connect(core, &MpvCore::fileLoaded,         this, &MainWindow::onFileLoaded);
@@ -297,6 +311,15 @@ void MainWindow::setupConnections() {
 }
 
 void MainWindow::openFiles(const QStringList& paths) {
+    // HiDPI 근본 수정: MPV 초기화 전이면 pendingStartupFiles_에 저장
+    // initializeGL()이 완료되면 mpvInitialized 시그널이 발생하고
+    // setupConnections()의 슬롯에서 이 큐를 처리함
+    if (!mpvWidget_->isMpvInitialized()) {
+        qInfo() << "[MainWindow] openFiles: MPV 초기화 전 → pendingStartupFiles_에 저장" << paths;
+        pendingStartupFiles_ = paths;
+        return;
+    }
+
     bool first = true;
     for (const QString& path : paths) {
         QFileInfo fi(path);
@@ -311,12 +334,11 @@ void MainWindow::openFiles(const QStringList& paths) {
                 switchToVideoMode();
             }
             // switchToVideoMode/MusicMode에서 QOpenGLWidget 컨텍스트가 재배치될 수 있음.
-            // QTimer::singleShot(100)으로 다음 이벤트 루프 사이클에서 loadFile 호출.
-            // → 컨텍스트 메뉴/다이얼로그 닫힘 처리가 완전히 끝난 후 실행 보장.
-            // HiDPI 250% 환경에서 컨텍스트 메뉴 닫힘 타이밍 문제 해결.
-            // 100ms: 저사양 PC / 비정수 DPR(125%, 150%, 175%, 250%) 환경 안전 마진.
+            // QTimer::singleShot(0)으로 현재 이벤트 루프 사이클이 끝난 후 loadFile 호출.
+            // → 컨텍스트 메뉴 닫힌 처리가 완전히 끝난 후 실행 보장.
+            // 0ms: MPV 초기화 완료 후 호출되므로 타이밍 의존 불필요.
             const QString pathCopy = path;
-            QTimer::singleShot(100, this, [this, pathCopy]() {
+            QTimer::singleShot(0, this, [this, pathCopy]() {
                 mpvWidget_->loadFile(pathCopy);
             });
             first = false;

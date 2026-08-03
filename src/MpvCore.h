@@ -107,6 +107,9 @@ public:
     // 저수준 MPV 접근
     mpv_handle* handle() const { return mpv_; }
 
+    // MPV 초기화 완료 여부 (MpvWidget::isMpvInitialized()에서 사용)
+    bool isInitialized() const { return initialized_; }
+
     // 속성 직접 설정
     void     setProperty(const QString& name, const QVariant& value);
     QVariant getProperty(const QString& name) const;

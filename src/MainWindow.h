@@ -177,6 +177,12 @@ private:
     QString pendingUrl_;
     QProgressDialog* ytdlpProgress_ = nullptr;
 
+    // HiDPI 근본 수정: 시작 파일 대기 큐
+    // main.cpp에서 window.show() 직후 openFiles() 호출 시
+    // initializeGL()이 아직 실행되지 않아 loadFile이 무시되는 문제 해결
+    // mpvInitialized 시그널 수신 후 이 큐를 처리
+    QStringList pendingStartupFiles_;
+
     // 창 크기 조절
     bool   resizing_    = false;
     QPoint resizeStart_;

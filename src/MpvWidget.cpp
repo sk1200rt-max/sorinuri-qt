@@ -83,6 +83,12 @@ void MpvWidget::initializeGL() {
 
     qInfo() << "[MpvWidget] OpenGL render context 초기화 완료";
 
+    // HiDPI 근본 수정: initializeGL() 완료 후 mpvInitialized 시그널 emit
+    // → MainWindow가 pendingStartupFiles_를 처리하는 트리거
+    // QTimer::singleShot(0): 현재 initializeGL() 스택이 완전히 끝난 후 emit
+    // (renderCtx_ 설정 완료 보장)
+    QTimer::singleShot(0, this, [this]() { emit mpvInitialized(); });
+
     // ── OpenGL 컨텍스트 준비 완료 후 GPU 정보 재감지 ─────────────
     // initialize() 시점에는 OpenGL 컨텍스트가 없어 GPU 벤더 감지 불가.
     // initializeGL() 이후에는 GL_RENDERER/GL_VENDOR 읽기 가능.
@@ -244,6 +250,10 @@ void MpvWidget::updateLogoPos() {
     int y = (height() - logoLabel_->height()) / 2;
     logoLabel_->move(x, y);
     logoLabel_->raise();
+}
+
+bool MpvWidget::isMpvInitialized() const {
+    return core_ && core_->isInitialized();
 }
 
 void MpvWidget::showLogo(bool show) {

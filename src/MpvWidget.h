@@ -22,6 +22,15 @@ public:
     void setAiSubtitle(const QString& text, int confidence);
     void clearAiSubtitle();
 
+    // MPV 초기화 완료 여부 확인 (시작 파일 로드 타이밍 제어에 사용)
+    bool isMpvInitialized() const;
+
+signals:
+    // initializeGL() 완료 후 emit → 시작 파일 로드에 사용
+    // HiDPI 250% 환경에서 window.show() 직후 loadFile 호출 시
+    // initialized_=false 로 무시되는 문제를 근본 해결
+    void mpvInitialized();
+
 protected:
     void initializeGL() override;
     void paintGL() override;
