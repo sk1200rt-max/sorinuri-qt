@@ -1,6 +1,7 @@
 #pragma once
 #include <QWidget>
 #include <QListWidget>
+#include <QListWidgetItem>
 #include <QVBoxLayout>
 #include <QToolBar>
 #include <QStringList>
@@ -31,9 +32,14 @@ signals:
 
 private slots:
     void onItemDoubleClicked(QListWidgetItem* item);
+    void onThumbnailLoaded(const QString& path, const QPixmap& thumb);
 
 private:
+    void    loadThumbnailAsync(const QString& path, QListWidgetItem* item);
+    QString formatDuration(double secs) const;
+
     QListWidget* listWidget_ = nullptr;
     QStringList  filePaths_;
     int          currentIdx_ = -1;
+    QHash<QString, QPixmap> thumbCache_;
 };
