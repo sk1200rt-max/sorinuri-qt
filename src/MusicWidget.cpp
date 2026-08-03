@@ -10,6 +10,7 @@
 #include <QImage>
 #include <QFontMetrics>
 #include <QFileInfo>
+#include <QMessageBox>
 #include <cmath>
 
 static const QColor kTeal(0, 200, 180);
@@ -122,8 +123,6 @@ void EqPanel::buildUI(){
     br->setStyleSheet("QPushButton{background:#222;color:#aaa;border:1px solid #444;border-radius:4px;padding:4px 16px;font-size:12px;}"
                       "QPushButton:hover{background:#2a2a2a;color:white;}");
     connect(br,&QPushButton::clicked,this,[this](){applyPreset(0);});
-
-    // 사용자 정의 프리셋 저장/불러오기
     auto* saveBtn=new QPushButton("프리셋 저장",this);
     saveBtn->setStyleSheet(br->styleSheet());
     connect(saveBtn,&QPushButton::clicked,this,[this,saveBtn](){
@@ -134,7 +133,6 @@ void EqPanel::buildUI(){
         saveBtn->setText("✓ 저장됨");
         QTimer::singleShot(1500,saveBtn,[saveBtn](){saveBtn->setText("프리셋 저장");});
     });
-
     auto* loadBtn=new QPushButton("저장된 프리셋",this);
     loadBtn->setStyleSheet(br->styleSheet());
     connect(loadBtn,&QPushButton::clicked,this,[this](){
@@ -143,12 +141,8 @@ void EqPanel::buildUI(){
         if(list.size()==10)
             for(int i=0;i<10;++i) sliders_[i]->setValue(qRound(list[i].toDouble()*10));
     });
-
     auto* brow=new QHBoxLayout;
-    brow->addWidget(br);
-    brow->addWidget(saveBtn);
-    brow->addWidget(loadBtn);
-    brow->addStretch();
+    brow->addWidget(br);brow->addWidget(saveBtn);brow->addWidget(loadBtn);brow->addStretch();
     root->addLayout(brow);
 }
 
@@ -202,7 +196,6 @@ void PlaylistPanel::setCurrentIndex(int idx){
 // MusicWidget
 MusicWidget::MusicWidget(MpvCore* core, QWidget* parent):QWidget(parent),core_(core){
     setAutoFillBackground(false);
-    // 마우스 이동 이벤트를 MainWindow까지 전달하여 커서 숨김 방지
     setMouseTracking(true);
     dominantColor_=kTeal;
     specBins_.fill(0.0f,64);specPeak_.fill(0.0f,64);
@@ -219,8 +212,6 @@ MusicWidget::MusicWidget(MpvCore* core, QWidget* parent):QWidget(parent),core_(c
 }
 
 void MusicWidget::mouseMoveEvent(QMouseEvent* e) {
-    // 마우스 이동 이벤트를 부모(MainWindow)까지 전달
-    // → MainWindow::mouseMoveEvent에서 showUI() 호출 → 커서 복원
     QWidget::mouseMoveEvent(e);
     if (parent()) {
         QMouseEvent* parentEvent = new QMouseEvent(
@@ -228,6 +219,85 @@ void MusicWidget::mouseMoveEvent(QMouseEvent* e) {
             e->button(), e->buttons(), e->modifiers());
         QApplication::postEvent(parent(), parentEvent);
     }
+}
+
+void MusicWidget::contextMenuEvent(QContextMenuEvent* e) {
+    QMenu menu(this);
+    menu.setStyleSheet(
+        "QMenu{background:#1e1e1e;border:1px solid #333;color:white;padding:4px 0;}"
+        "QMenu::item{padding:6px 20px;font-size:13px;}"
+        "QMenu::item:selected{background:#2a2a2a;color:#00c8b4;}"
+        "QMenu::separator{height:1px;background:#333;margin:4px 0;}");
+
+    auto* actPlay = menu.addAction(isPlaying_ ? "⏸  일시정지" : "▶  재생");
+    connect(actPlay, &QAction::triggered, this, &MusicWidget::playPauseRequested);
+
+    auto* actPrev = menu.addAction("⏮  이전 트랙");
+    connect(actPrev, &QAction::triggered, this, &MusicWidget::prevRequested);
+    auto* actNext = menu.addAction("⏭  다음 트랙");
+    connect(actNext, &QAction::triggered, this, &MusicWidget::nextRequested);
+
+    menu.addSeparator();
+
+    auto* actShuffle = menu.addAction(isShuffle_ ? "✓  셔플 켜짐" : "⇌  셔플");
+    connect(actShuffle, &QAction::triggered, this, [this](){
+        isShuffle_ = !isShuffle_;
+        btnShuffle_->setStyleSheet(isShuffle_
+            ?"QPushButton{background:transparent;color:#00c8b4;border:none;font-size:16px;}"
+            :"QPushButton{background:transparent;color:#aaa;border:none;font-size:16px;}QPushButton:hover{color:white;}");
+        emit shuffleToggled(isShuffle_);
+    });
+
+    auto* actRepeat = menu.addAction(isRepeat_ ? "✓  반복 켜짐" : "↺  반복");
+    connect(actRepeat, &QAction::triggered, this, [this](){
+        isRepeat_ = !isRepeat_;
+        btnRepeat_->setStyleSheet(isRepeat_
+            ?"QPushButton{background:transparent;color:#00c8b4;border:none;font-size:16px;}"
+            :"QPushButton{background:transparent;color:#aaa;border:none;font-size:16px;}QPushButton:hover{color:white;}");
+        emit repeatToggled(isRepeat_);
+    });
+
+    menu.addSeparator();
+
+    auto* actPlaylist = menu.addAction("☰  재생목록 보기");
+    connect(actPlaylist, &QAction::triggered, this, [this](){ onRightPanelToggle(2); });
+    auto* actLyrics = menu.addAction("♪  가사 보기");
+    connect(actLyrics, &QAction::triggered, this, [this](){ onRightPanelToggle(0); });
+    auto* actEq = menu.addAction("🎚  이퀄라이저");
+    connect(actEq, &QAction::triggered, this, [this](){ onRightPanelToggle(1); });
+
+    menu.addSeparator();
+
+    if (!currentMeta_.filePath.isEmpty()) {
+        auto* actInfo = menu.addAction("ℹ  파일 정보");
+        connect(actInfo, &QAction::triggered, this, [this](){
+            QFileInfo fi(currentMeta_.filePath);
+            QString info = QString(
+                "파일명: %1\n경로: %2\n크기: %3 MB\n코덱: %4\n샘플레이트: %5 Hz\n비트 깊이: %6 bit\n채널: %7")
+                .arg(fi.fileName())
+                .arg(fi.absolutePath())
+                .arg(fi.size() / (1024.0*1024.0), 0, 'f', 2)
+                .arg(currentMeta_.codec.isEmpty() ? "알 수 없음" : currentMeta_.codec.toUpper())
+                .arg(currentMeta_.sampleRate)
+                .arg(currentMeta_.bitDepth > 0 ? QString::number(currentMeta_.bitDepth) : "알 수 없음")
+                .arg(currentMeta_.channels == 1 ? "모노" :
+                     currentMeta_.channels == 2 ? "스테레오" :
+                     QString("%1ch").arg(currentMeta_.channels));
+            QMessageBox* mb = new QMessageBox(this);
+            mb->setWindowTitle("파일 정보");
+            mb->setText(info);
+            mb->setStyleSheet("QMessageBox{background:#1e1e1e;color:white;}"
+                              "QLabel{color:white;font-size:13px;}"
+                              "QPushButton{background:#333;color:white;border:1px solid #555;border-radius:4px;padding:4px 16px;}"
+                              "QPushButton:hover{background:#444;}");
+            mb->exec();
+        });
+    }
+
+    menu.addSeparator();
+    auto* actSettings = menu.addAction("⚙  설정");
+    connect(actSettings, &QAction::triggered, this, &MusicWidget::settingsRequested);
+    menu.exec(e->globalPos());
 }
 
 void MusicWidget::setupUI(){
@@ -253,7 +323,9 @@ void MusicWidget::setupUI(){
     leftPanel->addWidget(badgeRow_);
     auto* specSpacer=new QWidget(this);specSpacer->setFixedHeight(60);specSpacer->setAttribute(Qt::WA_TransparentForMouseEvents);
     leftPanel->addWidget(specSpacer);
-    auto* ctrlRow=new QHBoxLayout;ctrlRow->setSpacing(16);ctrlRow->setAlignment(Qt::AlignHCenter);
+
+    // ── 컨트롤 버튼 행 ──────────────────────────────────────────────
+    auto* ctrlRow=new QHBoxLayout;ctrlRow->setSpacing(12);ctrlRow->setAlignment(Qt::AlignHCenter);
     auto makeCtrlBtn=[&](const QString& text,bool big=false){
         auto* btn=new QPushButton(text,this);int sz=big?48:32;btn->setFixedSize(sz,sz);
         if(big) btn->setStyleSheet(QString("QPushButton{background:#00c8b4;color:#0e0e0e;border-radius:%1px;font-size:18px;font-weight:bold;border:none;}"
@@ -262,11 +334,27 @@ void MusicWidget::setupUI(){
                                 "QPushButton:hover{color:white;}");
         return btn;
     };
-    btnShuffle_=makeCtrlBtn("⇌");btnPrev_=makeCtrlBtn("⏮");btnPlay_=makeCtrlBtn("▶",true);
-    btnNext_=makeCtrlBtn("⏭");btnRepeat_=makeCtrlBtn("↺");
+    btnShuffle_=makeCtrlBtn("⇌"); btnShuffle_->setToolTip("셔플 (S)");
+    btnPrev_=makeCtrlBtn("⏮");    btnPrev_->setToolTip("이전 트랙 (←)");
+    btnPlay_=makeCtrlBtn("▶",true);btnPlay_->setToolTip("재생/일시정지 (Space)");
+    btnNext_=makeCtrlBtn("⏭");    btnNext_->setToolTip("다음 트랙 (→)");
+    btnRepeat_=makeCtrlBtn("↺");  btnRepeat_->setToolTip("반복 재생 (R)");
+
+    // A-B 반복 버튼
+    btnAbRepeat_=new QPushButton("A-B",this);
+    btnAbRepeat_->setFixedSize(36,28);
+    btnAbRepeat_->setToolTip("A-B 구간 반복\n첫 클릭: A 지점 설정\n두 번째 클릭: B 지점 설정 후 반복 시작\n세 번째 클릭: 해제");
+    btnAbRepeat_->setStyleSheet(
+        "QPushButton{background:transparent;color:#666;border:1px solid #444;border-radius:4px;"
+        "font-size:11px;font-weight:bold;font-family:'Consolas';}"
+        "QPushButton:hover{color:#aaa;border-color:#666;}");
+
     ctrlRow->addWidget(btnShuffle_);ctrlRow->addWidget(btnPrev_);ctrlRow->addWidget(btnPlay_);
-    ctrlRow->addWidget(btnNext_);ctrlRow->addWidget(btnRepeat_);
+    ctrlRow->addWidget(btnNext_);ctrlRow->addWidget(btnRepeat_);ctrlRow->addSpacing(8);
+    ctrlRow->addWidget(btnAbRepeat_);
     leftPanel->addLayout(ctrlRow);leftPanel->addStretch();
+
+    // ── 우측 패널 ──────────────────────────────────────────────────
     auto* rightPanel=new QVBoxLayout;rightPanel->setSpacing(0);
     auto* tabRow=new QHBoxLayout;tabRow->setSpacing(0);tabRow->setContentsMargins(0,0,0,0);
     auto makeTabBtn=[&](const QString& text){
@@ -286,34 +374,60 @@ void MusicWidget::setupUI(){
     rightStack_->setCurrentIndex(0);rightPanel->addWidget(rightStack_,1);
     auto* leftWidget=new QWidget(this);leftWidget->setLayout(leftPanel);leftWidget->setFixedWidth(320);
     content->addWidget(leftWidget);content->addLayout(rightPanel,1);root->addLayout(content,1);
+
+    // ── 시크바 행 (볼륨 인라인 배치) ────────────────────────────────
     auto* seekRow=new QHBoxLayout;seekRow->setContentsMargins(20,0,20,4);seekRow->setSpacing(8);
-    timeCurrent_=new QLabel("00:00",this);timeCurrent_->setStyleSheet("font-size:12px;color:#888;font-family:'Consolas';");timeCurrent_->setFixedWidth(42);
+    timeCurrent_=new QLabel("00:00",this);
+    timeCurrent_->setStyleSheet("font-size:12px;color:#888;font-family:'Consolas';");
+    timeCurrent_->setFixedWidth(42);
     seekSlider_=new QSlider(Qt::Horizontal,this);seekSlider_->setRange(0,1000);
-    seekSlider_->setStyleSheet("QSlider::groove:horizontal{background:#2a2a2a;height:4px;border-radius:2px;}"
-                               "QSlider::handle:horizontal{background:#00c8b4;width:12px;height:12px;margin:-4px 0;border-radius:6px;}"
-                               "QSlider::sub-page:horizontal{background:#00c8b4;border-radius:2px;}");
-    timeDuration_=new QLabel("00:00",this);timeDuration_->setStyleSheet("font-size:12px;color:#888;font-family:'Consolas';");
+    seekSlider_->setStyleSheet(
+        "QSlider::groove:horizontal{background:#2a2a2a;height:4px;border-radius:2px;}"
+        "QSlider::handle:horizontal{background:#00c8b4;width:12px;height:12px;margin:-4px 0;border-radius:6px;}"
+        "QSlider::sub-page:horizontal{background:#00c8b4;border-radius:2px;}");
+    timeDuration_=new QLabel("00:00",this);
+    timeDuration_->setStyleSheet("font-size:12px;color:#888;font-family:'Consolas';");
     timeDuration_->setFixedWidth(42);timeDuration_->setAlignment(Qt::AlignRight);
-    seekRow->addWidget(timeCurrent_);seekRow->addWidget(seekSlider_,1);seekRow->addWidget(timeDuration_);root->addLayout(seekRow);
-    auto* bottomRow=new QHBoxLayout;bottomRow->setContentsMargins(20,4,20,8);bottomRow->setSpacing(8);
-    speedLabel_=new QLabel("1.0x",this);speedLabel_->setStyleSheet("font-size:12px;color:#666;font-family:'Consolas';");
+
+    // 볼륨 버튼 + 슬라이더 (시크바 우측 인라인)
     btnVolume_=new QPushButton("🔊",this);btnVolume_->setFixedSize(28,28);
-    btnVolume_->setStyleSheet("QPushButton{background:transparent;border:none;font-size:14px;color:#888;}QPushButton:hover{color:white;}");
-    volSlider_=new QSlider(Qt::Horizontal,this);volSlider_->setRange(0,100);volSlider_->setValue(100);volSlider_->setFixedWidth(100);
-    volSlider_->setStyleSheet("QSlider::groove:horizontal{background:#2a2a2a;height:3px;border-radius:2px;}"
-                              "QSlider::handle:horizontal{background:#888;width:10px;height:10px;margin:-3.5px 0;border-radius:5px;}"
-                              "QSlider::sub-page:horizontal{background:#666;border-radius:2px;}");
-    btnMini_=new QPushButton("⊟",this);btnMini_->setFixedSize(28,28);btnMini_->setToolTip("미니 플레이어 (M)");
+    btnVolume_->setToolTip("음소거 (M)");
+    btnVolume_->setStyleSheet(
+        "QPushButton{background:transparent;border:none;font-size:14px;color:#888;}"
+        "QPushButton:hover{color:white;}");
+    volSlider_=new QSlider(Qt::Horizontal,this);
+    volSlider_->setRange(0,100);volSlider_->setValue(100);volSlider_->setFixedWidth(90);
+    volSlider_->setToolTip("볼륨");
+    volSlider_->setStyleSheet(
+        "QSlider::groove:horizontal{background:#2a2a2a;height:3px;border-radius:2px;}"
+        "QSlider::handle:horizontal{background:#888;width:10px;height:10px;margin:-3.5px 0;border-radius:5px;}"
+        "QSlider::sub-page:horizontal{background:#666;border-radius:2px;}");
+
+    seekRow->addWidget(timeCurrent_);
+    seekRow->addWidget(seekSlider_,1);
+    seekRow->addWidget(timeDuration_);
+    seekRow->addSpacing(12);
+    seekRow->addWidget(btnVolume_);
+    seekRow->addWidget(volSlider_);
+    root->addLayout(seekRow);
+
+    // ── 하단 컨트롤바 ───────────────────────────────────────────────
+    auto* bottomRow=new QHBoxLayout;bottomRow->setContentsMargins(20,4,20,8);bottomRow->setSpacing(8);
+    speedLabel_=new QLabel("1.0x",this);
+    speedLabel_->setStyleSheet("font-size:12px;color:#666;font-family:'Consolas';");
+    btnMini_=new QPushButton("⊟",this);btnMini_->setFixedSize(28,28);
+    btnMini_->setToolTip("미니 플레이어 (M)");
     btnMini_->setStyleSheet("QPushButton{background:transparent;border:none;font-size:14px;color:#888;}QPushButton:hover{color:white;}");
-    // 소형 모드 버튼 (코팩트 플레이어)
     btnCompact_=new QPushButton("⬜",this);btnCompact_->setFixedSize(28,28);
-    btnCompact_->setToolTip("소형 모드 전환 (세로형 독립 창)");
+    btnCompact_->setToolTip("소형 모드 전환");
     btnCompact_->setStyleSheet("QPushButton{background:transparent;border:none;font-size:11px;color:#888;font-family:'Segoe UI';}QPushButton:hover{color:#00c8b4;}");
     btnSettings_=new QPushButton("⚙",this);btnSettings_->setFixedSize(28,28);
+    btnSettings_->setToolTip("설정");
     btnSettings_->setStyleSheet("QPushButton{background:transparent;border:none;font-size:14px;color:#888;}QPushButton:hover{color:white;}");
     bottomRow->addWidget(speedLabel_);bottomRow->addStretch();
-    bottomRow->addWidget(btnVolume_);bottomRow->addWidget(volSlider_);bottomRow->addSpacing(8);
-    bottomRow->addWidget(btnCompact_);bottomRow->addWidget(btnMini_);bottomRow->addWidget(btnSettings_);root->addLayout(bottomRow);
+    bottomRow->addWidget(btnCompact_);bottomRow->addWidget(btnMini_);bottomRow->addWidget(btnSettings_);
+    root->addLayout(bottomRow);
+
     statusBar_=new QLabel("FLAC  ·  DECODE  ·  2.0  ·  192kHz  ·  24bit  ·  BIT-PERFECT",this);
     statusBar_->setAlignment(Qt::AlignCenter);
     statusBar_->setStyleSheet("font-size:10px;color:#555;font-family:'Consolas';background:#0a0a0a;padding:4px 0;");
@@ -338,10 +452,23 @@ void MusicWidget::setupConnections(){
             :"QPushButton{background:transparent;color:#aaa;border:none;font-size:16px;}QPushButton:hover{color:white;}");
         emit repeatToggled(isRepeat_);
     });
+    connect(btnAbRepeat_,&QPushButton::clicked,this,&MusicWidget::onAbRepeatClicked);
     connect(seekSlider_,&QSlider::sliderMoved,this,[this](int v){
         if(duration_>0) emit seekRequested(duration_*v/1000.0);
     });
     connect(volSlider_,&QSlider::valueChanged,this,&MusicWidget::volumeChanged);
+    // 볼륨 버튼: 음소거 토글
+    connect(btnVolume_,&QPushButton::clicked,this,[this](){
+        static int lastVol=100;
+        if(volSlider_->value()>0){
+            lastVol=volSlider_->value();
+            volSlider_->setValue(0);
+            btnVolume_->setText("🔇");
+        } else {
+            volSlider_->setValue(lastVol>0?lastVol:100);
+            btnVolume_->setText("🔊");
+        }
+    });
     connect(btnMini_,&QPushButton::clicked,this,&MusicWidget::miniModeRequested);
     connect(btnCompact_,&QPushButton::clicked,this,&MusicWidget::compactModeRequested);
     connect(btnSettings_,&QPushButton::clicked,this,&MusicWidget::settingsRequested);
@@ -359,6 +486,48 @@ void MusicWidget::setupConnections(){
     });
 }
 
+void MusicWidget::onAbRepeatClicked(){
+    if(!core_) return;
+    double currentPos=0;
+    if(duration_>0){
+        currentPos = duration_ * seekSlider_->value() / 1000.0;
+    }
+    if(abState_==0){
+        abPointA_=currentPos;
+        abState_=1;
+        core_->setProperty("ab-loop-a", abPointA_);
+        btnAbRepeat_->setToolTip(QString("B 지점을 클릭하여 구간 반복 시작\nA: %1").arg(formatTime(abPointA_)));
+        btnAbRepeat_->setStyleSheet(
+            "QPushButton{background:rgba(0,200,180,0.15);color:#00c8b4;border:1px solid #00c8b4;border-radius:4px;"
+            "font-size:11px;font-weight:bold;font-family:'Consolas';}"
+            "QPushButton:hover{background:rgba(0,200,180,0.25);}");
+    } else if(abState_==1){
+        abPointB_=currentPos;
+        if(abPointB_<=abPointA_){
+            double tmp=abPointA_;abPointA_=abPointB_;abPointB_=tmp;
+        }
+        abState_=2;
+        core_->setProperty("ab-loop-a", abPointA_);
+        core_->setProperty("ab-loop-b", abPointB_);
+        btnAbRepeat_->setToolTip(QString("A-B 구간 반복 중\nA: %1  B: %2\n클릭하여 해제")
+            .arg(formatTime(abPointA_)).arg(formatTime(abPointB_)));
+        btnAbRepeat_->setStyleSheet(
+            "QPushButton{background:#00c8b4;color:#0e0e0e;border:1px solid #00c8b4;border-radius:4px;"
+            "font-size:11px;font-weight:bold;font-family:'Consolas';}"
+            "QPushButton:hover{background:#00ddc9;}");
+    } else {
+        abState_=0;abPointA_=-1.0;abPointB_=-1.0;
+        core_->setProperty("ab-loop-a", QString("no"));
+        core_->setProperty("ab-loop-b", QString("no"));
+        btnAbRepeat_->setText("A-B");
+        btnAbRepeat_->setToolTip("A-B 구간 반복\n첫 클릭: A 지점 설정\n두 번째 클릭: B 지점 설정 후 반복 시작\n세 번째 클릭: 해제");
+        btnAbRepeat_->setStyleSheet(
+            "QPushButton{background:transparent;color:#666;border:1px solid #444;border-radius:4px;"
+            "font-size:11px;font-weight:bold;font-family:'Consolas';}"
+            "QPushButton:hover{color:#aaa;border-color:#666;}");
+    }
+}
+
 void MusicWidget::onRightPanelToggle(int panel){
     rightStack_->setCurrentIndex(panel);
     btnShowLyrics_->setChecked(panel==0);
@@ -374,6 +543,19 @@ void MusicWidget::onRotationTick(){
 
 void MusicWidget::loadMeta(const MusicMeta& meta){
     currentMeta_=meta;
+    // A-B 반복 상태 초기화 (새 트랙 로드 시)
+    if(abState_!=0){
+        abState_=0;abPointA_=-1.0;abPointB_=-1.0;
+        if(core_){
+            core_->setProperty("ab-loop-a", QString("no"));
+            core_->setProperty("ab-loop-b", QString("no"));
+        }
+        btnAbRepeat_->setText("A-B");
+        btnAbRepeat_->setStyleSheet(
+            "QPushButton{background:transparent;color:#666;border:1px solid #444;border-radius:4px;"
+            "font-size:11px;font-weight:bold;font-family:'Consolas';}"
+            "QPushButton:hover{color:#aaa;border-color:#666;}");
+    }
     titleLabel_->setText(meta.title.isEmpty()?"알 수 없는 트랙":meta.title);
     artistLabel_->setText(meta.artist.isEmpty()?"알 수 없는 아티스트":meta.artist);
     QString albumText=meta.album;
@@ -395,23 +577,20 @@ void MusicWidget::loadMeta(const MusicMeta& meta){
         .arg(rateBadge_->text()).arg(bitBadge_->text());
     if(meta.hasReplayGain) status+=QString("  ·  ReplayGain: %1dB").arg(meta.replayGain,0,'f',1);
     statusBar_->setText(status);
-    // AI 가사 검색: duration과 album을 함께 전달하여 /api/get 정확 매칭 시도
     if(lyricsWidget_) lyricsWidget_->loadForTrack(
         meta.title, meta.artist, meta.filePath,
-        duration_,  // 현재 알려진 duration (없으면 0)
+        duration_,
         meta.album
     );
     update();
 }
 
-// 비트퍼펙트 상태 실시간 표시: 실제 AO 출력 경로와 소스 비교
 void MusicWidget::setOutputInfo(int outSampleRate,const QString& outFormat,bool exclusive){
     if(!statusBar_) return;
     QString outRate=outSampleRate>=1000
         ?(outSampleRate%1000==0?QString("%1kHz").arg(outSampleRate/1000)
                                :QString("%1kHz").arg(outSampleRate/1000.0,0,'f',1))
         :QString("%1Hz").arg(outSampleRate);
-    // 비트퍼펙트 판정: 소스 샘플레이트 == 출력 샘플레이트 && Exclusive 모드
     const bool bitPerfect = exclusive && currentMeta_.sampleRate>0
                             && currentMeta_.sampleRate==outSampleRate;
     QString status=QString("%1  ·  DECODE  ·  %2  ·  OUT: %3 %4 %5")

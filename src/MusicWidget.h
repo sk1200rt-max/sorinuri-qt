@@ -12,6 +12,10 @@
 #include <QListWidget>
 #include <QLineEdit>
 #include <QMouseEvent>
+#include <QContextMenuEvent>
+#include <QMenu>
+#include <QAction>
+#include <QFileInfo>
 
 class LyricsWidget;
 class MpvCore;
@@ -94,15 +98,18 @@ signals:
     void settingsRequested();
     void miniModeRequested();
     void compactModeRequested();   // 소형 모드 (코팩트 플레이어)
+    void addToPlaylistRequested(const QString& filePath);
 
 protected:
     void paintEvent(QPaintEvent* e) override;
     void resizeEvent(QResizeEvent* e) override;
     void mouseMoveEvent(QMouseEvent* e) override;  // 커서 숨김 방지: 이벤트를 MainWindow에 전달
+    void contextMenuEvent(QContextMenuEvent* e) override;  // 우클릭 컨텍스트 메뉴
 
 private slots:
     void onRotationTick();
     void onRightPanelToggle(int panel); // 0=가사 1=EQ 2=재생목록
+    void onAbRepeatClicked();           // A-B 반복 버튼 클릭
 
 private:
     void setupUI();
@@ -147,6 +154,11 @@ private:
     QPushButton*  btnPlay_      = nullptr;
     QPushButton*  btnNext_      = nullptr;
     QPushButton*  btnRepeat_    = nullptr;
+    QPushButton*  btnAbRepeat_  = nullptr;  // A-B 반복 버튼
+    // A-B 반복 상태 (0=비활성, 1=A 지점 설정됨, 2=A-B 구간 반복 중)
+    int           abState_      = 0;
+    double        abPointA_     = -1.0;
+    double        abPointB_     = -1.0;
 
     // 우측 패널 스택 (0=가사 1=EQ 2=재생목록)
     QStackedWidget* rightStack_    = nullptr;
@@ -159,15 +171,16 @@ private:
     QPushButton*  btnShowEq_       = nullptr;
     QPushButton*  btnShowPlaylist_ = nullptr;
 
-    // 하단 시크바
+    // 하단 시크바 (볼륨도 여기에 인라인 배치)
     QSlider*      seekSlider_   = nullptr;
     QLabel*       timeCurrent_  = nullptr;
     QLabel*       timeDuration_ = nullptr;
+    // 볼륨 (seekRow 우측 인라인)
+    QPushButton*  btnVolume_    = nullptr;
+    QSlider*      volSlider_    = nullptr;
 
     // 하단 컨트롤바
     QLabel*       speedLabel_   = nullptr;
-    QPushButton*  btnVolume_    = nullptr;
-    QSlider*      volSlider_    = nullptr;
     QPushButton*  btnMini_      = nullptr;
     QPushButton*  btnCompact_   = nullptr;   // 소형 모드 버튼
     QPushButton*  btnSettings_  = nullptr;

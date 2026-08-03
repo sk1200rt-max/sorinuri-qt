@@ -284,6 +284,13 @@ void MainWindow::setupConnections() {
     connect(musicPage_, &MusicWidget::miniModeRequested, this, &MainWindow::toggleMiniPlayer);
     // 소형 모드 (코팩트 플레이어) 연결
     connect(musicPage_, &MusicWidget::compactModeRequested, this, &MainWindow::toggleCompactPlayer);
+    // 셔플/반복 시그널 연결 - MPV 속성 직접 적용
+    connect(musicPage_, &MusicWidget::shuffleToggled, this, [core](bool on) {
+        core->setProperty("shuffle", on ? QString("yes") : QString("no"));
+    });
+    connect(musicPage_, &MusicWidget::repeatToggled, this, [core](bool on) {
+        core->setProperty("loop-file", on ? QString("inf") : QString("no"));
+    });
     // miniPlayer_, whisperWidget_, chapterWidget_ 연결은 지연 초기화
     // (toggleMiniPlayer, onProFeaturesRequested에서 처음 생성 시 연결)
 }
