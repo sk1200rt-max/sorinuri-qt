@@ -10,6 +10,8 @@
 #include <QThread>
 #include <QMutex>
 #include <QStringList>
+#include <QHash>
+#include <QPixmap>
 
 /**
  * MediaLibraryWidget - 스마트 미디어 라이브러리
@@ -38,12 +40,15 @@ private slots:
     void onItemDoubleClicked(QListWidgetItem* item);
     void onScanProgress(int current, int total);
     void onScanFinished(const QStringList& videoFiles, const QStringList& audioFiles);
+    void onThumbnailLoaded(const QString& path, const QPixmap& thumb);
 
 private:
     void setupUI();
     void setupDatabase();
     void scanFolder(const QString& path);
     void populateList(QListWidget* list, const QStringList& files, const QString& filter = {});
+    void loadThumbnailAsync(const QString& path, QListWidgetItem* item);
+    QPixmap makeThumbnailFromAlbumArt(const QString& path);
     QString dbPath() const;
 
     QTabWidget*   tabs_        = nullptr;
@@ -59,4 +64,5 @@ private:
 
     QThread*      scanThread_  = nullptr;
     bool          scanning_    = false;
+    QHash<QString, QPixmap> thumbCache_;  // 썸네일 캐시 (path → pixmap)
 };

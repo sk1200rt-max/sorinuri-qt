@@ -21,6 +21,7 @@ QPushButton* ControlBar::makeBtn(const QString& svg, const QString& tip, int siz
     btn->setFixedSize(size, 30);
     btn->setFlat(true);
     btn->setCursor(Qt::ArrowCursor);
+    btn->setFocusPolicy(Qt::NoFocus);  // HiDPI: 버튼 클릭 후 포커스가 MainWindow에 유지되도록
     btn->setIcon(QIcon(svg));
     btn->setIconSize(QSize(size == 36 ? 20 : 16, size == 36 ? 20 : 16));
     btn->setStyleSheet(
@@ -35,6 +36,7 @@ QPushButton* ControlBar::makeModeBtn(const QString& text, const QString& tip) {
     btn->setToolTip(tip);
     btn->setFixedHeight(22);
     btn->setCursor(Qt::ArrowCursor);
+    btn->setFocusPolicy(Qt::NoFocus);  // HiDPI: 버튼 클릭 후 포커스가 MainWindow에 유지되도록
     btn->setStyleSheet(
         "QPushButton { background: #1a1a1a; color: #666; border: 1px solid #2a2a2a;"
         "  border-radius: 3px; padding: 0 10px; font-size: 11px; }"
@@ -57,7 +59,7 @@ ControlBar::ControlBar(QWidget* parent) : QWidget(parent) {
     auto* seekRow = new QHBoxLayout();
     seekRow->setSpacing(6);
 
-        seekSlider_ = new QSlider(Qt::Horizontal, this);
+        seekSlider_ = new ClickSeekSlider(Qt::Horizontal, this);
     seekSlider_->setRange(0, 10000);
     seekSlider_->setValue(0);
     seekSlider_->setStyleSheet(SEEK_STYLE);

@@ -9,6 +9,7 @@ QPushButton* TitleBar::makeIconBtn(const QString& svgPath, const QString& toolti
     btn->setFixedSize(w, 36);
     btn->setFlat(true);
     btn->setCursor(Qt::ArrowCursor);
+    btn->setFocusPolicy(Qt::NoFocus);  // HiDPI: 버튼 클릭 후 포커스가 MainWindow에 유지되도록
     btn->setIcon(QIcon(svgPath));
     btn->setIconSize(QSize(16, 16));
     btn->setStyleSheet(QString(
@@ -61,6 +62,7 @@ TitleBar::TitleBar(QWidget* parent) : QWidget(parent) {
     btnPin_->setFixedSize(38, 36);
     btnPin_->setFlat(true);
     btnPin_->setCursor(Qt::ArrowCursor);
+    btnPin_->setFocusPolicy(Qt::NoFocus);  // HiDPI: 버튼 클릭 후 포커스가 MainWindow에 유지되도록
     btnPin_->setCheckable(true);
     btnPin_->setIcon(QIcon(":/icons/pin_off.svg"));
     btnPin_->setIconSize(QSize(18, 18));

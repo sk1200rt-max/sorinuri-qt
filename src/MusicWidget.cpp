@@ -380,7 +380,7 @@ void MusicWidget::setupUI(){
     timeCurrent_=new QLabel("00:00",this);
     timeCurrent_->setStyleSheet("font-size:12px;color:#888;font-family:'Consolas';");
     timeCurrent_->setFixedWidth(42);
-    seekSlider_=new QSlider(Qt::Horizontal,this);seekSlider_->setRange(0,1000);
+    seekSlider_=new ClickSeekSlider(Qt::Horizontal,this);seekSlider_->setRange(0,1000);
     seekSlider_->setStyleSheet(
         "QSlider::groove:horizontal{background:#2a2a2a;height:4px;border-radius:2px;}"
         "QSlider::handle:horizontal{background:#00c8b4;width:12px;height:12px;margin:-4px 0;border-radius:6px;}"
@@ -453,8 +453,15 @@ void MusicWidget::setupConnections(){
         emit repeatToggled(isRepeat_);
     });
     connect(btnAbRepeat_,&QPushButton::clicked,this,&MusicWidget::onAbRepeatClicked);
+    connect(seekSlider_,&QSlider::sliderPressed,this,[this](){
+        // ClickSeekSlider: 클릭 즉시 이동 (HiDPI 250% 지원)
+        if(duration_>0) emit seekRequested(duration_*seekSlider_->value()/1000.0);
+    });
     connect(seekSlider_,&QSlider::sliderMoved,this,[this](int v){
         if(duration_>0) emit seekRequested(duration_*v/1000.0);
+    });
+    connect(seekSlider_,&QSlider::sliderReleased,this,[this](){
+        if(duration_>0) emit seekRequested(duration_*seekSlider_->value()/1000.0);
     });
     connect(volSlider_,&QSlider::valueChanged,this,&MusicWidget::volumeChanged);
     // 볼륨 버튼: 음소거 토글

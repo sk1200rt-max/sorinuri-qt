@@ -1,4 +1,7 @@
 #include "MediaLibraryWidget.h"
+#include "AlbumArtExtractor.h"
+#include <QPainter>
+#include <QPainterPath>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QTabWidget>
@@ -285,11 +288,20 @@ void MediaLibraryWidget::populateList(QListWidget* list,
         item->setData(Qt::UserRole, path);
         item->setToolTip(path);
 
-        // 비디오: 필름 아이콘, 음악: 음표 아이콘 (실제 썸네일은 향후 추가)
-        if (list == videoList_) {
-            item->setIcon(QIcon(":/icons/video_file.svg"));
+        // 캐시에 썸네일이 있으면 즉시 표시, 없으면 비동기 로드
+        if (thumbCache_.contains(path)) {
+            item->setIcon(QIcon(thumbCache_[path]));
         } else {
-            item->setIcon(QIcon(":/icons/audio_file.svg"));
+            // 기본 아이콘 먼저 표시
+            if (list == videoList_) {
+                item->setIcon(QIcon(":/icons/video_file.svg"));
+            } else {
+                item->setIcon(QIcon(":/icons/audio_file.svg"));
+            }
+            // 음악 파일은 앨범아트 비동기 로드
+            if (list == audioList_) {
+                loadThumbnailAsync(path, item);
+            }
         }
     }
 }
@@ -307,4 +319,40 @@ void MediaLibraryWidget::onTabChanged(int) {
 void MediaLibraryWidget::onItemDoubleClicked(QListWidgetItem* item) {
     QString path = item->data(Qt::UserRole).toString();
     if (!path.isEmpty()) emit fileRequested(path);
+}
+
+void MediaLibraryWidget::loadThumbnailAsync(const QString& path, QListWidgetItem* item) {
+    // QtConcurrent로 비동기 앨범아트 추출
+    auto* watcher = new QFutureWatcher<QPixmap>(this);
+    connect(watcher, &QFutureWatcher<QPixmap>::finished, this, [this, watcher, path, item]() {
+        QPixmap thumb = watcher->result();
+        watcher->deleteLater();
+        if (!thumb.isNull()) {
+            // 40x40으로 크롭
+            QPixmap scaled = thumb.scaled(40, 40, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation);
+            QPixmap cropped(40, 40);
+            cropped.fill(Qt::transparent);
+            QPainter p(&cropped);
+            p.setRenderHint(QPainter::Antialiasing);
+            QPainterPath path2;
+            path2.addRoundedRect(0, 0, 40, 40, 4, 4);
+            p.setClipPath(path2);
+            int ox = (scaled.width() - 40) / 2;
+            int oy = (scaled.height() - 40) / 2;
+            p.drawPixmap(-ox, -oy, scaled);
+            thumbCache_[path] = cropped;
+            if (item) item->setIcon(QIcon(cropped));
+        }
+    });
+    watcher->setFuture(QtConcurrent::run([path]() -> QPixmap {
+        return AlbumArtExtractor::extract(path);
+    }));
+}
+
+QPixmap MediaLibraryWidget::makeThumbnailFromAlbumArt(const QString& path) {
+    return AlbumArtExtractor::extract(path);
+}
+
+void MediaLibraryWidget::onThumbnailLoaded(const QString& path, const QPixmap& thumb) {
+    thumbCache_[path] = thumb;
 }

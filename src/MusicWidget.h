@@ -4,6 +4,7 @@
 #include <QPixmap>
 #include <QTimer>
 #include <QSlider>
+#include "ControlBar.h"  // ClickSeekSlider (HiDPI 클릭 즉시 이동)
 #include <QPushButton>
 #include <QHBoxLayout>
 #include <QVBoxLayout>
@@ -172,7 +173,7 @@ private:
     QPushButton*  btnShowPlaylist_ = nullptr;
 
     // 하단 시크바 (볼륨도 여기에 인라인 배치)
-    QSlider*      seekSlider_   = nullptr;
+    ClickSeekSlider* seekSlider_   = nullptr;
     QLabel*       timeCurrent_  = nullptr;
     QLabel*       timeDuration_ = nullptr;
     // 볼륨 (seekRow 우측 인라인)

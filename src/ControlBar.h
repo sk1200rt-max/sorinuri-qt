@@ -6,10 +6,58 @@
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QVector>
+#include <QMouseEvent>
+#include <QStyleOptionSlider>
 #include "TrackSelector.h"
 #include "MpvCore.h"
 
 struct ChapterMark { double startSec; QString title; };
+
+/**
+ * ClickSeekSlider - HiDPI 250% 환경에서 클릭 즉시 이동 지원
+ * QSlider 기본 동작(pageStep 이동)을 오버라이드하여
+ * 클릭한 위치로 즉시 이동하도록 구현
+ */
+class ClickSeekSlider : public QSlider {
+    Q_OBJECT
+public:
+    explicit ClickSeekSlider(Qt::Orientation o, QWidget* parent = nullptr)
+        : QSlider(o, parent) {}
+protected:
+    void mousePressEvent(QMouseEvent* e) override {
+        if (e->button() == Qt::LeftButton) {
+            // QStyleOptionSlider로 정확한 슬라이더 값 계산 (HiDPI 안전)
+            QStyleOptionSlider opt;
+            initStyleOption(&opt);
+            QRect groove = style()->subControlRect(QStyle::CC_Slider, &opt,
+                                                    QStyle::SC_SliderGroove, this);
+            QRect handle = style()->subControlRect(QStyle::CC_Slider, &opt,
+                                                    QStyle::SC_SliderHandle, this);
+            int sliderMin, sliderMax, sliderLength;
+            if (orientation() == Qt::Horizontal) {
+                sliderLength = handle.width();
+                sliderMin = groove.x();
+                sliderMax = groove.right() - sliderLength + 1;
+            } else {
+                sliderLength = handle.height();
+                sliderMin = groove.y();
+                sliderMax = groove.bottom() - sliderLength + 1;
+            }
+            int pos = orientation() == Qt::Horizontal
+                      ? e->pos().x() - sliderLength / 2
+                      : e->pos().y() - sliderLength / 2;
+            int val = QStyle::sliderValueFromPosition(
+                minimum(), maximum(), pos - sliderMin,
+                sliderMax - sliderMin, opt.upsideDown);
+            setValue(val);
+            emit sliderMoved(val);
+            emit sliderPressed();
+            e->accept();
+            return;
+        }
+        QSlider::mousePressEvent(e);
+    }
+};
 
 class ControlBar : public QWidget {
     Q_OBJECT
@@ -61,7 +109,7 @@ private:
     QString getDisplayCodec(const QString& codec) const;
     QString formatChannels(int ch) const;
 
-    QSlider*     seekSlider_ = nullptr;
+    ClickSeekSlider* seekSlider_ = nullptr;
     QLabel*      timeLabel_  = nullptr;
     QPushButton* btnOpen_    = nullptr;
     QPushButton* btnPrev_    = nullptr;
