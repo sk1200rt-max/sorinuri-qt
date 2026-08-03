@@ -203,7 +203,7 @@ bool MpvCore::initialize(WId windowId) {
     // 이렇게 해야 설정에서 독점 모드를 활성화한 사용자가 다음 실행 시도 유지됨
     {
         QSettings s("Sorinuri", "SorinuriPlayer");
-        const bool savedExclusive = s.value("audio/exclusive", false).toBool();
+        const bool savedExclusive = s.value("audio/exclusive", true).toBool();  // 기본값 true: 독점 모드 (멀티채널 자동 인식)
         check_error(mpv_set_property_string(mpv_, "ao", "wasapi"));
         check_error(mpv_set_property_string(mpv_, "audio-exclusive",
             savedExclusive ? "yes" : "no"));
@@ -216,6 +216,9 @@ bool MpvCore::initialize(WId windowId) {
         "ac3,eac3,dts,dts-hd,truehd"));
     // 오디오 초기화 실패 시 영상은 계속 재생 (null 오디오 폴백)
     check_error(mpv_set_property_string(mpv_, "audio-fallback-to-null", "yes"));
+    // 멀티채널 자동 인식: audio-channels=auto (5.1/7.1 PCM 자동 출력)
+    // WASAPI 독점 모드에서 원본 채널 수 그대로 출력 (다운믹스 없음)
+    check_error(mpv_set_property_string(mpv_, "audio-channels", "auto"));
     // 오디오 필터 초기화
     check_error(mpv_set_property_string(mpv_, "af", ""));
 
@@ -625,6 +628,9 @@ void MpvCore::loadFile(const QString& path, bool append) {
     // 패스스루 지원 장치(HDMI/리시버)는 spdif 유지 → 비트스트림 그대로.
     // 판단 실패 시에도 AO 실패 자동복구(ao-reload)가 백업으로 동작.
     if (!append) {
+        // audio-channels=auto: 파일마다 채널 수 자동 감지 (이전 파일 설정 초기화)
+        // WASAPI 독점 모드에서 5.1/7.1 PCM 멀티채널 자동 출력 보장
+        mpv_set_property_string(mpv_, "audio-channels", "auto");
         if (deviceLikelySupportsPassthrough()) {
             if (passthroughEnabled_)
                 mpv_set_property_string(mpv_, "audio-spdif", spdifCodecs_.toUtf8().constData());

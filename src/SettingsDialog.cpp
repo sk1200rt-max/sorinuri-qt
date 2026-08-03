@@ -272,8 +272,8 @@ void SettingsDialog::setupAudioTab(QTabWidget* tabs) {
 
     tabs->addTab(page, "오디오");
 
-    // 기본값 설정: 공유 모드 (false)
-    exclusiveModeCheck_->setChecked(false);
+    // 기본값 설정: 독점 모드 (true) - 멀티채널 자동 인식을 위해 기본 독점 모드
+    exclusiveModeCheck_->setChecked(true);
     passthroughCheck_->setChecked(true);
     ptAC3_->setChecked(true);
     ptEAC3_->setChecked(true);
@@ -561,7 +561,7 @@ void SettingsDialog::refreshAudioDevices() {
 
 void SettingsDialog::loadSettings() {
     // 기본값: 공유 모드 (false) - 독점 모드는 사용자가 명시적으로 선택할 때만 활성화
-    exclusiveModeCheck_->setChecked(settings_.value("audio/exclusive", false).toBool());
+    exclusiveModeCheck_->setChecked(settings_.value("audio/exclusive", true).toBool());  // 기본값 true: 독점 모드 (멀티채널 자동 인식)
     passthroughCheck_->setChecked(settings_.value("audio/passthrough", true).toBool());
     ptAC3_->setChecked(settings_.value("audio/pt_ac3", true).toBool());
     ptEAC3_->setChecked(settings_.value("audio/pt_eac3", true).toBool());

@@ -619,10 +619,12 @@ void MainWindow::onVolumeChanged(int v) {
 void MainWindow::onAudioFormatChanged(const QString& codec, int channelCount, int, const QString&) {
     titleBar_->setAudioBadge(codec.toUpper());
 
-    // 멀티체널 파일 감지: 공유 모드에서 5.1 이상인 경우 안내
+    // 멀티채널 파일 감지: 공유 모드에서 5.1 이상인 경우 안내
+    // QSettings 대신 MPV audio-exclusive 속성 직접 확인 (실제 상태 반영)
     if (channelCount >= 6 && !multichannelPromptShown_) {
-        QSettings s("Sorinuri", "SorinuriPlayer");
-        const bool isExclusive = s.value("audio/exclusive", false).toBool();
+        auto* core = mpvWidget_->core();
+        // MPV에서 현재 실제 독점 모드 여부 직접 확인
+        const bool isExclusive = core->getProperty("audio-exclusive").toString() == "yes";
         if (!isExclusive) {
             multichannelPromptShown_ = true;
             QMetaObject::invokeMethod(this, [this, channelCount]() {
