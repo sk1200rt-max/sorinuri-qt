@@ -163,8 +163,11 @@ bool MpvCore::initialize(WId windowId) {
         check_error(mpv_set_property_string(mpv_, "cscale-antiring", antiringVal));
 
         // ── HDR 톤매핑 ────────────────────────────────────────────
-        // bt.2446a: 가장 자연스러운 HDR→SDR 변환 (모든 환경 동일)
-        check_error(mpv_set_property_string(mpv_, "tone-mapping", "bt.2446a"));
+        // HDR 모니터 감지 시 tone-mapping=auto (패스스루), SDR 모니터는 bt.2446a
+        const bool hdrDisplay = env.hdrEnabled;
+        const char* toneMapping = hdrDisplay ? "auto" : "bt.2446a";
+        check_error(mpv_set_property_string(mpv_, "tone-mapping", toneMapping));
+        qInfo() << "[MPV] HDR 디스플레이:" << (hdrDisplay ? "ON → tone-mapping=auto" : "OFF → tone-mapping=bt.2446a");
         // hdr-compute-peak: 동적 밝기 측정 (4K 이상에서는 부하로 비활성화)
         check_error(mpv_set_property_string(mpv_, "hdr-compute-peak",
             env.hdrComputePeak ? "yes" : "no"));

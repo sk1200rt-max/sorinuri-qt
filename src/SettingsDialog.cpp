@@ -304,6 +304,16 @@ void SettingsDialog::setupVideoTab(QTabWidget* tabs) {
     voCombo_->addItems({"gpu (권장)", "gpu-next (차세대 렌더러)", "direct3d", "software"});
     decodeForm->addRow("비디오 출력:", voCombo_);
 
+    // 재시작 필요 항목 안내 (주황색 배너)
+    QLabel* restartHint = new QLabel(
+        "⚠️  하드웨어 디코딩 및 비디오 출력 변경은 <b>다음 실행 시 적용</b>됩니다.", page);
+    restartHint->setStyleSheet(
+        "background:#1a0e00; border:1px solid #4a2800; border-radius:4px;"
+        "color:#ff9800; font-size:11px; padding:6px 10px;");
+    restartHint->setWordWrap(true);
+    restartHint->setTextFormat(Qt::RichText);
+    decodeForm->addRow("", restartHint);
+
     // gpu-next 안내 레이블
     QLabel* gpuNextHint = new QLabel(
         "gpu-next: D3D12/Vulkan 기반 차세대 렌더러. 일부 GPU에서 불안정 시 자동 폴백.", page);

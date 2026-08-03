@@ -403,17 +403,24 @@ public:
     }
 
     // ── HDR 디스플레이 감지 (Windows HDR 활성 여부) ───────────────
-    // Qt 6.6+ QScreen::hdrEnabled() 사용
-    // Qt 6.5 이하 (현재 빌드 환경): Windows DISPLAYCONFIG API로 확인
+    // Qt 6.6+: QScreen::hdrEnabled() 직접 사용 (현재 Qt 6.7.3 빌드)
     static bool detectHdrEnabled(QScreen* screen = nullptr) {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 6, 0)
+        // Qt 6.6+: QScreen::hdrEnabled() 사용 (HDR 디스플레이 자동 감지)
+        if (!screen) screen = QApplication::primaryScreen();
+        if (screen) {
+            bool hdr = screen->hdrEnabled();
+            qInfo() << "[HDR] QScreen::hdrEnabled():" << hdr
+                    << "| Screen:" << screen->name();
+            return hdr;
+        }
+        return false;
+#elif defined(Q_OS_WIN)
+        // Qt 6.5 이하 폴백: Windows DISPLAYCONFIG API
         Q_UNUSED(screen)
-#ifdef Q_OS_WIN
-        // Windows: DISPLAYCONFIG API로 HDR 활성 여부 확인
-        // GetDisplayConfigBufferSizes + QueryDisplayConfig 사용
-        // 복잡한 API이므로 현재는 false 반환 (향후 Qt 6.6 업그레이드 시 활성화)
-        // TODO: Qt 6.6 업그레이드 후 screen->hdrEnabled() 사용
         return false;
 #else
+        Q_UNUSED(screen)
         return false;
 #endif
     }
