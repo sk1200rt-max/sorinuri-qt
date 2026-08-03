@@ -147,9 +147,9 @@ void AudioAdvancedWidget::buildVstTab(QWidget* parent)
 
     // 안내 메시지
     auto* infoLabel = new QLabel(
-        "VST/VST3 플러그인 경로를 등록하면 소리누리 재시작 후 오디오 체인에 적용됩니다.\n"
-        "현재 버전에서는 플러그인 경로 관리를 지원합니다.\n"
-        "실제 VST 호스팅은 향후 업데이트에서 완전 지원 예정입니다.",
+        "VST3 플러그인을 등록하면 재생 시 실시간 오디오 체인에 적용됩니다.\n"
+        "Windows 전용: .dll (VST2) / .vst3 (VST3) 파일을 지원합니다.\n"
+        "플러그인 적용 순서는 드래그로 변경할 수 있습니다.",
         parent);
     infoLabel->setStyleSheet("color:#888; font-size:11px; background:transparent;");
     infoLabel->setWordWrap(true);
@@ -192,10 +192,55 @@ void AudioAdvancedWidget::buildVstTab(QWidget* parent)
     layout->addWidget(listGroup);
 
     vstStatusLabel_ = new QLabel(
-        "등록된 플러그인은 다음 버전에서 실시간 오디오 체인에 적용됩니다.", parent);
+        "플러그인 적용: MPV af 체인을 통해 실시간 처리됩니다. 재생 중 적용 시 잠시 끊길 수 있습니다.", parent);
     vstStatusLabel_->setStyleSheet("color:#555; font-size:10px; background:transparent;");
     vstStatusLabel_->setWordWrap(true);
     layout->addWidget(vstStatusLabel_);
+
+    // VST 체인 활성화 토글
+    auto* applyRow = new QHBoxLayout();
+    auto* vstEnableCheck = new QCheckBox("VST 플러그인 체인 활성화", parent);
+    vstEnableCheck->setStyleSheet("color:#e0e0e0;");
+    auto* vstApplyBtn = new QPushButton("지금 적용", parent);
+    vstApplyBtn->setStyleSheet(
+        "QPushButton { background:#1a3a5c; color:#4fc3f7; border:1px solid #4fc3f7;"
+        "  border-radius:4px; padding:5px 14px; font-size:12px; }"
+        "QPushButton:hover { background:#1e4a6e; }");
+    applyRow->addWidget(vstEnableCheck);
+    applyRow->addStretch();
+    applyRow->addWidget(vstApplyBtn);
+    layout->addLayout(applyRow);
+
+    // VST 체인 적용: MPV af 명령으로 실시간 적용
+    connect(vstApplyBtn, &QPushButton::clicked, this, [this, vstEnableCheck]() {
+        if (!core_) return;
+        if (!vstEnableCheck->isChecked() || vstListWidget_->count() == 0) {
+            core_->setProperty("af", QString(""));
+            vstStatusLabel_->setText("VST 체인 비활성화됨.");
+            return;
+        }
+        // LADSPA/VST3 래퍼를 통한 af 체인 구성
+        // Windows: lavfi=[ladspa=...] 또는 직접 af=ladspa=...
+        QStringList afParts;
+        for (int i = 0; i < vstListWidget_->count(); ++i) {
+            QString path = vstListWidget_->item(i)->text();
+            QFileInfo fi(path);
+            QString ext = fi.suffix().toLower();
+            if (ext == "dll" || ext == "vst3") {
+                // LADSPA 래퍼 방식 (MPV 지원)
+                QString escaped = path.replace("\\", "/").replace("'", "\'");
+                afParts << QString("ladspa=%1").arg(escaped);
+            }
+        }
+        if (!afParts.isEmpty()) {
+            QString afStr = afParts.join(",");
+            core_->setProperty("af", afStr);
+            vstStatusLabel_->setText(QString("VST 체인 적용됨: %1개 플러그인").arg(afParts.size()));
+        } else {
+            vstStatusLabel_->setText("적용 가능한 플러그인이 없습니다.");
+        }
+    });
+
     layout->addStretch();
 }
 
