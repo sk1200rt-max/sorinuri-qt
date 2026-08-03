@@ -128,7 +128,8 @@ var
 
 function GetDolbyCaption(): String;
 begin
-  Result := CustomMessage('DolbyPageDesc') + #13#10 + #13#10 +
+  // DolbyPageDesc는 CreateCustomPage SubCaption에 이미 표시되므로 중복 제거
+  Result :=
     '------------------------------------------------------------' + #13#10 + #13#10 +
     CustomMessage('DolbyLine1') + #13#10 +
     CustomMessage('DolbyLine2') + #13#10 +
@@ -150,6 +151,7 @@ procedure InitializeWizard;
 var
   ScaleFactor: Integer;
   BaseFontSize: Integer;
+  LinkH: Integer;
 begin
   // HiDPI 스케일 팩터 적용 (96 DPI = 100%, 192 DPI = 200% 등)
   ScaleFactor := WizardForm.Font.PixelsPerInch;
@@ -158,32 +160,38 @@ begin
   BaseFontSize := MulDiv(9, ScaleFactor, 96);
   if BaseFontSize > 11 then BaseFontSize := 11;
 
+  // SubCaption에 DolbyPageDesc를 표시 (메모 안에서 중복 제거)
   DolbyPage := CreateCustomPage(
     wpSelectTasks,
     CustomMessage('DolbyPageTitle'),
     CustomMessage('DolbyPageDesc'));
 
-  // TNewMemo: 세로 스크롤바 자동 표시 → 내용이 길어도 잘리지 않음
-  // 기존 TLabel은 페이지 높이를 초과하면 내용이 잘리는 문제가 있었음
+  // 링크 레이블 높이를 DPI에 맞게 계산 (100% = 22px, 250% = 약 28px)
+  LinkH := MulDiv(22, ScaleFactor, 96);
+
+  // TNewMemo: 세로 스크롤바 자동 표시 → HiDPI에서도 내용 잘림 없음
+  // SurfaceHeight에서 링크 레이블 + 여백(8px)을 뺀 나머지 전체 사용
   DolbyInfoMemo := TNewMemo.Create(DolbyPage);
   DolbyInfoMemo.Parent := DolbyPage.Surface;
   DolbyInfoMemo.Left := 0;
   DolbyInfoMemo.Top := 0;
   DolbyInfoMemo.Width := DolbyPage.SurfaceWidth;
-  // 링크 레이블(약 20px) + 여백(12px) 제외한 나머지 전체 사용
-  DolbyInfoMemo.Height := DolbyPage.SurfaceHeight - 32;
+  DolbyInfoMemo.Height := DolbyPage.SurfaceHeight - LinkH - 8;
   DolbyInfoMemo.ScrollBars := ssVertical;
   DolbyInfoMemo.ReadOnly := True;
   DolbyInfoMemo.WantReturns := False;
   DolbyInfoMemo.Font.Size := BaseFontSize;
   DolbyInfoMemo.Lines.Text := GetDolbyCaption();
 
+  // 링크 레이블: 메모 바로 아래 고정 배치
+  // Top을 SurfaceHeight - LinkH로 설정하여 항상 하단에 표시
   DolbyLinkLabel := TNewStaticText.Create(DolbyPage);
   DolbyLinkLabel.Parent := DolbyPage.Surface;
   DolbyLinkLabel.Left := 0;
-  DolbyLinkLabel.Top := DolbyInfoMemo.Top + DolbyInfoMemo.Height + 4;
+  DolbyLinkLabel.Top := DolbyPage.SurfaceHeight - LinkH;
   DolbyLinkLabel.Width := DolbyPage.SurfaceWidth;
-  DolbyLinkLabel.AutoSize := True;
+  DolbyLinkLabel.AutoSize := False;
+  DolbyLinkLabel.Height := LinkH;
   DolbyLinkLabel.Caption := CustomMessage('DolbyLinkText');
   DolbyLinkLabel.Font.Size := BaseFontSize;
   DolbyLinkLabel.Font.Color := $00CC6600;
