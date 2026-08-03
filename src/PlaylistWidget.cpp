@@ -1,4 +1,10 @@
 #include "PlaylistWidget.h"
+#include "AlbumArtExtractor.h"
+#include <QFileInfo>
+#include <QPainter>
+#include <QPainterPath>
+#include <QtConcurrent>
+#include <QFutureWatcher>
 #include <QFileInfo>
 #include <QListWidgetItem>
 #include <QPushButton>
@@ -76,6 +82,8 @@ PlaylistWidget::PlaylistWidget(QWidget* parent) : QWidget(parent) {
     // 목록
     listWidget_ = new QListWidget(this);
     listWidget_->setAlternatingRowColors(false);
+    listWidget_->setIconSize(QSize(48, 48));  // 썸네일 크기
+    listWidget_->setSpacing(2);
 
     // 드래그앤드롭 재정렬 활성화
     listWidget_->setDragEnabled(true);
@@ -136,9 +144,69 @@ void PlaylistWidget::highlightCurrent() {
 
 void PlaylistWidget::addFile(const QString& path) {
     QFileInfo fi(path);
-    QListWidgetItem* item = new QListWidgetItem(fi.fileName(), listWidget_);
+    // 파일명 + 재생시간 표시
+    QString displayName = fi.fileName();
+    QListWidgetItem* item = new QListWidgetItem(displayName, listWidget_);
     item->setToolTip(path);
+    item->setForeground(QColor("#ccc"));
     filePaths_.append(path);
+
+    // 썸네일 비동기 로드 (음악 파일만)
+    static const QStringList audioExts = {
+        "mp3","flac","aac","wav","m4a","ogg","opus","wma","ape","alac","dsd","dsf","dff"
+    };
+    QString ext = fi.suffix().toLower();
+    if (audioExts.contains(ext)) {
+        if (thumbCache_.contains(path)) {
+            item->setIcon(QIcon(thumbCache_[path]));
+        } else {
+            item->setIcon(QIcon(":/icons/audio_file.svg"));
+            loadThumbnailAsync(path, item);
+        }
+    } else {
+        item->setIcon(QIcon(":/icons/video_file.svg"));
+    }
+}
+
+void PlaylistWidget::loadThumbnailAsync(const QString& path, QListWidgetItem* item) {
+    auto* watcher = new QFutureWatcher<QPixmap>(this);
+    connect(watcher, &QFutureWatcher<QPixmap>::finished, this,
+            [this, watcher, path, item]() {
+        QPixmap thumb = watcher->result();
+        watcher->deleteLater();
+        if (!thumb.isNull()) {
+            QPixmap scaled = thumb.scaled(48, 48,
+                Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation);
+            QPixmap cropped(48, 48);
+            cropped.fill(Qt::transparent);
+            QPainter p(&cropped);
+            p.setRenderHint(QPainter::Antialiasing);
+            QPainterPath pp;
+            pp.addRoundedRect(0, 0, 48, 48, 4, 4);
+            p.setClipPath(pp);
+            int ox = (scaled.width() - 48) / 2;
+            int oy = (scaled.height() - 48) / 2;
+            p.drawPixmap(-ox, -oy, scaled);
+            thumbCache_[path] = cropped;
+            if (item) item->setIcon(QIcon(cropped));
+        }
+    });
+    watcher->setFuture(QtConcurrent::run([path]() -> QPixmap {
+        return AlbumArtExtractor::extract(path);
+    }));
+}
+
+void PlaylistWidget::onThumbnailLoaded(const QString& path, const QPixmap& thumb) {
+    thumbCache_[path] = thumb;
+}
+
+QString PlaylistWidget::formatDuration(double secs) const {
+    if (secs <= 0) return "";
+    int t = static_cast<int>(secs);
+    int h = t / 3600, m = (t % 3600) / 60, s = t % 60;
+    if (h > 0)
+        return QString("%1:%2:%3").arg(h).arg(m,2,10,QChar('0')).arg(s,2,10,QChar('0'));
+    return QString("%1:%2").arg(m,2,10,QChar('0')).arg(s,2,10,QChar('0'));
 }
 
 void PlaylistWidget::addFiles(const QStringList& paths) {

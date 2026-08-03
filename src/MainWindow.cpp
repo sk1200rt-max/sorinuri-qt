@@ -121,6 +121,7 @@ void MainWindow::setupUI() {
     mpvWidget_->setFocusPolicy(Qt::ClickFocus);
     videoLayout->addWidget(mpvWidget_);
     // ── 플레이어 페이지 내부: 영상 vs 음악 스택 ────────────────────────────
+    videoPage_ = videoContainer;  // videoPage_ 멤버에 저장 (멀티뷰 전환용)
     playerStack_ = new QStackedWidget(playerPage_);
     playerStack_->addWidget(videoContainer);  // index 0: 영상
     musicPage_ = new MusicWidget(mpvWidget_->core(), playerPage_);
@@ -1325,6 +1326,18 @@ void MainWindow::showContextMenu(const QPoint& globalPos) {
     connect(actAspect235,  &QAction::triggered, [core]() { core->setProperty("video-aspect-override", QString("2.35:1")); });
     connect(actAspect11,   &QAction::triggered, [core]() { core->setProperty("video-aspect-override", QString("1:1")); });
 
+    // 멀티뷰 서브메뉴
+    QMenu* multiViewMenu = menu.addMenu("멀티뷰");
+    QAction* actSingle = multiViewMenu->addAction("단일 화면");
+    QAction* actDualH  = multiViewMenu->addAction("2분할 (좌우)");
+    QAction* actDualV  = multiViewMenu->addAction("2분할 (상하)");
+    QAction* actPIP    = multiViewMenu->addAction("PIP (화면 속 화면)");
+    QAction* actQuad   = multiViewMenu->addAction("4분할");
+    connect(actSingle, &QAction::triggered, this, [this]() { toggleMultiView(MultiViewLayout::Single); });
+    connect(actDualH,  &QAction::triggered, this, [this]() { toggleMultiView(MultiViewLayout::DualH); });
+    connect(actDualV,  &QAction::triggered, this, [this]() { toggleMultiView(MultiViewLayout::DualV); });
+    connect(actPIP,    &QAction::triggered, this, [this]() { toggleMultiView(MultiViewLayout::PIP); });
+    connect(actQuad,   &QAction::triggered, this, [this]() { toggleMultiView(MultiViewLayout::Quad); });
     // 전체화면
     QAction* actFull = menu.addAction(isFullscreen_ ? "전체화면 해제  (F)": "전체화면  (F)");
     connect(actFull, &QAction::triggered, this, &MainWindow::toggleFullscreen);
@@ -1733,6 +1746,26 @@ void MainWindow::onChapterBookmark() {
 }
 
 void MainWindow::toggleMultiView(MultiViewLayout l) {
-    Q_UNUSED(l);
-    // MultiViewWidget은 별도 창으로 구현 예정
+    if (l == MultiViewLayout::Single) {
+        // 단일 모드: 멀티뷰 해제 → 일반 영상 모드로 복귀
+        if (multiViewWidget_) {
+            multiViewWidget_->hide();
+        }
+        playerStack_->setCurrentIndex(0);
+        return;
+    }
+
+    // 멀티뷰 위젯 지연 초기화
+    if (!multiViewWidget_) {
+        multiViewWidget_ = new MultiViewWidget(mpvWidget_, playerPage_);
+        playerStack_->addWidget(multiViewWidget_);  // index 2: 멀티뷰
+        // 멀티뷰에서 파일 요청 시 처리
+        connect(multiViewWidget_, &MultiViewWidget::secondaryFileRequested,
+                this, [this]() { onOpenFile(); });
+    }
+
+    // 멀티뷰 레이아웃 설정 및 표시
+    multiViewWidget_->setLayout(l);
+    playerStack_->setCurrentIndex(2);
+    controlBar_->show();  // 멀티뷰에서도 컨트롤바 표시
 }

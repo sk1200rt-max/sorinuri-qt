@@ -4,6 +4,9 @@
 #include <QVBoxLayout>
 #include <QToolBar>
 #include <QStringList>
+#include <QHash>
+#include <QPixmap>
+#include <QMap>
 
 class PlaylistWidget : public QWidget {
     Q_OBJECT
