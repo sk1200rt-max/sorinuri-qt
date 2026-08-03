@@ -302,10 +302,14 @@ void MainWindow::openFiles(const QStringList& paths) {
             } else {
                 switchToVideoMode();
             }
-            // switchToVideoMode에서 QOpenGLWidget 컨텍스트가 재배치될 수 있으므로
-            // 이벤트 루프를 한 번 실행하여 컨텍스트 복구 후 loadFile 호출
-            QApplication::processEvents();
-            mpvWidget_->loadFile(path);
+            // switchToVideoMode/MusicMode에서 QOpenGLWidget 컨텍스트가 재배치될 수 있음.
+            // QTimer::singleShot(0)으로 다음 이벤트 루프 사이클에서 loadFile 호출.
+            // → 컨텍스트 메뉴/다이얼로그 닫힘 처리가 완전히 끝난 후 실행 보장.
+            // processEvents()만으로는 부족한 경우(우클릭 메뉴에서 파일 열기 등) 해결.
+            const QString pathCopy = path;
+            QTimer::singleShot(0, this, [this, pathCopy]() {
+                mpvWidget_->loadFile(pathCopy);
+            });
             first = false;
         } else {
             mpvWidget_->appendFile(path);
