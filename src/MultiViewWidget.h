@@ -22,7 +22,7 @@ public:
 
 public slots:
     void setLayout(MultiViewLayout l);
-    void loadSecondaryFile(const QString& path);
+    void loadSecondaryFile(const QString& path, int idx = 0);
     void closeSecondary(int idx);
 
 signals:

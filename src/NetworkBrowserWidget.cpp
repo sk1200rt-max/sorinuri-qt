@@ -277,24 +277,29 @@ void NetworkBrowserWidget::buildCastTab(QWidget* parent)
         // 실제 Cast 프로토콜: TCP 8009 포트 연결 후 TLS + Protobuf
         // 간소화: HTTP GET http://IP:8008/setup/eureka_info 로 기기 정보 확인
         auto* mgr = new QNetworkAccessManager(this);
+        // 발견 여부 추적 (발견 후 나머지 응답 무시)
+        auto* found = new bool(false);
         for (int i = 1; i <= 254; ++i) {
             QString ip = subnet + QString::number(i);
             QUrl url(QString("http://%1:8008/setup/eureka_info").arg(ip));
             QNetworkRequest req(url);
-            req.setTransferTimeout(500);
+            req.setTransferTimeout(300);  // 300ms로 단축 (빠른 스캔)
             auto* reply = mgr->get(req);
-            connect(reply, &QNetworkReply::finished, this, [this, reply, ip]() {
-                if (reply->error() == QNetworkReply::NoError) {
+            connect(reply, &QNetworkReply::finished, this, [this, reply, ip, found]() {
+                if (!*found && reply->error() == QNetworkReply::NoError) {
                     QByteArray data = reply->readAll();
                     if (data.contains("cast_build_revision") || data.contains("name")) {
+                        *found = true;
                         if (castUrlEdit_) castUrlEdit_->setText(ip);
-                        castStatusLabel_->setText(
+                        if (castStatusLabel_) castStatusLabel_->setText(
                             QString("크롬캐스트 발견: %1\n기기 IP가 자동 입력되었습니다.").arg(ip));
                     }
                 }
                 reply->deleteLater();
             });
         }
+        // 5초 후 found 메모리 해제
+        QTimer::singleShot(5000, this, [found]() { delete found; });
     });
 
     layout->addWidget(infoGroup);

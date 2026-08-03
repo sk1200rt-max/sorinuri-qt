@@ -109,6 +109,7 @@ void CompactPlayerWidget::setupUI() {
         auto* b = new QPushButton(txt, this);
         b->setFixedSize(22, 22);
         b->setToolTip(tip);
+        b->setFocusPolicy(Qt::NoFocus);  // HiDPI: 버튼 클릭 후 포커스 유지
         b->setStyleSheet(
             "QPushButton{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.08);"
             "border-radius:11px;color:rgba(200,200,210,0.7);font-size:10px;}"
@@ -124,9 +125,10 @@ void CompactPlayerWidget::setupUI() {
         "color:#00c8b4;}");
 
     // ── 시크바 ─────────────────────────────────────────────────────
-    seekSlider_ = new QSlider(Qt::Horizontal, this);
+    seekSlider_ = new ClickSeekSlider(Qt::Horizontal, this);
     seekSlider_->setRange(0, 1000);
     seekSlider_->setCursor(Qt::PointingHandCursor);
+    seekSlider_->setFocusPolicy(Qt::NoFocus);  // HiDPI: 키 이벤트가 MainWindow로 전달되도록
     seekSlider_->setStyleSheet(
         "QSlider{background:transparent;}"
         "QSlider::groove:horizontal{background:rgba(255,255,255,0.10);height:3px;border-radius:2px;}"
@@ -150,6 +152,7 @@ void CompactPlayerWidget::setupUI() {
         auto* b = new QPushButton(txt, this);
         b->setFixedSize(sz, sz);
         b->setCursor(Qt::PointingHandCursor);
+        b->setFocusPolicy(Qt::NoFocus);  // HiDPI: 버튼 클릭 후 포커스 유지
         if (accent) {
             b->setStyleSheet(QString(
                 "QPushButton{background:#00c8b4;color:#0a0a0c;border-radius:%1px;"
@@ -185,6 +188,7 @@ void CompactPlayerWidget::setupUI() {
         "QPushButton:hover{color:#fff;}");
 
     volSlider_ = new QSlider(Qt::Horizontal, this);
+    volSlider_->setFocusPolicy(Qt::NoFocus);  // HiDPI: 키 이벤트가 MainWindow로 전달되도록
     volSlider_->setRange(0, 100);
     volSlider_->setValue(100);
     volSlider_->setFixedWidth(72);

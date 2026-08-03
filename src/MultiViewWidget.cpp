@@ -197,12 +197,15 @@ void MultiViewWidget::dropEvent(QDropEvent* e) {
     if (!path.isEmpty()) loadSecondaryFile(path);
 }
 
-void MultiViewWidget::loadSecondaryFile(const QString& path) {
+void MultiViewWidget::loadSecondaryFile(const QString& path, int idx) {
+    // idx: 0=첫 번째 보조, 1=두 번째, 2=세 번째 (Quad 모드)
     if (secondary_.isEmpty()) {
         setLayout(MultiViewLayout::PIP);
     }
-    if (!secondary_.isEmpty()) {
-        secondary_[0]->core()->loadFile(path);
+    if (idx < secondary_.size()) {
+        secondary_[idx]->core()->loadFile(path);
+    } else if (!secondary_.isEmpty()) {
+        secondary_.last()->core()->loadFile(path);
     }
 }
 

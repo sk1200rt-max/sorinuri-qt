@@ -294,6 +294,13 @@ void MusicWidget::contextMenuEvent(QContextMenuEvent* e) {
         });
     }
 
+    // 재생목록에 추가 (현재 파일)
+    if (!currentMeta_.filePath.isEmpty()) {
+        auto* actAddPlaylist = menu.addAction("➕  재생목록에 추가");
+        connect(actAddPlaylist, &QAction::triggered, this, [this](){
+            emit addToPlaylistRequested(currentMeta_.filePath);
+        });
+    }
     menu.addSeparator();
     auto* actSettings = menu.addAction("⚙  설정");
     connect(actSettings, &QAction::triggered, this, &MusicWidget::settingsRequested);
@@ -398,6 +405,7 @@ void MusicWidget::setupUI(){
     volSlider_=new QSlider(Qt::Horizontal,this);
     volSlider_->setRange(0,100);volSlider_->setValue(100);volSlider_->setFixedWidth(90);
     volSlider_->setToolTip("볼륨");
+    volSlider_->setFocusPolicy(Qt::NoFocus);  // HiDPI: 키 이벤트가 MainWindow로 전달되도록
     volSlider_->setStyleSheet(
         "QSlider::groove:horizontal{background:#2a2a2a;height:3px;border-radius:2px;}"
         "QSlider::handle:horizontal{background:#888;width:10px;height:10px;margin:-3.5px 0;border-radius:5px;}"
@@ -495,10 +503,8 @@ void MusicWidget::setupConnections(){
 
 void MusicWidget::onAbRepeatClicked(){
     if(!core_) return;
-    double currentPos=0;
-    if(duration_>0){
-        currentPos = duration_ * seekSlider_->value() / 1000.0;
-    }
+    // core_->position()으로 정확한 현재 재생 위치 사용 (seekSlider 동기화 지연 방지)
+    double currentPos = core_ ? core_->position() : 0.0;
     if(abState_==0){
         abPointA_=currentPos;
         abState_=1;

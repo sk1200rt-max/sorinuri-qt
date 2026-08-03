@@ -911,18 +911,18 @@ void MainWindow::keyPressEvent(QKeyEvent* e) {
     case Qt::Key_S:  // 스크린샷
         if (e->modifiers() & Qt::ControlModifier) {
             core->command({"screenshot", "video"});
-            if (osdWidget_) osdWidget_->showInfo("화면 쾐치 저장");
+            if (osdWidget_) osdWidget_->showInfo("화면 캡처 저장");
         } else {
             core->command({"stop"});
         }
         break;
-    case Qt::Key_D:  // 오디오 딥레이
+    case Qt::Key_D:  // 오디오 딜레이
         if (e->modifiers() & Qt::ShiftModifier)
             proFeatures_->setAudioDelay(proFeatures_->audioDelay() - 100);
         else
             proFeatures_->setAudioDelay(proFeatures_->audioDelay() + 100);
         break;
-    case Qt::Key_Z:  // 자막 딥레이
+    case Qt::Key_Z:  // 자막 딜레이
         if (e->modifiers() & Qt::ShiftModifier)
             proFeatures_->setSubDelay(proFeatures_->subDelay() - 100);
         else
@@ -936,9 +936,9 @@ void MainWindow::keyPressEvent(QKeyEvent* e) {
         proFeatures_->setSpeed(qMax(proFeatures_->currentSpeed() - 0.25, 0.25));
         if (osdWidget_) osdWidget_->showSpeed(proFeatures_->currentSpeed());
         break;
-    case Qt::Key_C:  // 화면 쾐치
+    case Qt::Key_C:  // 화면 캡처
         core->command({"screenshot", "video"});
-        if (osdWidget_) osdWidget_->showInfo("화면 쾐치 저장");
+        if (osdWidget_) osdWidget_->showInfo("화면 캡처 저장");
         break;
     case Qt::Key_P:
         toggleProFeatures();

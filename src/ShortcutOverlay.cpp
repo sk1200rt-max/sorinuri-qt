@@ -41,7 +41,7 @@ void ShortcutOverlay::paintEvent(QPaintEvent*) {
     QVector<Item> left = {
         {""  ,"재생 제어",true},
         {"Space / Enter","재생 / 일시정지"},
-        {"S","정지"},
+        {"S","정지 (Ctrl+S: 화면 캡처)"},
         {"← / →","5초 뒤로 / 앞으로"},
         {"Shift+← / →","1분 뒤로 / 앞으로"},
         {"Ctrl+← / →","10초 뒤로 / 앞으로"},
@@ -66,7 +66,7 @@ void ShortcutOverlay::paintEvent(QPaintEvent*) {
         {"F / F11","전체화면 토글"},
         {"Esc","전체화면 해제"},
         {"T","항상 위에 토글"},
-        {"C / Ctrl+S","화면 캡처 저장"},
+        {"C / Ctrl+S","화면 캡처 저장 (PNG)"},
         {""  ,"전문 기능",true},
         {"P","전문 기능 패널 토글"},
         {"A / B","A-B 반복 시작 / 끝 설정"},

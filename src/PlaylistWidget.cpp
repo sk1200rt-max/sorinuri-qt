@@ -160,11 +160,14 @@ void PlaylistWidget::addFile(const QString& path) {
         if (thumbCache_.contains(path)) {
             item->setIcon(QIcon(thumbCache_[path]));
         } else {
-            item->setIcon(QIcon(":/icons/audio_file.svg"));
+            item->setIcon(QIcon(":/icons/audio.svg"));
             loadThumbnailAsync(path, item);
         }
     } else {
-        item->setIcon(QIcon(":/icons/video_file.svg"));
+        // 영상 파일: 기본 아이콘 (video 아이콘 없으면 빈 아이콘)
+        QIcon videoIcon = QIcon::fromTheme("video-x-generic");
+        if (videoIcon.isNull()) videoIcon = QIcon(":/icons/audio.svg");
+        item->setIcon(videoIcon);
     }
 }
 

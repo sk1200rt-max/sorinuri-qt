@@ -2,6 +2,7 @@
 #include <QWidget>
 #include <QLabel>
 #include <QSlider>
+#include "ControlBar.h"  // ClickSeekSlider (HiDPI 클릭 즉시 이동)
 #include <QPushButton>
 #include <QListWidget>
 #include <QPixmap>
@@ -92,7 +93,7 @@ private:
     QPushButton* btnRepeat_       = nullptr;
 
     // 시크바
-    QSlider*     seekSlider_      = nullptr;
+    ClickSeekSlider* seekSlider_  = nullptr;
     QLabel*      timeCurrent_     = nullptr;
     QLabel*      timeDuration_    = nullptr;
 
