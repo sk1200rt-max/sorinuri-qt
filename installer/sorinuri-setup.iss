@@ -128,8 +128,9 @@ var
 
 function GetDolbyCaption(): String;
 begin
-  // DolbyPageDesc는 CreateCustomPage SubCaption에 이미 표시되므로 중복 제거
-  Result :=
+  // SubCaption을 빈 문자열로 변경했으므로
+  // DolbyPageDesc를 메모 첫 줄에 포함하여 전체 내용을 메모 안에 표시
+  Result := CustomMessage('DolbyPageDesc') + #13#10 + #13#10 +
     '------------------------------------------------------------' + #13#10 + #13#10 +
     CustomMessage('DolbyLine1') + #13#10 +
     CustomMessage('DolbyLine2') + #13#10 +
@@ -160,11 +161,14 @@ begin
   BaseFontSize := MulDiv(9, ScaleFactor, 96);
   if BaseFontSize > 11 then BaseFontSize := 11;
 
-  // SubCaption에 DolbyPageDesc를 표시 (메모 안에서 중복 제거)
+  // SubCaption을 빈 문자열로 설정
+  // 이유: SubCaption이 있으면 Inno Setup이 페이지 상단에 별도 헤더 영역을 만들어
+  // SurfaceHeight가 줄어들고 메모 내용이 잘림.
+  // DolbyPageDesc는 GetDolbyCaption()에서 메모 첫 줄로 표시함.
   DolbyPage := CreateCustomPage(
     wpSelectTasks,
     CustomMessage('DolbyPageTitle'),
-    CustomMessage('DolbyPageDesc'));
+    '');
 
   // 링크 레이블 높이를 DPI에 맞게 계산 (100% = 22px, 250% = 약 28px)
   LinkH := MulDiv(22, ScaleFactor, 96);
