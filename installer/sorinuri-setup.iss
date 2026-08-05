@@ -181,7 +181,7 @@ begin
   DolbyInfoMemo.Top := 0;
   DolbyInfoMemo.Width := DolbyPage.SurfaceWidth;
   DolbyInfoMemo.Height := DolbyPage.SurfaceHeight - LinkH - 8;
-  DolbyInfoMemo.ScrollBars := ssAutoBoth;  // 가로/세로 자동 스크롤바
+  DolbyInfoMemo.ScrollBars := ssVertical;  // 세로 스크롤바 (ssAutoBoth는 Inno Setup 미지원)
   DolbyInfoMemo.ReadOnly := True;
   DolbyInfoMemo.WantReturns := False;
   DolbyInfoMemo.Font.Size := BaseFontSize;
