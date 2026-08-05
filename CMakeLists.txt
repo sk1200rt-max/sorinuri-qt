@@ -105,8 +105,6 @@ set(SOURCES
     src/NetworkBrowserWidget.h
     src/OsdWidget.cpp
     src/OsdWidget.h
-    src/InfoOverlayWidget.cpp
-    src/InfoOverlayWidget.h
     src/MediaLibraryWidget.cpp
     src/MediaLibraryWidget.h
     src/SubtitleEditorWidget.cpp

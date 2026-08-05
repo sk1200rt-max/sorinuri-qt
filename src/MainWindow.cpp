@@ -166,8 +166,6 @@ void MainWindow::setupUI() {
     osdWidget_ = new OsdWidget(mpvWidget_);
     osdWidget_->hide();
     // 재생 정보 대시보드 오버레이 - 비최대화 모드에서 표시
-    infoOverlay_ = new InfoOverlayWidget(mpvWidget_->core(), mpvWidget_);
-    infoOverlay_->hide();
 
     // ── 광고 관리자 초기화 ──────────────────────────────────────────────
     adManager_      = new AdManager(this);
@@ -219,21 +217,6 @@ void MainWindow::setupConnections() {
     connect(core, &MpvCore::volumeChanged,      this, &MainWindow::onVolumeChanged);
     connect(core, &MpvCore::audioFormatChanged, this, &MainWindow::onAudioFormatChanged);
     connect(core, &MpvCore::videoInfoChanged,   this, &MainWindow::onVideoInfoChanged);
-    // InfoOverlay 시그널 연결
-    connect(core, &MpvCore::fileLoaded, this, [this](const QString& path) {
-        if (infoOverlay_) infoOverlay_->onFileLoaded(path);
-    });
-    connect(core, &MpvCore::playbackStopped, this, [this]() {
-        if (infoOverlay_) infoOverlay_->onPlaybackStopped();
-    });
-    connect(core, &MpvCore::audioFormatChanged, this,
-            [this](const QString& codec, int ch, int sr, const QString& out) {
-        if (infoOverlay_) infoOverlay_->onAudioFormatChanged(codec, ch, sr, out);
-    });
-    connect(core, &MpvCore::videoInfoChanged, this,
-            [this](int w, int h, double fps, const QString& codec) {
-        if (infoOverlay_) infoOverlay_->onVideoInfoChanged(w, h, fps, codec);
-    });
     connect(core, &MpvCore::tracksChanged,      this, &MainWindow::onTracksChanged);
 
     // 실시간 렌더링 품질 강등/복원 시그널 → OSD로 사용자에게 알림
@@ -268,12 +251,8 @@ void MainWindow::setupConnections() {
     connect(titleBar_, &TitleBar::maximizeClicked, this, [this]() {
         if (isMaximized()) {
             showNormal();
-            // 비최대화 → infoOverlay_ 표시 (파일 있을 때)
-            if (infoOverlay_ && !isFullscreen_) infoOverlay_->setVisible(true);
         } else {
             showMaximized();
-            // 최대화 → infoOverlay_ 숨김
-            if (infoOverlay_) infoOverlay_->setVisible(false);
         }
     });
     connect(titleBar_, &TitleBar::fullscreenClicked, this, &MainWindow::toggleFullscreen);
@@ -456,10 +435,6 @@ void MainWindow::onFileLoaded(const QString& path) {
         saveResumePosition();
     currentFilePath_ = path;
     lastPosition_ = 0.0;
-    // 비최대화 모드일 때 infoOverlay_ 표시
-    if (infoOverlay_ && !isFullscreen_ && !isMaximized()) {
-        infoOverlay_->setVisible(true);
-    }
     // 새 파일 로드 시 멀티체널 안내 상태 초기화 (파일마다 한 번씩 감지)
     multichannelPromptShown_ = false;
     updateWindowTitle(QFileInfo(path).fileName());
@@ -820,15 +795,11 @@ void MainWindow::toggleFullscreen() {
         titleBar_->show();
         titleBar_->setFullscreenMode(false);
         isFullscreen_ = false;
-        // 전체화면 해제 → 비최대화 모드 → infoOverlay_ 표시
-        if (infoOverlay_) infoOverlay_->setVisible(true);
     } else {
         showFullScreen();
         titleBar_->hide();
         isFullscreen_ = true;
         titleBar_->setFullscreenMode(true);
-        // 전체화면 → infoOverlay_ 숨김
-        if (infoOverlay_) infoOverlay_->setVisible(false);
     }
 }
 
@@ -1089,9 +1060,6 @@ void MainWindow::resizeEvent(QResizeEvent* e) {
     // 단축키 오버레이 크기를 영상 위젯에 맞춤
     if (shortcutOverlay_ && mpvWidget_) {
         shortcutOverlay_->setGeometry(mpvWidget_->rect());
-    }
-    if (infoOverlay_ && mpvWidget_) {
-        infoOverlay_->setGeometry(mpvWidget_->rect());
     }
 }
 
