@@ -102,6 +102,7 @@ void EqPanel::buildUI(){
         gl->setFixedWidth(36);gainLabels_.append(gl);col->addWidget(gl);
         auto* sl=new QSlider(Qt::Vertical,this);
         sl->setRange(-120,120);sl->setValue(0);sl->setFixedWidth(24);sl->setMinimumHeight(100);
+        sl->setFocusPolicy(Qt::NoFocus);  // HiDPI: EQ 슬라이더 클릭 후 단축키 유지
         sl->setStyleSheet("QSlider::groove:vertical{background:#333;width:4px;border-radius:2px;}"
                           "QSlider::handle:vertical{background:#00c8b4;width:14px;height:14px;margin:-5px -5px;border-radius:7px;}"
                           "QSlider::add-page:vertical{background:#00c8b4;border-radius:2px;}"
@@ -120,6 +121,7 @@ void EqPanel::buildUI(){
     }
     root->addLayout(srow,1);
     auto* br=new QPushButton("Reset",this);
+    br->setFocusPolicy(Qt::NoFocus);  // HiDPI: 버튼 클릭 후 단축키 유지
     br->setStyleSheet("QPushButton{background:#222;color:#aaa;border:1px solid #444;border-radius:4px;padding:4px 16px;font-size:12px;}"
                       "QPushButton:hover{background:#2a2a2a;color:white;}");
     connect(br,&QPushButton::clicked,this,[this](){applyPreset(0);});

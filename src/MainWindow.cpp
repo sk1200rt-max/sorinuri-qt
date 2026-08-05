@@ -338,7 +338,11 @@ void MainWindow::openFiles(const QStringList& paths) {
             // → 컨텍스트 메뉴 닫힌 처리가 완전히 끝난 후 실행 보장.
             // 0ms: MPV 초기화 완료 후 호출되므로 타이밍 의존 불필요.
             const QString pathCopy = path;
-            QTimer::singleShot(0, this, [this, pathCopy]() {
+            // HiDPI 50ms: 컨텍스트 메뉴 닫힘 이벤트가 완전히 처리된 후 loadFile 호출
+            // 0ms는 이벤트 루프 1회전만 보장하지만, HiDPI에서 메뉴 닫힘 처리가
+            // 여러 이벤트 루프 사이클에 걸쳐 발생할 수 있음.
+            // 50ms는 어떤 PC 사양에서도 충분한 여유 시간.
+            QTimer::singleShot(50, this, [this, pathCopy]() {
                 mpvWidget_->loadFile(pathCopy);
             });
             first = false;

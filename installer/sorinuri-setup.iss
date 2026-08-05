@@ -3,7 +3,7 @@
 
 #define MyAppName "소리누리"
 #define MyAppNameEn "Sorinuri"
-#define MyAppVersion "6.7.2"
+#define MyAppVersion "6.7.4"
 #define MyAppPublisher "Sorinuri"
 #define MyAppURL "https://sorinuri.com"
 #define MyAppExeName "Sorinuri.exe"
@@ -159,7 +159,7 @@ begin
   // 기본 폰트 크기: 96 DPI에서 9pt, HiDPI에서 비례 확대
   // 250% 배율(240 DPI)에서 글씨 잘림 방지: 최대 11pt로 제한
   BaseFontSize := MulDiv(9, ScaleFactor, 96);
-  if BaseFontSize > 11 then BaseFontSize := 11;
+  if BaseFontSize > 10 then BaseFontSize := 10;  // 250% 배율에서 잘림 방지
 
   // SubCaption을 빈 문자열로 설정
   // 이유: SubCaption이 있으면 Inno Setup이 페이지 상단에 별도 헤더 영역을 만들어
@@ -181,7 +181,7 @@ begin
   DolbyInfoMemo.Top := 0;
   DolbyInfoMemo.Width := DolbyPage.SurfaceWidth;
   DolbyInfoMemo.Height := DolbyPage.SurfaceHeight - LinkH - 8;
-  DolbyInfoMemo.ScrollBars := ssVertical;
+  DolbyInfoMemo.ScrollBars := ssAutoBoth;  // 가로/세로 자동 스크롤바
   DolbyInfoMemo.ReadOnly := True;
   DolbyInfoMemo.WantReturns := False;
   DolbyInfoMemo.Font.Size := BaseFontSize;
