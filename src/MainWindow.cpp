@@ -194,6 +194,9 @@ void MainWindow::setupConnections() {
     mpvWidget_->setMouseTracking(true);
     mpvWidget_->installEventFilter(this);
     setMouseTracking(true);
+    // Tab키 전역 감지: Qt는 Tab키를 포커스 이동으로 처리하여 keyPressEvent로 전달하지 않음
+    // qApp 이벤트 필터로 애플리케이션 전체에서 Tab키를 감지하여 처리
+    qApp->installEventFilter(this);
 
     // HiDPI 근본 수정: mpvInitialized 시그널 연결
     // initializeGL() 완료 후 pendingStartupFiles_ 자동 처리
@@ -1136,6 +1139,15 @@ void MainWindow::mousePressEvent(QMouseEvent* e) {
 }
 
 bool MainWindow::eventFilter(QObject* obj, QEvent* event) {
+    // Tab키 전역 처리: qApp 이벤트 필터로 모든 이벤트를 감지
+    // Qt가 Tab키를 포커스 이동으로 가로채기 전에 여기서 먹음
+    if (event->type() == QEvent::KeyPress) {
+        auto* ke = static_cast<QKeyEvent*>(event);
+        if (ke->key() == Qt::Key_Tab && ke->modifiers() == Qt::NoModifier) {
+            if (mediaInfoOverlay_) mediaInfoOverlay_->toggle();
+            return true;  // 이벤트 소비 - 포커스 이동 방지
+        }
+    }
     if (obj == mpvWidget_) {
         // 클릭 시 MainWindow로 포커스 재설정 - 키 이벤트가 keyPressEvent로 정상 전달됨
         if (event->type() == QEvent::MouseButtonPress) {
