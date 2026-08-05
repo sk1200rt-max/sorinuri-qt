@@ -161,6 +161,9 @@ void MainWindow::setupUI() {
     // ── 단축키 오버레이 (영상 위에 표시) ─────────────────────────────
     shortcutOverlay_ = new ShortcutOverlay(mpvWidget_);
     shortcutOverlay_->hide();
+    // ── 미디어 정보 오버레이 (Tab키로 토글, 좌측 사이드바) ──────────────
+    mediaInfoOverlay_ = new MediaInfoOverlay(mpvWidget_);
+    mediaInfoOverlay_->hide();
 
     // OSD 위젯 (화면 중앙 반투명 표시) - mpvWidget_ 위에 오버레이
     osdWidget_ = new OsdWidget(mpvWidget_);
@@ -243,6 +246,7 @@ void MainWindow::setupConnections() {
 
     // 전문 기능 패널 연결
     proFeatures_->connectMpv(core);
+    mediaInfoOverlay_->connectMpv(core);
     // 패널 내부 닫기 버튼 → toggleProFeatures (앱 종료 아님)
     connect(proFeatures_, &ProFeaturesWidget::closeRequested,
             this, &MainWindow::toggleProFeatures);
@@ -973,6 +977,9 @@ void MainWindow::keyPressEvent(QKeyEvent* e) {
         core->command({"screenshot", "video"});
         if (osdWidget_) osdWidget_->showInfo("화면 캡처 저장");
         break;
+    case Qt::Key_Tab:
+        mediaInfoOverlay_->toggle();
+        break;
     case Qt::Key_P:
         toggleProFeatures();
         break;
@@ -1060,6 +1067,10 @@ void MainWindow::resizeEvent(QResizeEvent* e) {
     // 단축키 오버레이 크기를 영상 위젯에 맞춤
     if (shortcutOverlay_ && mpvWidget_) {
         shortcutOverlay_->setGeometry(mpvWidget_->rect());
+    }
+    // 미디어 정보 오버레이 높이를 영상 위젯에 맞춤 (좌측 고정, 높이만 동기화)
+    if (mediaInfoOverlay_ && mpvWidget_) {
+        mediaInfoOverlay_->setGeometry(0, 0, 178, mpvWidget_->height());
     }
 }
 

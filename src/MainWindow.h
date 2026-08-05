@@ -24,6 +24,7 @@
 #include "OttWidget.h"
 #include "ProFeaturesWidget.h"
 #include "ShortcutOverlay.h"
+#include "MediaInfoOverlay.h"
 #include "MusicWidget.h"
 #include "HiFiEngine.h"
 #include "MiniPlayerWidget.h"
@@ -137,7 +138,8 @@ private:
     TrackSelector*     trackSelector_   = nullptr;
     ControlBar*        controlBar_      = nullptr;
     ProFeaturesWidget* proFeatures_     = nullptr;
-    ShortcutOverlay*   shortcutOverlay_ = nullptr;
+    ShortcutOverlay*   shortcutOverlay_  = nullptr;
+    MediaInfoOverlay*  mediaInfoOverlay_ = nullptr;
 
     // HiFi 엔진
     HiFiEngine*        hifiEngine_      = nullptr;

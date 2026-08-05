@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(Sorinuri VERSION 6.7.6 LANGUAGES CXX)
+project(Sorinuri VERSION 6.7.7 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -68,6 +68,7 @@ set(SOURCES
     src/ProFeaturesWidget.cpp
     src/ProFeaturesWidget.h
     src/ShortcutOverlay.cpp
+    src/MediaInfoOverlay.cpp
     src/ShortcutOverlay.h
     src/MusicWidget.cpp
     src/MiniPlayerWidget.cpp

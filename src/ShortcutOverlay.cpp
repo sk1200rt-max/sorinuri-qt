@@ -68,7 +68,7 @@ void ShortcutOverlay::paintEvent(QPaintEvent*) {
         {"T","항상 위에 토글"},
         {"C / Ctrl+S","화면 캡처 저장 (PNG)"},
         {""  ,"전문 기능",true},
-        {"P","전문 기능 패널 토글"},
+        {"Tab / P","전문 기능 패널 토글"},
         {"A / B","A-B 반복 시작 / 끝 설정"},
         {"Ctrl+A","A-B 반복 해제"},
         {"+ / -","재생속도 ±0.1x"},
