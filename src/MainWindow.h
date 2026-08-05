@@ -38,6 +38,7 @@
 #include "NetworkBrowserWidget.h"
 #include "OsdWidget.h"
 #include "MediaLibraryWidget.h"
+#include "InfoOverlayWidget.h"
 #include "SubtitleEditorWidget.h"
 #include "AdManager.h"
 #include "SplashAdWidget.h"
@@ -151,6 +152,7 @@ private:
     VideoAdvancedWidget* videoAdvancedWidget_ = nullptr;  // 하이엔드 비디오 (3D LUT)
     NetworkBrowserWidget* networkBrowserWidget_ = nullptr;  // SMB/DLNA + 360도 VR + 캐스팅
     OsdWidget*           osdWidget_            = nullptr;  // 화면 중앙 OSD
+    InfoOverlayWidget*   infoOverlay_          = nullptr;  // 비최대화 재생 정보 대시보드
     MediaLibraryWidget*  mediaLibrary_         = nullptr;  // 스마트 미디어 라이브러리
     SubtitleEditorWidget* subtitleEditor_      = nullptr;  // 자막 편집기
     AdManager*            adManager_            = nullptr;  // 광고 관리자
