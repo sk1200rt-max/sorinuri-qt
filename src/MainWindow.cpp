@@ -1071,9 +1071,9 @@ void MainWindow::resizeEvent(QResizeEvent* e) {
     if (shortcutOverlay_ && mpvWidget_) {
         shortcutOverlay_->setGeometry(mpvWidget_->rect());
     }
-    // 미디어 정보 오버레이 높이를 영상 위젯에 맞춤 (좌측 고정, 높이만 동기화)
-    if (mediaInfoOverlay_ && mpvWidget_) {
-        mediaInfoOverlay_->setGeometry(0, 0, 178, mpvWidget_->height());
+    // 미디어 정보 오버레이: 열려있을 때만 높이 동기화
+    if (mediaInfoOverlay_ && mpvWidget_ && mediaInfoOverlay_->isVisible()) {
+        mediaInfoOverlay_->setGeometry(0, 0, 180, mpvWidget_->height());
     }
 }
 

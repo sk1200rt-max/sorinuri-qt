@@ -3,6 +3,8 @@
 #include <QLabel>
 #include <QVBoxLayout>
 #include <QPropertyAnimation>
+#include <QScrollArea>
+#include <QRect>
 
 class MpvCore;
 
