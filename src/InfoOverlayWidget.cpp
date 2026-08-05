@@ -225,10 +225,8 @@ void InfoOverlayWidget::buildLayout() {
         buildIdleLayout();
     if (container_) {
         container_->setParent(this);
+        container_->setGeometry(rect());
         container_->show();
-        // 크기 맞춤
-        QResizeEvent dummy(size(), size());
-        resizeEvent(&dummy);
     }
 }
 
