@@ -370,7 +370,9 @@ void OriginalsWidget::setupUI() {
 // ── 네트워크: songs.json fetch ────────────────────────────────────────────────
 void OriginalsWidget::fetchSongs() {
     statusLabel_->setText("갱신 중...");
-    QNetworkRequest req(QUrl(apiUrl_));
+    QUrl fetchUrl(apiUrl_);
+    QNetworkRequest req;
+    req.setUrl(fetchUrl);
     req.setHeader(QNetworkRequest::UserAgentHeader, "SorinuriPlayer/6.0");
     req.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
                      QNetworkRequest::NoLessSafeRedirectPolicy);
@@ -445,8 +447,9 @@ void OriginalsWidget::onFetchFinished(QNetworkReply* reply) {
 // ── 썸네일 fetch ──────────────────────────────────────────────────────────────
 void OriginalsWidget::fetchThumbnail(const SongInfo& song) {
     if (song.cover.isEmpty()) return;
-    QString url = baseUrl_ + song.cover;
-    QNetworkRequest req(QUrl(url));
+    QUrl thumbUrl(baseUrl_ + song.cover);
+    QNetworkRequest req;
+    req.setUrl(thumbUrl);
     req.setAttribute(QNetworkRequest::CacheLoadControlAttribute,
                      QNetworkRequest::PreferCache);
     QNetworkReply* reply = nam_->get(req);
