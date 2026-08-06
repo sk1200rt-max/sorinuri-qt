@@ -1,6 +1,7 @@
 #pragma once
 #include <QWidget>
 #include <QNetworkAccessManager>
+#include <QNetworkRequest>
 #include <QNetworkReply>
 #include <QTimer>
 #include <QJsonArray>
