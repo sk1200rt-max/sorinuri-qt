@@ -24,6 +24,7 @@
 #include <QMimeData>
 #include <QUrl>
 #include <QMenu>
+#include <QStandardPaths>
 #include <QAction>
 #include <QCryptographicHash>
 #include <QDateTime>
