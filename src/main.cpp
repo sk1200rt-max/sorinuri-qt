@@ -27,6 +27,11 @@
 #include <QSharedMemory>
 #include <QCommandLineParser>
 #include <QCommandLineOption>
+#include <QLocalServer>
+#include <QLocalSocket>
+#include <QDataStream>
+
+static const QString IPC_SERVER_NAME = "SorinuriIPC_v1";
 
 int main(int argc, char* argv[])
 {
@@ -51,11 +56,11 @@ int main(int argc, char* argv[])
     QApplication app(argc, argv);
     app.setApplicationName("Sorinuri");
     app.setApplicationDisplayName("소리누리");
-    app.setApplicationVersion("6.9.0");
+    app.setApplicationVersion("6.10.0");
     app.setOrganizationName("Sorinuri");
     app.setWindowIcon(QIcon(":/icons/sorinuri.ico"));
 
-    // ── 멀티 인스턴스 (새 창에서 열기) 처리 ────────────────────────
+    // ── 멀티 인스턴스 / LocalSocket IPC 처리 ────────────────────────
     QCommandLineParser parser;
     parser.addHelpOption();
     QCommandLineOption newWindowOption(QStringList() << "n" << "new-window", "새 창에서 실행합니다.");
@@ -66,8 +71,23 @@ int main(int argc, char* argv[])
     QSharedMemory sharedMem("Sorinuri_Instance");
     bool isNewWindow = parser.isSet(newWindowOption);
     if (!isNewWindow && !sharedMem.create(1)) {
-        // 이미 실행 중인 인스턴스가 있으면 파일을 전달하고 종료하는 로직 (현재는 단순히 종료)
-        // (향후 LocalSocket 등을 통해 전달하도록 구현 가능)
+        // 이미 실행 중인 인스턴스가 있음 → LocalSocket으로 파일 전달 후 종료
+        QLocalSocket sock;
+        sock.connectToServer(IPC_SERVER_NAME);
+        if (sock.waitForConnected(1500)) {
+            QStringList positional = parser.positionalArguments();
+            QByteArray data;
+            QDataStream ds(&data, QIODevice::WriteOnly);
+            ds << positional;
+            // 길이 프리픽스 포함 전송
+            QByteArray packet;
+            QDataStream ps(&packet, QIODevice::WriteOnly);
+            ps << (quint32)data.size();
+            ps.writeRawData(data.constData(), data.size());
+            sock.write(packet);
+            sock.flush();
+            sock.waitForBytesWritten(1500);
+        }
         return 0;
     }
 
@@ -93,12 +113,38 @@ int main(int argc, char* argv[])
     MainWindow window;
     window.show();
 
+    // ── LocalSocket IPC 서버 (단일 인스턴스 파일 수신) ────────────
+    QLocalServer::removeServer(IPC_SERVER_NAME);  // 이전 소켓 정리
+    QLocalServer ipcServer;
+    ipcServer.listen(IPC_SERVER_NAME);
+    QObject::connect(&ipcServer, &QLocalServer::newConnection, [&]() {
+        QLocalSocket* client = ipcServer.nextPendingConnection();
+        QObject::connect(client, &QLocalSocket::readyRead, [&window, client]() {
+            QByteArray buf = client->readAll();
+            if (buf.size() < 4) return;
+            QDataStream ps(buf);
+            quint32 len = 0;
+            ps >> len;
+            if ((quint32)buf.size() < 4 + len) return;
+            QByteArray data = buf.mid(4, len);
+            QDataStream ds(data);
+            QStringList files;
+            ds >> files;
+            if (!files.isEmpty()) {
+                // 창을 앞으로 가져오고 파일 열기
+                window.raise();
+                window.activateWindow();
+                window.openFiles(files);
+            }
+            client->deleteLater();
+        });
+    });
+
     // ── 커맨드라인 파일/URL 인수 처리 ────────────────────────────
-    QStringList args = app.arguments();
-    if (args.size() > 1) {
+    QStringList positional = parser.positionalArguments();
+    if (!positional.isEmpty()) {
         QStringList files;
-        for (int i = 1; i < args.size(); ++i) {
-            const QString& arg = args[i];
+        for (const QString& arg : positional) {
             if (arg.startsWith("http://")  || arg.startsWith("https://") ||
                 arg.startsWith("rtmp://")  || arg.startsWith("rtsp://")  ||
                 QFile::exists(arg)) {

@@ -28,6 +28,10 @@
 #include <QAction>
 #include <QCryptographicHash>
 #include <QDateTime>
+#include <QTableWidget>
+#include <QHeaderView>
+#include <algorithm>
+#include <tuple>
 
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -66,6 +70,11 @@ MainWindow::MainWindow(QWidget* parent)
                 this, &MainWindow::onYtdlpDownloadFailed);
     });
 
+    // 스마트폰 리모컨 서버 자동 시작 (설정에서 활성화된 경우)
+    QTimer::singleShot(1000, this, [this]() {
+        if (settings_.value("remote/enabled", false).toBool())
+            startRemoteServer();
+    });
     // 자동 업데이트 체크 (앱 시작 5초 후 - 시작 직후 부하 방지)
     QTimer::singleShot(5000, this, [this]() {
         auto* updater = new UpdateChecker(this);
@@ -380,12 +389,21 @@ void MainWindow::switchToMusicMode() {
     if (musicPage_) musicPage_->unsetCursor();
     // 음악 모드: 걪리스 재생 항상 활성화 (앨범 연속 재생 시 공백 제거)
     mpvWidget_->core()->setProperty("gapless-audio", QString("yes"));
+    // 스펙트럼 활성화 (음악 모드에서만 동작)
+    mpvWidget_->core()->setSpectrumEnabled(true);
+    connect(mpvWidget_->core(), &MpvCore::spectrumReady,
+            musicPage_, &MusicWidget::updateSpectrum,
+            Qt::UniqueConnection);
 }
 
 void MainWindow::switchToVideoMode() {
     isMusicMode_ = false;
     playerStack_->setCurrentIndex(0);
     controlBar_->show();
+    // 스펙트럼 비활성화 (영상 모드에서는 불필요)
+    mpvWidget_->core()->setSpectrumEnabled(false);
+    disconnect(mpvWidget_->core(), &MpvCore::spectrumReady,
+               musicPage_, &MusicWidget::updateSpectrum);
 }
 
 void MainWindow::loadMusicMeta(const QString& path) {
@@ -564,6 +582,7 @@ void MainWindow::onPlaybackPaused() {
     // 일시정지 시 UI 항상 표시
     if (uiHideTimer_) uiHideTimer_->stop();
     showUI();
+    updateTaskbarProgress(lastPosition_, totalDuration_, true, false);
 #ifdef Q_OS_WIN
     SetThreadExecutionState(ES_CONTINUOUS);
 #endif
@@ -594,6 +613,7 @@ void MainWindow::onPlaybackStopped() {
         musicPage_->setPlaying(false);
     }
     updateWindowTitle();
+    updateTaskbarProgress(0, 0, false, true);
 #ifdef Q_OS_WIN
     SetThreadExecutionState(ES_CONTINUOUS);
 #endif
@@ -601,6 +621,46 @@ void MainWindow::onPlaybackStopped() {
 void MainWindow::onPositionChanged(double s) {
     controlBar_->setPosition(s, totalDuration_);
     lastPosition_ = s;  // 이어보기용 현재 위치 추적
+    updateTaskbarProgress(s, totalDuration_, false, false);
+}
+
+#ifdef Q_OS_WIN
+#include <shobjidl.h>
+#endif
+
+void MainWindow::initTaskbarList() {
+#ifdef Q_OS_WIN
+    if (taskbarList_) return;
+    ITaskbarList3* tbl = nullptr;
+    HRESULT hr = CoCreateInstance(CLSID_TaskbarList, nullptr, CLSCTX_INPROC_SERVER,
+                                  IID_ITaskbarList3, (void**)&tbl);
+    if (SUCCEEDED(hr) && tbl) {
+        tbl->HrInit();
+        taskbarList_ = tbl;
+    }
+#endif
+}
+
+void MainWindow::updateTaskbarProgress(double pos, double dur, bool paused, bool stopped) {
+#ifdef Q_OS_WIN
+    if (!taskbarList_) initTaskbarList();
+    if (!taskbarList_) return;
+    ITaskbarList3* tbl = static_cast<ITaskbarList3*>(taskbarList_);
+    HWND hwnd = (HWND)winId();
+    if (stopped || dur <= 0) {
+        tbl->SetProgressState(hwnd, TBPF_NOPROGRESS);
+        return;
+    }
+    if (paused) {
+        tbl->SetProgressState(hwnd, TBPF_PAUSED);
+        tbl->SetProgressValue(hwnd, (ULONGLONG)(pos * 1000), (ULONGLONG)(dur * 1000));
+    } else {
+        tbl->SetProgressState(hwnd, TBPF_NORMAL);
+        tbl->SetProgressValue(hwnd, (ULONGLONG)(pos * 1000), (ULONGLONG)(dur * 1000));
+    }
+#else
+    Q_UNUSED(pos); Q_UNUSED(dur); Q_UNUSED(paused); Q_UNUSED(stopped);
+#endif
 }
 
 // ─── 이어보기 (재생 위치 저장/복원) ──────────────────────────────
@@ -1074,6 +1134,69 @@ void MainWindow::toggleProFeatures() {
         if (!subtitleEditor_) {
             subtitleEditor_ = new SubtitleEditorWidget(mpvWidget_->core(), this);
             proFeatures_->addTab(subtitleEditor_, "자막 편집기");
+        }
+        // 재생 통계/최근 감상 화면
+        if (!statsWidget_) {
+            statsWidget_ = new QWidget(this);
+            statsWidget_->setStyleSheet("background:#111; color:#ccc;");
+            auto* statsLayout = new QVBoxLayout(statsWidget_);
+            statsLayout->setContentsMargins(12, 12, 12, 12);
+            statsLayout->setSpacing(8);
+
+            auto* statsTitle = new QLabel("최근 감상 기록", statsWidget_);
+            statsTitle->setStyleSheet("font-size:14px; font-weight:bold; color:#4fc3f7; background:transparent;");
+            statsLayout->addWidget(statsTitle);
+
+            auto* statsTable = new QTableWidget(statsWidget_);
+            statsTable->setColumnCount(3);
+            statsTable->setHorizontalHeaderLabels({"파일명", "재생 횟수", "마지막 재생"});
+            statsTable->setStyleSheet(
+                "QTableWidget { background:#1a1a1a; color:#ccc; border:none; gridline-color:#2a2a2a; }"
+                "QHeaderView::section { background:#0d0d0d; color:#888; border:none; padding:4px; font-size:11px; }"
+                "QTableWidget::item { padding:4px 8px; border-bottom:1px solid #1e1e1e; }"
+                "QTableWidget::item:selected { background:#1a3a5c; }");
+            statsTable->horizontalHeader()->setStretchLastSection(true);
+            statsTable->verticalHeader()->setVisible(false);
+            statsTable->setSelectionBehavior(QAbstractItemView::SelectRows);
+            statsTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
+            statsTable->setAlternatingRowColors(false);
+
+            // QSettings에서 stats/ 키 읽어서 표시
+            QSettings s("Sorinuri", "SorinuriPlayer");
+            s.beginGroup("stats");
+            QStringList keys = s.childGroups();
+            s.endGroup();
+
+            // 마지막 재생 시각 기준 정렬
+            QVector<std::tuple<QString, int, QString, QString>> entries;
+            for (const QString& key : keys) {
+                QString path = s.value("stats/" + key + "/path").toString();
+                int count    = s.value("stats/" + key + "/count", 0).toInt();
+                QString last = s.value("stats/" + key + "/last_played").toString();
+                if (!path.isEmpty())
+                    entries.append({path, count, last, key});
+            }
+            std::sort(entries.begin(), entries.end(),
+                [](const auto& a, const auto& b) { return std::get<2>(a) > std::get<2>(b); });
+
+            statsTable->setRowCount(qMin((int)entries.size(), 100));
+            for (int i = 0; i < qMin((int)entries.size(), 100); ++i) {
+                const auto& [path, count, last, key] = entries[i];
+                statsTable->setItem(i, 0, new QTableWidgetItem(QFileInfo(path).fileName()));
+                statsTable->item(i, 0)->setToolTip(path);
+                statsTable->setItem(i, 1, new QTableWidgetItem(QString::number(count) + "회"));
+                statsTable->setItem(i, 2, new QTableWidgetItem(last.left(16).replace('T', ' ')));
+            }
+
+            statsLayout->addWidget(statsTable, 1);
+
+            // 재생 통계 요약
+            auto* summaryLabel = new QLabel(
+                QString("전체 재생 기록: %1개 파일").arg(entries.size()), statsWidget_);
+            summaryLabel->setStyleSheet("color:#666; font-size:11px; background:transparent;");
+            statsLayout->addWidget(summaryLabel);
+
+            proFeatures_->addTab(statsWidget_, "재생 통계");
         }
     }
 
@@ -1867,4 +1990,113 @@ void MainWindow::toggleMultiView(MultiViewLayout l) {
     multiViewWidget_->setLayout(l);
     playerStack_->setCurrentIndex(2);
     controlBar_->show();  // 멀티뷰에서도 컨트롤바 표시
+}
+
+// ── 스마트폰 리모컨 (QTcpServer 기반 HTTP 서버) ──────────────────────────
+void MainWindow::startRemoteServer() {
+    if (remoteServer_) return;
+    remoteServer_ = new QTcpServer(this);
+    connect(remoteServer_, &QTcpServer::newConnection, this, [this]() {
+        QTcpSocket* socket = remoteServer_->nextPendingConnection();
+        connect(socket, &QTcpSocket::readyRead, this, [this, socket]() {
+            handleRemoteRequest(socket);
+        });
+    });
+    if (remoteServer_->listen(QHostAddress::Any, 7373)) {
+        remoteEnabled_ = true;
+        qInfo() << "[Remote] HTTP 리모컨 서버 시작: 포트 7373";
+    }
+}
+
+void MainWindow::stopRemoteServer() {
+    if (remoteServer_) {
+        remoteServer_->close();
+        remoteServer_->deleteLater();
+        remoteServer_ = nullptr;
+    }
+    remoteEnabled_ = false;
+}
+
+void MainWindow::handleRemoteRequest(QTcpSocket* socket) {
+    QByteArray req = socket->readAll();
+    QString reqStr = QString::fromUtf8(req);
+    QString path = reqStr.section(' ', 1, 1).section('?', 0, 0);
+
+    auto* core = mpvWidget_ ? mpvWidget_->core() : nullptr;
+    QString body;
+    QString contentType = "application/json";
+
+    if (path == "/api/play")        { if (core) core->play();         body = "{\"ok\":true}"; }
+    else if (path == "/api/pause")  { if (core) core->pause();        body = "{\"ok\":true}"; }
+    else if (path == "/api/toggle") { if (core) core->togglePause();  body = "{\"ok\":true}"; }
+    else if (path == "/api/next")   { if (core) core->command({"playlist-next"});  body = "{\"ok\":true}"; }
+    else if (path == "/api/prev")   { if (core) core->command({"playlist-prev"});  body = "{\"ok\":true}"; }
+    else if (path.startsWith("/api/seek/")) {
+        double sec = path.section('/', 3).toDouble();
+        if (core) core->seek(sec);
+        body = "{\"ok\":true}";
+    }
+    else if (path.startsWith("/api/volume/")) {
+        int vol = path.section('/', 3).toInt();
+        if (core) core->setVolume(qBound(0, vol, 200));
+        body = "{\"ok\":true}";
+    }
+    else if (path == "/api/status") {
+        double pos = core ? core->position() : 0;
+        double dur = core ? core->duration() : 0;
+        bool paused = core ? core->isPaused() : true;
+        int vol = core ? core->volume() : 0;
+        QString title = currentFilePath_.isEmpty() ? "" : QFileInfo(currentFilePath_).fileName();
+        body = QString("{\"pos\":%1,\"dur\":%2,\"paused\":%3,\"vol\":%4,\"title\":\"%5\"}")
+            .arg(pos, 0, 'f', 1).arg(dur, 0, 'f', 1)
+            .arg(paused ? "true" : "false").arg(vol)
+            .arg(title.replace('"', '\''));
+    }
+    else {
+        // 기본 리모컨 UI (HTML)
+        contentType = "text/html; charset=utf-8";
+        body = R"(<!DOCTYPE html><html><head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width,initial-scale=1'>
+<title>소리누리 리모컨</title>
+<style>
+body{background:#111;color:#eee;font-family:sans-serif;text-align:center;padding:20px}
+h2{color:#4fc3f7;margin-bottom:24px}
+.btn{display:inline-block;background:#1a3a5c;color:#4fc3f7;border:1px solid #4fc3f7;
+border-radius:8px;padding:16px 28px;margin:8px;font-size:18px;cursor:pointer;
+text-decoration:none;min-width:80px}
+.btn:active{background:#0d2a4c}
+.row{margin:12px 0}
+#status{color:#888;font-size:13px;margin-top:20px}
+</style></head><body>
+<h2>🎵 소리누리 리모컨</h2>
+<div class='row'>
+  <a class='btn' href='/api/prev'>⏮</a>
+  <a class='btn' href='/api/toggle'>⏯</a>
+  <a class='btn' href='/api/next'>⏭</a>
+</div>
+<div class='row'>
+  <a class='btn' href='/api/volume/70'>🔉</a>
+  <a class='btn' href='/api/volume/100'>🔊</a>
+  <a class='btn' href='/api/volume/130'>🔊+</a>
+</div>
+<div id='status'>연결됨</div>
+<script>
+setInterval(()=>{
+  fetch('/api/status').then(r=>r.json()).then(d=>{
+    document.getElementById('status').textContent=
+      (d.paused?'⏸ ':'▶ ')+d.title+' | '+
+      Math.floor(d.pos/60)+':'+String(Math.floor(d.pos%60)).padStart(2,'0')+
+      ' / '+Math.floor(d.dur/60)+':'+String(Math.floor(d.dur%60)).padStart(2,'0')+
+      ' | 볼륨 '+d.vol+'%';
+  }).catch(()=>{});
+},1000);
+</script></body></html>)";
+    }
+
+    QString response = QString("HTTP/1.1 200 OK\r\nContent-Type: %1\r\nContent-Length: %2\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n%3")
+        .arg(contentType).arg(body.toUtf8().size()).arg(body);
+    socket->write(response.toUtf8());
+    socket->flush();
+    socket->disconnectFromHost();
+    socket->deleteLater();
 }

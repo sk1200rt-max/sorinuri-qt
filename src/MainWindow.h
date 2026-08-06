@@ -42,6 +42,9 @@
 #include "SubtitleEditorWidget.h"
 #include "AdManager.h"
 #include "SplashAdWidget.h"
+#include <QTcpServer>
+#include <QTcpSocket>
+#include <QHostAddress>
 
 
 class MainWindow : public QMainWindow {
@@ -155,6 +158,7 @@ private:
     OsdWidget*           osdWidget_            = nullptr;  // 화면 중앙 OSD
     MediaLibraryWidget*  mediaLibrary_         = nullptr;  // 스마트 미디어 라이브러리
     SubtitleEditorWidget* subtitleEditor_      = nullptr;  // 자막 편집기
+    QWidget*              statsWidget_          = nullptr;  // 재생 통계/최근 감상 화면
     AdManager*            adManager_            = nullptr;  // 광고 관리자
     SplashAdWidget*       splashAdWidget_       = nullptr;  // 시작 화면 광고
 
@@ -174,8 +178,20 @@ private:
     QString currentFilePath_;
     QSettings settings_;
 
+    // Windows 작업표시줄 진행률 표시 (ITaskbarList3)
+    void* taskbarList_  = nullptr;  // ITaskbarList3* (void*로 선언하여 헤더 의존성 제거)
+    void  updateTaskbarProgress(double pos, double dur, bool paused, bool stopped);
+    void  initTaskbarList();
+
     // yt-dlp 관리자
     YtdlpManager* ytdlp_ = nullptr;
+
+    // 스마트폰 리모컨 (QTcpServer 기반 HTTP 서버)
+    QTcpServer*   remoteServer_    = nullptr;
+    bool          remoteEnabled_   = false;
+    void          startRemoteServer();
+    void          stopRemoteServer();
+    void          handleRemoteRequest(QTcpSocket* socket);
     QString pendingUrl_;
     QProgressDialog* ytdlpProgress_ = nullptr;
 

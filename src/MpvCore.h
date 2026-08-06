@@ -136,9 +136,13 @@ signals:
     void renderQualityDegraded(const QString& reason);
     void renderQualityRestored();
 
+    // 스펙트럼 활성화/비활성화
+    void setSpectrumEnabled(bool on);
+
 private slots:
     void onMpvEvents();
     void onFrameDropCheck();  // 실시간 프레임 드롭 모니터링 타이머
+    void onSpectrumTick();    // 스펙트럼 데이터 폴링 타이머
 
 private:
     void handleEvent(mpv_event* event);
@@ -173,4 +177,11 @@ private:
     int     currentVideoH_ = 0;
     double  currentFps_    = 0.0;
     QString currentCodec_;
+
+    // 실시간 스펙트럼 (의사 FFT 기반 VU 레벨 분산)
+    QTimer*        spectrumTimer_  = nullptr; // 60fps 폴링
+    QVector<float> specBins_;                // 현재 빈 값
+    QVector<float> specSmooth_;              // 스무딩 누적값
+    float          specLevel_      = 0.0f;   // 현재 전체 레벨
+    bool           specEnabled_    = false;  // 스펙트럼 활성화 여부
 };

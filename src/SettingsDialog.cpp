@@ -269,9 +269,48 @@ void SettingsDialog::setupAudioTab(QTabWidget* tabs) {
     volRow->addWidget(volumeLabel_);
     volForm->addRow("볼륨:", volRow);
 
-    layout->addWidget(volGroup);
-    layout->addStretch();
+        layout->addWidget(volGroup);
 
+    // ── DSD 네이티브 재생 ──────────────────────────────────────────────────────────
+    QGroupBox* dsdGroup = new QGroupBox("DSD 네이티브 재생 (.dsf / .dff)", page);
+    QFormLayout* dsdForm = new QFormLayout(dsdGroup);
+    dsdForm->setSpacing(8);
+
+    dsdModeCombo_ = new QComboBox(page);
+    dsdModeCombo_->addItems({
+        "PCM 변환 (호환성 우선)",
+        "DoP (DSD over PCM - WASAPI 독점모드 필요)",
+        "DSD Direct (ASIO 전용 DAC 필요)"
+    });
+    dsdForm->addRow("DSD 출력 모드:", dsdModeCombo_);
+
+    QLabel* dsdHint = new QLabel(
+        "DoP: WASAPI 독점 모드 + DSD 지원 DAC 필요.\n"
+        "DSD Direct: ASIO 드라이버 설치 필요 (전문가용).", page);
+    dsdHint->setStyleSheet("color: #666; font-size: 11px;");
+    dsdHint->setWordWrap(true);
+    dsdForm->addRow("", dsdHint);
+
+    layout->addWidget(dsdGroup);
+
+    // ── 스마트폰 리모컨 ──────────────────────────────────────────────────────────
+    QGroupBox* remoteGroup = new QGroupBox("스마트폰 리모컨 (Wi-Fi)", page);
+    QFormLayout* remoteForm = new QFormLayout(remoteGroup);
+    remoteForm->setSpacing(8);
+
+    remoteEnabledCheck_ = new QCheckBox("리모컨 서버 활성화 (포트 7373)", page);
+    remoteForm->addRow("", remoteEnabledCheck_);
+
+    QLabel* remoteHint = new QLabel(
+        "활성화 후 같은 Wi-Fi의 스마트폰 브라우저에서\n"
+        "http://[PC IP]:7373 접속 → 재생/일시정지/볼륨 제어 가능.", page);
+    remoteHint->setStyleSheet("color: #666; font-size: 11px;");
+    remoteHint->setWordWrap(true);
+    remoteForm->addRow("", remoteHint);
+
+    layout->addWidget(remoteGroup);
+
+    layout->addStretch();
     tabs->addTab(page, "오디오");
 
     // 기본값 설정: 독점 모드 (true) - 멀티채널 자동 인식을 위해 기본 독점 모드
@@ -651,6 +690,8 @@ void SettingsDialog::loadSettings() {
     QString defPicDir = QStandardPaths::writableLocation(QStandardPaths::PicturesLocation);
     if (screenshotDirEdit_) screenshotDirEdit_->setText(settings_.value("general/screenshot_dir", defPicDir).toString());
     if (screenshotFmtCombo_) screenshotFmtCombo_->setCurrentText(settings_.value("general/screenshot_format", "PNG").toString());
+    if (dsdModeCombo_) dsdModeCombo_->setCurrentIndex(settings_.value("audio/dsd_mode", 0).toInt());
+    if (remoteEnabledCheck_) remoteEnabledCheck_->setChecked(settings_.value("remote/enabled", false).toBool());
 }
 
 void SettingsDialog::applyToMpv() {
@@ -754,6 +795,10 @@ void SettingsDialog::onApply() {
         settings_.setValue("general/screenshot_dir", screenshotDirEdit_->text());
     if (screenshotFmtCombo_)
         settings_.setValue("general/screenshot_format", screenshotFmtCombo_->currentText());
+    if (dsdModeCombo_)
+        settings_.setValue("audio/dsd_mode", dsdModeCombo_->currentIndex());
+    if (remoteEnabledCheck_)
+        settings_.setValue("remote/enabled", remoteEnabledCheck_->isChecked());
     settings_.setValue("subtitle/auto_load",autoLoadSubCheck_->isChecked());
     if (subApiKeyEdit_)
         settings_.setValue("subtitle/opensubtitles_apikey", subApiKeyEdit_->text().trimmed());

@@ -91,4 +91,8 @@ private:
     QComboBox*  langCombo_          = nullptr;
     QLineEdit*  screenshotDirEdit_  = nullptr;
     QComboBox*  screenshotFmtCombo_ = nullptr;
+    // DSD 설정
+    QComboBox*  dsdModeCombo_       = nullptr;
+    // 스마트폰 리모컨
+    QCheckBox*  remoteEnabledCheck_ = nullptr;
 };

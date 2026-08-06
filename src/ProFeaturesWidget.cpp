@@ -5,6 +5,9 @@
 #include <QMessageBox>
 #include <QGroupBox>
 #include <QFrame>
+#include <QFileDialog>
+#include <QProcess>
+#include <QCoreApplication>
 
 static QLabel* makeSectionTitle(const QString& text, QWidget* parent) {
     auto* lbl = new QLabel(text, parent);
@@ -114,6 +117,49 @@ ProFeaturesWidget::ProFeaturesWidget(QWidget* parent) : QWidget(parent) {
         connect(btnSetA_, &QPushButton::clicked, this, &ProFeaturesWidget::setAbPointA);
         connect(btnSetB_, &QPushButton::clicked, this, &ProFeaturesWidget::setAbPointB);
         connect(btnClearAB_, &QPushButton::clicked, this, &ProFeaturesWidget::clearAbLoop);
+
+        // 구간 클립 저장 버튼
+        auto* btnSaveClip = makeSmallBtn("클립 저장", "A-B 구간을 MP4 클립으로 저장", sec);
+        row->addWidget(btnSaveClip);
+        connect(btnSaveClip, &QPushButton::clicked, this, [this]() {
+            if (abPointA_ < 0 || abPointB_ <= abPointA_) {
+                QMessageBox::information(this, "클립 저장", "A-B 구간을 먼저 설정해주세요.");
+                return;
+            }
+            QString srcFile = mpv_ ? mpv_->currentFile() : QString();
+            if (srcFile.isEmpty() || srcFile.startsWith("http")) {
+                QMessageBox::information(this, "클립 저장", "로컈 파일만 지원됩니다.");
+                return;
+            }
+            QFileInfo fi(srcFile);
+            QString defaultOut = fi.dir().filePath(fi.baseName() + "_clip.mp4");
+            QString outFile = QFileDialog::getSaveFileName(this, "클립 저장",
+                defaultOut, "MP4 클립 (*.mp4)");
+            if (outFile.isEmpty()) return;
+
+            double dur = abPointB_ - abPointA_;
+            QString ffmpegPath = QDir(QCoreApplication::applicationDirPath()).filePath("ffmpeg.exe");
+            if (!QFile::exists(ffmpegPath)) ffmpegPath = "ffmpeg";
+
+            QStringList args = {
+                "-y", "-ss", QString::number(abPointA_, 'f', 3),
+                "-i", srcFile,
+                "-t", QString::number(dur, 'f', 3),
+                "-c", "copy", outFile
+            };
+            auto* proc = new QProcess(this);
+            connect(proc, QOverload<int,QProcess::ExitStatus>::of(&QProcess::finished),
+                    this, [proc, outFile](int code, QProcess::ExitStatus) {
+                proc->deleteLater();
+                if (code == 0)
+                    QMessageBox::information(nullptr, "클립 저장 완료",
+                        "저장되었습니다:\n" + outFile);
+                else
+                    QMessageBox::warning(nullptr, "클립 저장 실패",
+                        "ffmpeg 실행 중 오류가 발생했습니다.");
+            });
+            proc->start(ffmpegPath, args);
+        });
 
         mainLayout->addWidget(sec);
     }

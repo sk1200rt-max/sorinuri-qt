@@ -229,6 +229,11 @@ void PlaylistWidget::onSavePlaylist() {
         out.setEncoding(QStringConverter::Utf8);
         out << "#EXTM3U\n";
         for (const QString& p : filePaths_) {
+            QFileInfo fi(p);
+            // #EXTINF:재생시간(초),아티스트 - 제목 형식
+            // 재생시간은 현재 알 수 없으므로 -1 사용 (표준 M3U 관례)
+            QString title = fi.completeBaseName();
+            out << QString("#EXTINF:-1,%1\n").arg(title);
             out << p << "\n";
         }
     }

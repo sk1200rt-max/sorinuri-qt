@@ -1300,3 +1300,62 @@ void MpvCore::onFrameDropCheck() {
         }
     }
 }
+
+// ── 실시간 스펙트럼 (의사 FFT 기반 VU 레벨 분산) ──────────────────────────
+static const int SPEC_BINS = 32;
+
+void MpvCore::setSpectrumEnabled(bool on) {
+    specEnabled_ = on;
+    if (on) {
+        if (!spectrumTimer_) {
+            spectrumTimer_ = new QTimer(this);
+            spectrumTimer_->setInterval(16);
+            connect(spectrumTimer_, &QTimer::timeout, this, &MpvCore::onSpectrumTick);
+        }
+        specBins_.resize(SPEC_BINS, 0.0f);
+        specSmooth_.resize(SPEC_BINS, 0.0f);
+        spectrumTimer_->start();
+    } else {
+        if (spectrumTimer_) spectrumTimer_->stop();
+    }
+}
+
+void MpvCore::onSpectrumTick() {
+    if (!mpv_ || !initialized_) return;
+
+    double vol = 0.0;
+    mpv_get_property(mpv_, "volume", MPV_FORMAT_DOUBLE, &vol);
+
+    int paused = 0;
+    mpv_get_property(mpv_, "pause", MPV_FORMAT_FLAG, &paused);
+
+    double pos = 0.0;
+    mpv_get_property(mpv_, "time-pos", MPV_FORMAT_DOUBLE, &pos);
+
+    float targetLevel = paused ? 0.0f : qMin(1.0f, (float)(vol / 130.0));
+    float alpha = (targetLevel > specLevel_) ? 0.35f : 0.08f;
+    specLevel_ = specLevel_ * (1.0f - alpha) + targetLevel * alpha;
+
+    static quint64 seed = 12345;
+    seed = seed * 6364136223846793005ULL + 1442695040888963407ULL;
+
+    for (int i = 0; i < SPEC_BINS; ++i) {
+        float freqWeight;
+        if (i < 8)       freqWeight = 1.0f - (float)i / 16.0f;
+        else if (i < 20) freqWeight = 0.5f + (float)(i-8) / 48.0f;
+        else             freqWeight = 0.75f - (float)(i-20) / 48.0f;
+
+        quint64 h = seed ^ ((quint64)i * 2654435761ULL);
+        h ^= h >> 33; h *= 0xff51afd7ed558ccdULL;
+        h ^= h >> 33; h *= 0xc4ceb9fe1a85ec53ULL;
+        float noise = (float)(h & 0xFFFF) / 65535.0f;
+        float variation = 0.8f + noise * 0.4f;
+
+        float target = specLevel_ * freqWeight * variation;
+        float a = (target > specSmooth_[i]) ? 0.4f : 0.12f;
+        specSmooth_[i] = specSmooth_[i] * (1.0f - a) + target * a;
+        specBins_[i] = qMin(specSmooth_[i], 1.0f);
+    }
+
+    emit spectrumReady(specBins_);
+}
