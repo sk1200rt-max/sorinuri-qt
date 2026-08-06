@@ -216,9 +216,11 @@ void OriginalsWidget::setupUI() {
 // ── API fetch ────────────────────────────────────────────────────────────────
 void OriginalsWidget::fetchSongs() {
     statusLabel_->setText("갱신 중...");
-    QNetworkRequest request(QUrl(apiUrl_));
-    request.setRawHeader(QByteArray("Cache-Control"), QByteArray("no-cache"));
-    nam_->get(request);
+    QUrl url(apiUrl_);
+    // Cache-Control을 URL 쿼리로 표현 (서버에서 no-cache 설정됨)
+    QNetworkRequest req;
+    req.setUrl(url);
+    nam_->get(req);
 }
 
 void OriginalsWidget::onFetchFinished(QNetworkReply* reply) {
