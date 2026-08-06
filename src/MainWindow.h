@@ -42,6 +42,7 @@
 #include "SubtitleEditorWidget.h"
 #include "AdManager.h"
 #include "SplashAdWidget.h"
+#include "OriginalsWidget.h"
 #include <QTcpServer>
 #include <QTcpSocket>
 #include <QHostAddress>
@@ -159,6 +160,7 @@ private:
     MediaLibraryWidget*  mediaLibrary_         = nullptr;  // 스마트 미디어 라이브러리
     SubtitleEditorWidget* subtitleEditor_      = nullptr;  // 자막 편집기
     QWidget*              statsWidget_          = nullptr;  // 재생 통계/최근 감상 화면
+    OriginalsWidget*      originalsWidget_      = nullptr;  // SORINURI ORIGINALS 탭
     AdManager*            adManager_            = nullptr;  // 광고 관리자
     SplashAdWidget*       splashAdWidget_       = nullptr;  // 시작 화면 광고
 

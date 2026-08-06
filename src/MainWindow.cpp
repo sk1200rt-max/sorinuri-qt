@@ -477,6 +477,9 @@ void MainWindow::onFileLoaded(const QString& path) {
             QDateTime::currentDateTime().toString(Qt::ISODate));
         settings_.setValue(statsKey + "/path", path);
     }
+    // ORIGINALS 탭 재생 중 표시 갱신
+    if (originalsWidget_)
+        originalsWidget_->setCurrentFile(path);
     if (isMusicMode_) {
         // 음악 모드: 메타데이터 로드 (파일 로드 후 MPV가 태그를 읽은 시점)
         QTimer::singleShot(200, this, [this, path]() { loadMusicMeta(path); });
@@ -1196,10 +1199,23 @@ void MainWindow::toggleProFeatures() {
             summaryLabel->setStyleSheet("color:#666; font-size:11px; background:transparent;");
             statsLayout->addWidget(summaryLabel);
 
-            proFeatures_->addTab(statsWidget_, "재생 통계");
+                        proFeatures_->addTab(statsWidget_, "재생 통계");
         }
+        // SORINURI ORIGINALS 탭
+        if (!originalsWidget_) {
+            originalsWidget_ = new OriginalsWidget(this);
+            proFeatures_->addTab(originalsWidget_, "♪ ORIGINALS");
+            // 공 URL 재생 요청 연결
+            connect(originalsWidget_, &OriginalsWidget::playRequested,
+                    this, [this](const QString& url) { openFiles({url}); });
+            // M3U 전체 재생 연결
+            connect(originalsWidget_, &OriginalsWidget::playlistRequested,
+                    this, [this](const QString& m3uUrl) { openFiles({m3uUrl}); });
+        }
+        // 현재 재생 중 파일 전달
+        if (originalsWidget_)
+            originalsWidget_->setCurrentFile(currentFilePath_);
     }
-
     proFeatures_->setVisible(isProFeaturesOpen_);
 }
 

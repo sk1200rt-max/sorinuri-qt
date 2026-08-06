@@ -95,4 +95,6 @@ private:
     QComboBox*  dsdModeCombo_       = nullptr;
     // 스마트폰 리모컨
     QCheckBox*  remoteEnabledCheck_ = nullptr;
+    // SORINURI ORIGINALS API URL
+    QLineEdit*  originalsApiUrlEdit_ = nullptr;
 };

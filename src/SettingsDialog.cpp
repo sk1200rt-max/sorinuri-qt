@@ -613,7 +613,29 @@ void SettingsDialog::setupGeneralTab(QTabWidget* tabs) {
     screenshotFmtCombo_->addItems({"PNG", "JPG", "WEBP"});
     shotForm->addRow("파일 형식:", screenshotFmtCombo_);
 
-    layout->addWidget(shotGroup);
+        layout->addWidget(shotGroup);
+
+    // ── SORINURI ORIGINALS API ─────────────────────────────────────────────────────────
+    QGroupBox* origGroup = new QGroupBox("SORINURI ORIGINALS", page);
+    QFormLayout* origForm = new QFormLayout(origGroup);
+    origForm->setSpacing(8);
+
+    originalsApiUrlEdit_ = new QLineEdit(page);
+    originalsApiUrlEdit_->setPlaceholderText("https://sorinuri.com/api/songs.json");
+    originalsApiUrlEdit_->setStyleSheet(
+        "QLineEdit { background:#1a1a1a; border:1px solid #2a2a2a; border-radius:3px;"
+        "  padding:4px 8px; color:#e0e0e0; }"
+        "QLineEdit:focus { border-color: #00D4B4; }");
+    origForm->addRow("API URL:", originalsApiUrlEdit_);
+
+    QLabel* origHint = new QLabel(
+        "기본값: https://sorinuri.com/api/songs.json\n"
+        "변경 시 적용 버튼을 누르면 즉시 갱신됩니다.", page);
+    origHint->setStyleSheet("color: #666; font-size: 11px;");
+    origHint->setWordWrap(true);
+    origForm->addRow("", origHint);
+
+    layout->addWidget(origGroup);
 
     layout->addStretch();
     tabs->addTab(page, "일반");
@@ -692,6 +714,8 @@ void SettingsDialog::loadSettings() {
     if (screenshotFmtCombo_) screenshotFmtCombo_->setCurrentText(settings_.value("general/screenshot_format", "PNG").toString());
     if (dsdModeCombo_) dsdModeCombo_->setCurrentIndex(settings_.value("audio/dsd_mode", 0).toInt());
     if (remoteEnabledCheck_) remoteEnabledCheck_->setChecked(settings_.value("remote/enabled", false).toBool());
+    if (originalsApiUrlEdit_) originalsApiUrlEdit_->setText(settings_.value("originals/api_url",
+        "https://sorinuri.com/api/songs.json").toString());
 }
 
 void SettingsDialog::applyToMpv() {
@@ -799,6 +823,8 @@ void SettingsDialog::onApply() {
         settings_.setValue("audio/dsd_mode", dsdModeCombo_->currentIndex());
     if (remoteEnabledCheck_)
         settings_.setValue("remote/enabled", remoteEnabledCheck_->isChecked());
+    if (originalsApiUrlEdit_ && !originalsApiUrlEdit_->text().isEmpty())
+        settings_.setValue("originals/api_url", originalsApiUrlEdit_->text().trimmed());
     settings_.setValue("subtitle/auto_load",autoLoadSubCheck_->isChecked());
     if (subApiKeyEdit_)
         settings_.setValue("subtitle/opensubtitles_apikey", subApiKeyEdit_->text().trimmed());
