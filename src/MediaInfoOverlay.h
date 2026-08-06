@@ -67,11 +67,4 @@ private:
     QLabel* videoHdr_      = nullptr;
 
     QPropertyAnimation* anim_ = nullptr;
-
-    // 탭 스타일 상수
-    static const QString TEAL;
-    static const QString TEXT_DIM;
-    static const QString ACTIVE_STYLE;
-    static const QString INACTIVE_STYLE;
-    static const QString HOVER_STYLE;
 };

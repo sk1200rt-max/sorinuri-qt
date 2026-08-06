@@ -139,7 +139,7 @@ if(WIN32)
             # /EXPORT: NvOptimusEnablement / AmdPowerXpressRequestHighPerformance를
             # EXE export table에 포함시켜 NVIDIA Optimus / AMD Hybrid GPU가
             # 노트북에서 전용 GPU를 자동 선택하도록 함
-            LINK_FLAGS "/MANIFEST:NO /EXPORT:NvOptimusEnablement /EXPORT:AmdPowerXpressRequestHighPerformance"
+            LINK_FLAGS "/MANIFEST:NO"
         )
     endif()
 else()
