@@ -132,10 +132,11 @@ signals:
     void renderProfileChanged(RenderProfile profile);
     void spectrumReady(const QVector<float>& bins);
 
-    // 실시간 품질 자동 강등/복원 알림 (UI 표시용)
+        // 실시간 품질 자동 강등/복원 알림 (UI 표시용)
     void renderQualityDegraded(const QString& reason);
     void renderQualityRestored();
 
+public:
     // 스펙트럼 활성화/비활성화
     void setSpectrumEnabled(bool on);
 
