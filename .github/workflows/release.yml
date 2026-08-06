@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - 'v*.*.*'   # v4.2.0, v4.3.0 등 태그 push 시 트리거
+  workflow_dispatch:
+    inputs:
+      version_tag:
+        description: '빌드할 태그 (refs/tags/vX.Y.Z 형식)'
+        required: true
+        default: 'v6.11.3'
 
 jobs:
   release:
