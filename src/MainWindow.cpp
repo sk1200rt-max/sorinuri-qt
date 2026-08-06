@@ -544,9 +544,23 @@ void MainWindow::showUI() {
 
 void MainWindow::hideUI() {
     // 음악 모드에서는 타이틀바/커서를 절대 숨기지 않음
-    // (음악 청취 중 타이틀바와 마우스 커서는 항상 보여야 함)
     if (isMusicMode_) return;
-
+    // ── 사이드 메뉴/팝업/메뉴가 열려 있으면 절대 숨기지 않음 ──────────────
+    // MediaInfoOverlay(사이드 메뉴)가 열려 있으면 타이머 재시작 후 복귀
+    if (mediaInfoOverlay_ && mediaInfoOverlay_->isVisible()) {
+        if (uiHideTimer_) uiHideTimer_->start(3000);  // 메뉴 닫힌 후 3초 뒤 재시도
+        return;
+    }
+    // QApplication 레벨 팝업(QMenu, QComboBox 드롭다운 등)이 열려 있으면 숨기지 않음
+    if (QApplication::activePopupWidget() != nullptr) {
+        if (uiHideTimer_) uiHideTimer_->start(1000);
+        return;
+    }
+    // proFeatures_ 패널이 열려 있으면 숨기지 않음
+    if (isProFeaturesOpen_) {
+        if (uiHideTimer_) uiHideTimer_->start(3000);
+        return;
+    }
     if (uiVisible_ && isPlaying_) {
         if (isFullscreen_) {
             // 영상 전체화면: 컨트롤바만 숨김

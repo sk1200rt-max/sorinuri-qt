@@ -830,9 +830,16 @@ void MpvCore::setProperty(const QString& name, const QVariant& value) {
     } else if (value.typeId() == QMetaType::Double || value.typeId() == QMetaType::Float) {
         double v = value.toDouble();
         mpv_set_property(mpv_, name.toUtf8().constData(), MPV_FORMAT_DOUBLE, &v);
-    } else if (value.typeId() == QMetaType::Int || value.typeId() == QMetaType::Bool) {
-        int v = value.toInt();
+    } else if (value.typeId() == QMetaType::Bool) {
+        // Bool: MPV_FORMAT_FLAG (0/1)
+        int v = value.toBool() ? 1 : 0;
         mpv_set_property(mpv_, name.toUtf8().constData(), MPV_FORMAT_FLAG, &v);
+    } else if (value.typeId() == QMetaType::Int || value.typeId() == QMetaType::LongLong
+               || value.typeId() == QMetaType::UInt || value.typeId() == QMetaType::ULongLong) {
+        // Int: MPV_FORMAT_INT64 — sid/aid/vid 등 트랙 ID는 정수로 전달
+        // MPV_FORMAT_FLAG로 전달하면 0/1만 인식되어 트랙 선택이 잘못됨
+        int64_t v = static_cast<int64_t>(value.toLongLong());
+        mpv_set_property(mpv_, name.toUtf8().constData(), MPV_FORMAT_INT64, &v);
     }
 }
 
@@ -1054,13 +1061,27 @@ void MpvCore::applyVideoSyncByFps(double fps) {
     //   - 120Hz 이상: 비정수여도 display-resample (충분한 주사율)
     double refreshRate = renderEnv_.refreshRate > 0 ? renderEnv_.refreshRate : 60.0;
     QString optimalSync = RenderEnvironment::selectVideoSync(fps, refreshRate);
+    // 통합 GPU(노트북 Intel UHD/Iris, AMD APU) 환경에서는
+    // display-resample이 프레임 타이밍 부하를 가중시켜 끊김을 유발함
+    // 통합 GPU는 audio 모드가 항상 안정적
+    if (renderEnv_.gpuTier == GpuTier::Integrated) {
+        qInfo() << "[MPV] 통합 GPU 감지 → video-sync=audio 강제 (끊김 방지)";
+        optimalSync = "audio";
+    }
 
     mpv_set_property_string(mpv_, "video-sync", optimalSync.toUtf8().constData());
 
     if (optimalSync == "display-resample") {
         mpv_set_property_string(mpv_, "interpolation", "no");
-        // display-resample 최대 드롭 허용: 5% 이내
-        mpv_set_property_string(mpv_, "video-sync-max-video-change", "5");
+        // display-resample 시 framedrop 비활성화
+        // framedrop=vo는 display-resample과 충돌하여 노트북 통합 GPU에서 프레임 끊김 유발
+        // audio 모드에서만 framedrop=vo 사용
+        mpv_set_property_string(mpv_, "framedrop", "no");
+        // display-resample 최대 드롭 허용: 10% 이내 (노트북 환경 안전 마진)
+        mpv_set_property_string(mpv_, "video-sync-max-video-change", "10");
+    } else {
+        // audio 모드: framedrop=vo 복원 (GPU 연산 능력 부족 시 프레임 스킵)
+        mpv_set_property_string(mpv_, "framedrop", "vo");
     }
 }
 // tryGpuNext: DISABLED
