@@ -114,6 +114,26 @@ bool MpvCore::initialize(WId windowId) {
     // → MPV VSync 비활성화, Qt만 VSync 사용 = 이중 VSync 제거.
     check_error(mpv_set_property_string(mpv_, "opengl-swapinterval", "0"));
 
+    // ── D3D11 동기화 간격 설정 (노트북 이중 VSync 방지) ────────────────────
+    // d3d11-sync-interval=1: D3D11 백엔드에서 VSync 1회 대기 (기본값)
+    // 일부 노트북 드라이버에서 기본값이 0 또는 2로 설정되어 이중 VSync 발생
+    // 명시적으로 1로 설정하여 Qt swapInterval=1과 충돌 방지
+    check_error(mpv_set_property_string(mpv_, "d3d11-sync-interval", "1"));
+
+    // ── 노트북 배터리 모드 감지 및 최적화 ─────────────────────────────────
+    // 배터리 모드에서 Windows가 CPU/GPU 클럭을 동적으로 낮춰 프레임 타이밍 불규칙
+    // 배터리 모드 감지 시 video-sync=audio 강제 (display-resample 금지)
+    {
+        RenderEnvInfo tmpEnv = RenderEnvironment::detect();
+        if (tmpEnv.isOnBattery) {
+            qInfo() << "[MPV] 배터리 모드 감지 → video-sync=audio 강제 (프레임 타이밍 안정화)";
+            check_error(mpv_set_property_string(mpv_, "video-sync", "audio"));
+            check_error(mpv_set_property_string(mpv_, "framedrop", "vo"));
+        } else if (tmpEnv.isLaptop) {
+            qInfo() << "[MPV] 노트북 AC 연결 감지 → 일반 최적화 적용";
+        }
+    }
+
 
     // ── 하드웨어 디코딩 ──────────────────────────────────────────────
     // auto-safe: NVIDIA/AMD/Intel GPU 자동 감지, 실패 시 소프트웨어로 폴백

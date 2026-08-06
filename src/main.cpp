@@ -15,6 +15,29 @@
 // FBO 크기를 물리 픽셀로 계산한다. 나머지 위젯은 Qt가 자동 처리.
 // ══════════════════════════════════════════════════════════════════
 
+// ══════════════════════════════════════════════════════════════════
+// 노트북 전용 GPU 강제 선택 (NVIDIA Optimus / AMD Hybrid)
+//
+// 노트북에서 소리누리가 기본적으로 Intel 통합 GPU에서 실행되는 문제 수정.
+// NvOptimusEnablement / AmdPowerXpressRequestHighPerformance 심볼을
+// DLL 익스포트로 선언하면 드라이버가 자동으로 전용 GPU를 선택한다.
+//
+// 참고: https://stackoverflow.com/questions/16823372
+// NVIDIA: NvOptimusEnablement = 1 → 전용 GPU 강제
+// AMD:    AmdPowerXpressRequestHighPerformance = 1 → 전용 GPU 강제
+// ══════════════════════════════════════════════════════════════════
+#ifdef _WIN32
+extern "C" {
+    // NVIDIA Optimus: 전용 GPU 강제 (노트북 Intel+NVIDIA 듀얼 GPU)
+    __declspec(dllexport) unsigned long NvOptimusEnablement = 0x00000001;
+    // AMD PowerXpress: 전용 GPU 강제 (노트북 Intel+AMD 듀얼 GPU)
+    __declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
+}
+#include <windows.h>
+#include <timeapi.h>  // timeBeginPeriod / timeEndPeriod
+#pragma comment(lib, "winmm.lib")
+#endif
+
 #include <QApplication>
 #include <QDir>
 #include <QFile>
@@ -35,16 +58,30 @@ static const QString IPC_SERVER_NAME = "SorinuriIPC_v1";
 
 int main(int argc, char* argv[])
 {
+#ifdef _WIN32
+    // ── Windows 타이머 해상도 1ms로 설정 ─────────────────────────────
+    // 기본값 15.6ms → MPV의 display-resample 프레임 타이밍이 부정확해짐
+    // 노트북에서 Balanced 전원 모드일 때 특히 심각한 끊김 유발
+    // timeBeginPeriod(1): 타이머 해상도를 1ms로 낮춰 정밀한 프레임 타이밍 확보
+    // 참고: https://docs.microsoft.com/en-us/windows/win32/api/timeapi/nf-timeapi-timebeginperiod
+    timeBeginPeriod(1);
+#endif
+
     // ── 깜빡임 수정: 포커스 전환 시 OpenGL 컨텍스트 재생성 방지 ──
     // QApplication 생성 전에 반드시 설정해야 효과 있음
     QApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
 
-    // ── OpenGL 포맷 사전 설정 (시작속도 최적화) ───────────────────
+    // ── OpenGL 포맷 사전 설정 ─────────────────────────────────────
     // QApplication 생성 전에 설정해야 OpenGL 컨텍스트 협상 시간 단축
+    //
+    // 노트북 호환성 수정:
+    //   - TripleBuffer → DoubleBuffer: 통합 GPU에서 TripleBuffer 요청이
+    //     드라이버에 의해 무시되거나 충돌하여 끊김 발생. DoubleBuffer가 안전.
+    //   - swapInterval=1: Qt VSync만 사용 (MPV는 opengl-swapinterval=0으로 비활성화)
     QSurfaceFormat fmt;
     fmt.setVersion(3, 3);
     fmt.setProfile(QSurfaceFormat::CoreProfile);
-    fmt.setSwapBehavior(QSurfaceFormat::TripleBuffer);  // 프레임 대기 제거 (4K HiDPI 끊김 방지)
+    fmt.setSwapBehavior(QSurfaceFormat::DoubleBuffer);  // 노트북 통합 GPU 호환성
     fmt.setSwapInterval(1);  // Qt VSync만 사용 (이중 VSync 충돌 방지)
     QSurfaceFormat::setDefaultFormat(fmt);
 
@@ -56,7 +93,7 @@ int main(int argc, char* argv[])
     QApplication app(argc, argv);
     app.setApplicationName("Sorinuri");
     app.setApplicationDisplayName("소리누리");
-    app.setApplicationVersion("6.11.1");
+    app.setApplicationVersion("6.11.2");
     app.setOrganizationName("Sorinuri");
     app.setWindowIcon(QIcon(":/icons/sorinuri.ico"));
 
@@ -154,5 +191,12 @@ int main(int argc, char* argv[])
         if (!files.isEmpty()) window.openFiles(files);
     }
 
-    return app.exec();
+    int ret = app.exec();
+
+#ifdef _WIN32
+    // ── 타이머 해상도 복원 ────────────────────────────────────────
+    timeEndPeriod(1);
+#endif
+
+    return ret;
 }

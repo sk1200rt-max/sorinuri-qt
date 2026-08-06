@@ -6,6 +6,9 @@
 #include <QOpenGLFunctions>
 #include <QDebug>
 #include <mpv/client.h>
+#if defined(Q_OS_WIN)
+#include <windows.h>  // GetSystemPowerStatus, SYSTEM_POWER_STATUS
+#endif
 
 /**
  * RenderEnvironment - 실행 환경 자동 감지 및 최적 렌더링 설정 결정
@@ -83,6 +86,10 @@ struct RenderEnvInfo {
 
     // 환경 설명 (로그용)
     QString description;
+    // 노트북/전원 상태 (노트북 전용 최적화에 사용)
+    bool    isLaptop     = false;  // 배터리 장착 여부 (노트북 감지)
+    bool    isOnBattery  = false;  // 현재 배터리로 동작 중 (AC 미연결)
+    bool    isDualGpu    = false;  // 듀얼 GPU 환경 (Optimus/Hybrid)
 };
 
 class RenderEnvironment {
@@ -163,6 +170,17 @@ public:
         info.hdrEnabled   = detectHdrEnabled(screen);
         info.gpuNextReady = canUseGpuNext(info.gpuVendor, info.gpuTier);
         info.lavcThreads  = optimalLavcThreads(info.pixelLoad, info.gpuTier);
+        // ── 노트북/배터리 상태 감지 ────────────────────────────────
+        // Windows GetSystemPowerStatus API로 배터리 여부 및 충전 상태 확인
+        // isLaptop: 배터리가 장착된 기기 = 노트북
+        // isOnBattery: AC 연결 안 됨 = 배터리 모드 (성능 제한 상태)
+        detectPowerStatus(info);
+        // 듀얼 GPU 환경: 노트북에서 Intel 통합 GPU가 현재 렌더링 중이면
+        // NvOptimusEnablement 선언에도 불구하고 통합 GPU로 돌아가는 경우 감지
+        if (info.isLaptop && info.gpuTier == GpuTier::Integrated) {
+            info.isDualGpu = true;  // 노트북 + 통합 GPU = 듀얼 GPU 환경 가능성 높음
+            qInfo() << "[RenderEnv] 노트북 + 통합 GPU 감지 → Optimus/Hybrid 환경 가능성";
+        }
 
         // VRAM 기반 GPU 등급 보정
         // GPU 이름만으로는 VRAM 용량을 알 수 없음 (GTX 1070 4GB vs 8GB 등)
@@ -719,6 +737,28 @@ private:
         info.hdrComputePeak     = false;
         info.ditherMode         = "no";
         qInfo() << "[RenderEnv] 통합 GPU 감지 → 최소 부하 설정 적용";
+    }
+
+    // ── 배터리/전원 상태 감지 (Windows GetSystemPowerStatus) ──────────
+    // 노트북 감지: 배터리가 장착된 기기 = 노트북
+    // 배터리 모드: AC 연결 안 됨 = 성능 제한 상태 (끊김 유발 주원)
+    static void detectPowerStatus(RenderEnvInfo& info) {
+#if defined(Q_OS_WIN)
+        SYSTEM_POWER_STATUS ps;
+        if (GetSystemPowerStatus(&ps)) {
+            // ACLineStatus: 0=배터리, 1=AC, 255=알 수 없음
+            // BatteryFlag: 128=배터리 없음, 255=알 수 없음
+            bool hasBattery = (ps.BatteryFlag != 128) && (ps.BatteryFlag != 255);
+            info.isLaptop    = hasBattery;
+            info.isOnBattery = hasBattery && (ps.ACLineStatus == 0);
+            qInfo() << "[RenderEnv] 전원 상태:"
+                    << (hasBattery ? "노트북" : "데스크탑")
+                    << "| AC:" << (ps.ACLineStatus == 1 ? "연결" : "미연결")
+                    << "| 배터리:" << (int)ps.BatteryLifePercent << "%";
+        }
+#else
+        Q_UNUSED(info);
+#endif
     }
 
     static RenderEnvInfo safeDefault() {

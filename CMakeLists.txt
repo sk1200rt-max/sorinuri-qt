@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(Sorinuri VERSION 6.11.1 LANGUAGES CXX)
+project(Sorinuri VERSION 6.11.2 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -178,7 +178,7 @@ if(WIN32)
         target_compile_definitions(Sorinuri PRIVATE WEBVIEW2_NOT_AVAILABLE)
     endif()
     # WRL (Windows Runtime C++ Template Library) - WebView2 COM 인터페이스용
-    target_link_libraries(Sorinuri PRIVATE ole32 oleaut32 shlwapi)
+    target_link_libraries(Sorinuri PRIVATE ole32 oleaut32 shlwapi winmm)  # winmm: timeBeginPeriod (타이머 해상도 1ms, 노트북 끊김 방지)
 endif()
 
 # Windows: DLL 복사
