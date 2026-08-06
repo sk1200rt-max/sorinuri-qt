@@ -28,11 +28,16 @@ jobs:
         id: version
         shell: bash
         run: |
-          TAG="${GITHUB_REF#refs/tags/}"
+          # workflow_dispatch 시 inputs.version_tag 사용, 태그 push 시 GITHUB_REF 사용
+          if [ -n "${{ github.event.inputs.version_tag }}" ]; then
+            TAG="${{ github.event.inputs.version_tag }}"
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+          fi
           VERSION="${TAG#v}"
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "릴리스 버전: $VERSION"
+          echo "릴리스 버전: $VERSION (TAG: $TAG)"
 
       # ── CHANGELOG에서 이번 버전 릴리스 노트 추출 ─────────────────
       - name: Extract release notes
