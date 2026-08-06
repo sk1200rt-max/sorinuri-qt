@@ -1,4 +1,6 @@
 #include "SettingsDialog.h"
+#include <QFileDialog>
+#include <QStandardPaths>
 #include <QDialogButtonBox>
 #include <QScrollArea>
 #include <QDebug>
@@ -545,9 +547,36 @@ void SettingsDialog::setupGeneralTab(QTabWidget* tabs) {
     langHint->setStyleSheet("color: #666; font-size: 11px;");
     langForm->addRow("", langHint);
 
-    layout->addWidget(langGroup);
-    layout->addStretch();
+        layout->addWidget(langGroup);
 
+    // ── 스크린샷 설정 ──────────────────────────────────────────────────────────
+    QGroupBox* shotGroup = new QGroupBox("스크린샷 설정", page);
+    QFormLayout* shotForm = new QFormLayout(shotGroup);
+    shotForm->setSpacing(8);
+
+    QHBoxLayout* dirLay = new QHBoxLayout();
+    screenshotDirEdit_ = new QLineEdit(page);
+    screenshotDirEdit_->setReadOnly(true);
+    screenshotDirEdit_->setStyleSheet(
+        "QLineEdit { background:#1a1a1a; border:1px solid #2a2a2a; border-radius:3px;"
+        "  padding:4px 8px; color:#e0e0e0; }");
+    QPushButton* btnBrowseDir = new QPushButton("찾아보기...", page);
+    connect(btnBrowseDir, &QPushButton::clicked, this, [this]() {
+        QString dir = QFileDialog::getExistingDirectory(this, "스크린샷 저장 폴더 선택",
+            screenshotDirEdit_->text().isEmpty() ? QStandardPaths::writableLocation(QStandardPaths::PicturesLocation) : screenshotDirEdit_->text());
+        if (!dir.isEmpty()) screenshotDirEdit_->setText(dir);
+    });
+    dirLay->addWidget(screenshotDirEdit_, 1);
+    dirLay->addWidget(btnBrowseDir);
+    shotForm->addRow("저장 폴더:", dirLay);
+
+    screenshotFmtCombo_ = new QComboBox(page);
+    screenshotFmtCombo_->addItems({"PNG", "JPG", "WEBP"});
+    shotForm->addRow("파일 형식:", screenshotFmtCombo_);
+
+    layout->addWidget(shotGroup);
+
+    layout->addStretch();
     tabs->addTab(page, "일반");
 }
 
@@ -618,6 +647,10 @@ void SettingsDialog::loadSettings() {
         papagoClientIdEdit_->setText(settings_.value("subtitle/papago_client_id").toString());
     if (papagoClientSecretEdit_)
         papagoClientSecretEdit_->setText(settings_.value("subtitle/papago_client_secret").toString());
+        
+    QString defPicDir = QStandardPaths::writableLocation(QStandardPaths::PicturesLocation);
+    if (screenshotDirEdit_) screenshotDirEdit_->setText(settings_.value("general/screenshot_dir", defPicDir).toString());
+    if (screenshotFmtCombo_) screenshotFmtCombo_->setCurrentText(settings_.value("general/screenshot_format", "PNG").toString());
 }
 
 void SettingsDialog::applyToMpv() {
@@ -717,6 +750,10 @@ void SettingsDialog::onApply() {
         settings_.setValue("video/render_profile", renderProfileCombo_->currentIndex());
     settings_.setValue("general/remember_pos", rememberPosCheck_->isChecked());
     settings_.setValue("general/resume",    resumeCheck_->isChecked());
+    if (screenshotDirEdit_)
+        settings_.setValue("general/screenshot_dir", screenshotDirEdit_->text());
+    if (screenshotFmtCombo_)
+        settings_.setValue("general/screenshot_format", screenshotFmtCombo_->currentText());
     settings_.setValue("subtitle/auto_load",autoLoadSubCheck_->isChecked());
     if (subApiKeyEdit_)
         settings_.setValue("subtitle/opensubtitles_apikey", subApiKeyEdit_->text().trimmed());

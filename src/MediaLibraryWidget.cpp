@@ -226,15 +226,31 @@ void MediaLibraryWidget::refresh() {
         QStringList videos, audios;
         int count = 0;
 
+        auto db = QSqlDatabase::database("library");
+        bool dbOk = db.isOpen();
+        if (dbOk) db.transaction();
+        QSqlQuery q(db);
+        if (dbOk) q.prepare("INSERT OR IGNORE INTO media (path, title, type, added_at) VALUES (?, ?, ?, ?)");
+
         for (const QString& folder : foldersToScan) {
             QDirIterator it(folder, QDir::Files, QDirIterator::Subdirectories);
             while (it.hasNext()) {
                 it.next();
                 QString ext = it.fileInfo().suffix().toLower();
+                QString type;
                 if (VIDEO_EXTS.contains(ext)) {
                     videos.append(it.filePath());
+                    type = "video";
                 } else if (AUDIO_EXTS.contains(ext)) {
                     audios.append(it.filePath());
+                    type = "audio";
+                }
+                if (dbOk && !type.isEmpty()) {
+                    q.addBindValue(it.filePath());
+                    q.addBindValue(it.fileInfo().baseName());
+                    q.addBindValue(type);
+                    q.addBindValue(QDateTime::currentSecsSinceEpoch());
+                    q.exec();
                 }
                 count++;
                 if (count % 50 == 0) {
@@ -244,6 +260,7 @@ void MediaLibraryWidget::refresh() {
                 }
             }
         }
+        if (dbOk) db.commit();
 
         QMetaObject::invokeMethod(this, "onScanFinished",
             Qt::QueuedConnection,

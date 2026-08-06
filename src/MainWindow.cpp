@@ -950,7 +950,14 @@ void MainWindow::keyPressEvent(QKeyEvent* e) {
         break;
     case Qt::Key_S:  // 스크린샷
         if (e->modifiers() & Qt::ControlModifier) {
+            {
+            QString dir = settings_.value("general/screenshot_dir", QStandardPaths::writableLocation(QStandardPaths::PicturesLocation)).toString();
+            QString fmt = settings_.value("general/screenshot_format", "PNG").toString().toLower();
+            core->setProperty("screenshot-dir", dir);
+            core->setProperty("screenshot-format", fmt);
+            core->setProperty("screenshot-template", "Sorinuri_%F_%p_%n");
             core->command({"screenshot", "video"});
+        }
             if (osdWidget_) osdWidget_->showInfo("화면 캡처 저장");
         } else {
             core->command({"stop"});
@@ -977,7 +984,14 @@ void MainWindow::keyPressEvent(QKeyEvent* e) {
         if (osdWidget_) osdWidget_->showSpeed(proFeatures_->currentSpeed());
         break;
     case Qt::Key_C:  // 화면 캡처
-        core->command({"screenshot", "video"});
+        {
+            QString dir = settings_.value("general/screenshot_dir", QStandardPaths::writableLocation(QStandardPaths::PicturesLocation)).toString();
+            QString fmt = settings_.value("general/screenshot_format", "PNG").toString().toLower();
+            core->setProperty("screenshot-dir", dir);
+            core->setProperty("screenshot-format", fmt);
+            core->setProperty("screenshot-template", "Sorinuri_%F_%p_%n");
+            core->command({"screenshot", "video"});
+        }
         if (osdWidget_) osdWidget_->showInfo("화면 캡처 저장");
         break;
     case Qt::Key_Tab:
@@ -1103,6 +1117,27 @@ bool MainWindow::nativeEvent(const QByteArray& type, void* msg, qintptr* result)
         if (m->message == WM_SYSCOMMAND && (m->wParam & 0xFFF0) == SC_CLOSE) {
             close();
             return true;
+        }
+
+        // 미디어 키 처리 (재생/일시정지, 이전곡, 다음곡, 정지)
+        if (m->message == WM_APPCOMMAND) {
+            int cmd = GET_APPCOMMAND_LPARAM(m->lParam);
+            switch (cmd) {
+                case APPCOMMAND_MEDIA_PLAY_PAUSE:
+                case APPCOMMAND_MEDIA_PLAY:
+                case APPCOMMAND_MEDIA_PAUSE:
+                    mpvWidget_->core()->togglePause();
+                    return true;
+                case APPCOMMAND_MEDIA_NEXTTRACK:
+                    mpvWidget_->core()->command({"playlist-next"});
+                    return true;
+                case APPCOMMAND_MEDIA_PREVIOUSTRACK:
+                    mpvWidget_->core()->command({"playlist-prev"});
+                    return true;
+                case APPCOMMAND_MEDIA_STOP:
+                    mpvWidget_->core()->stop();
+                    return true;
+            }
         }
 
         if (m->message == WM_NCHITTEST) {
@@ -1402,9 +1437,16 @@ void MainWindow::showContextMenu(const QPoint& globalPos) {
 
     // 화면 캐치
     QAction* actCapture = menu.addAction("화면 캐치  (C)");
-    connect(actCapture, &QAction::triggered, this, [core]() {
+    connect(actCapture, &QAction::triggered, this, [this, core]() {
         // MPV screenshot 명령 - 실행 파일 디렉토리에 PNG 저장
-        core->command({"screenshot", "video"});
+        {
+            QString dir = settings_.value("general/screenshot_dir", QStandardPaths::writableLocation(QStandardPaths::PicturesLocation)).toString();
+            QString fmt = settings_.value("general/screenshot_format", "PNG").toString().toLower();
+            core->setProperty("screenshot-dir", dir);
+            core->setProperty("screenshot-format", fmt);
+            core->setProperty("screenshot-template", "Sorinuri_%F_%p_%n");
+            core->command({"screenshot", "video"});
+        }
     });
 
     // 구간 반복 (A-B 반복)

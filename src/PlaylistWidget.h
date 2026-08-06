@@ -33,6 +33,8 @@ signals:
 private slots:
     void onItemDoubleClicked(QListWidgetItem* item);
     void onThumbnailLoaded(const QString& path, const QPixmap& thumb);
+    void onSavePlaylist();
+    void onLoadPlaylist();
 
 private:
     void    loadThumbnailAsync(const QString& path, QListWidgetItem* item);

@@ -89,4 +89,6 @@ private:
     QCheckBox*  autoLoadSubCheck_   = nullptr;
     QCheckBox*  resumeCheck_        = nullptr;
     QComboBox*  langCombo_          = nullptr;
+    QLineEdit*  screenshotDirEdit_  = nullptr;
+    QComboBox*  screenshotFmtCombo_ = nullptr;
 };

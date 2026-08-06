@@ -3,6 +3,9 @@
 #include <QFileInfo>
 #include <QPainter>
 #include <QPainterPath>
+#include <QFileDialog>
+#include <QStandardPaths>
+#include <QTextStream>
 #include <QtConcurrent>
 #include <QFutureWatcher>
 #include <QFileInfo>
@@ -73,7 +76,17 @@ PlaylistWidget::PlaylistWidget(QWidget* parent) : QWidget(parent) {
     )");
     connect(btnClear, &QPushButton::clicked, this, &PlaylistWidget::clear);
 
+    QPushButton* btnSave = new QPushButton("저장", toolbar);
+    btnSave->setStyleSheet(btnClear->styleSheet());
+    connect(btnSave, &QPushButton::clicked, this, &PlaylistWidget::onSavePlaylist);
+
+    QPushButton* btnLoad = new QPushButton("불러오기", toolbar);
+    btnLoad->setStyleSheet(btnClear->styleSheet());
+    connect(btnLoad, &QPushButton::clicked, this, &PlaylistWidget::onLoadPlaylist);
+
     tbLayout->addWidget(btnAdd);
+    tbLayout->addWidget(btnSave);
+    tbLayout->addWidget(btnLoad);
     tbLayout->addStretch();
     tbLayout->addWidget(btnClear);
 
@@ -201,6 +214,46 @@ void PlaylistWidget::loadThumbnailAsync(const QString& path, QListWidgetItem* it
 
 void PlaylistWidget::onThumbnailLoaded(const QString& path, const QPixmap& thumb) {
     thumbCache_[path] = thumb;
+}
+
+void PlaylistWidget::onSavePlaylist() {
+    if (filePaths_.isEmpty()) return;
+    QString path = QFileDialog::getSaveFileName(this, "재생목록 저장",
+        QStandardPaths::writableLocation(QStandardPaths::MusicLocation) + "/playlist.m3u",
+        "M3U 재생목록 (*.m3u)");
+    if (path.isEmpty()) return;
+
+    QFile file(path);
+    if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QTextStream out(&file);
+        out.setEncoding(QStringConverter::Utf8);
+        out << "#EXTM3U\n";
+        for (const QString& p : filePaths_) {
+            out << p << "\n";
+        }
+    }
+}
+
+void PlaylistWidget::onLoadPlaylist() {
+    QString path = QFileDialog::getOpenFileName(this, "재생목록 불러오기",
+        QStandardPaths::writableLocation(QStandardPaths::MusicLocation),
+        "M3U 재생목록 (*.m3u *.m3u8);;모든 파일 (*.*)");
+    if (path.isEmpty()) return;
+
+    QFile file(path);
+    if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        QTextStream in(&file);
+        in.setEncoding(QStringConverter::Utf8);
+        QStringList newPaths;
+        while (!in.atEnd()) {
+            QString line = in.readLine().trimmed();
+            if (line.isEmpty() || line.startsWith("#")) continue;
+            newPaths << line;
+        }
+        if (!newPaths.isEmpty()) {
+            addFiles(newPaths);
+        }
+    }
 }
 
 QString PlaylistWidget::formatDuration(double secs) const {

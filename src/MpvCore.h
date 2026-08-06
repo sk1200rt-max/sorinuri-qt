@@ -130,6 +130,7 @@ signals:
     void videoInfoChanged(int width, int height, double fps, const QString& codec);
     void errorOccurred(const QString& message);
     void renderProfileChanged(RenderProfile profile);
+    void spectrumReady(const QVector<float>& bins);
 
     // 실시간 품질 자동 강등/복원 알림 (UI 표시용)
     void renderQualityDegraded(const QString& reason);

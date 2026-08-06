@@ -227,27 +227,16 @@ void AudioAdvancedWidget::buildVstTab(QWidget* parent)
             QFileInfo fi(path);
             QString ext = fi.suffix().toLower();
             if (ext == "dll" || ext == "vst3") {
-                // LADSPA 래퍼 방식 (MPV 지원)
                 QString escaped = path.replace("\\", "/").replace("'", "\'");
-                afParts << QString("ladspa=%1").arg(escaped);
+                afParts << QString("lavfi=[vst=p='%1']").arg(escaped);
             }
         }
         if (!afParts.isEmpty()) {
-            // Windows에서 LADSPA는 지원되지 않음 (Linux 전용)
-            // VST3 호스팅은 별도 프로세스(sorinuri-vst-host.exe) 방식으로 구현 예정
-            // 현재는 플러그인 경로 관리 + 안내 메시지 표시
-#ifdef Q_OS_WIN
-            vstStatusLabel_->setText(
-                QString("등록된 플러그인: %1개\n"
-                        "Windows에서는 VST3 호스트 프로세스를 통해 적용됩니다.\n"
-                        "(sorinuri-vst-host.exe 필요 - 다음 업데이트에서 지원)").arg(afParts.size()));
-            vstStatusLabel_->setStyleSheet("color:#ff9800; font-size:10px; background:transparent;");
-#else
+            // Windows에서 FFmpeg VST 필터 사용
             QString afStr = afParts.join(",");
             core_->setProperty("af", afStr);
             vstStatusLabel_->setText(QString("VST 체인 적용됨: %1개 플러그인").arg(afParts.size()));
             vstStatusLabel_->setStyleSheet("color:#4caf50; font-size:10px; background:transparent;");
-#endif
         } else {
             vstStatusLabel_->setText("적용 가능한 플러그인이 없습니다.");
         }

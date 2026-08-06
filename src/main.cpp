@@ -24,6 +24,9 @@
 #include <QSurfaceFormat>
 #include <QStringList>
 #include "MainWindow.h"
+#include <QSharedMemory>
+#include <QCommandLineParser>
+#include <QCommandLineOption>
 
 int main(int argc, char* argv[])
 {
@@ -48,9 +51,25 @@ int main(int argc, char* argv[])
     QApplication app(argc, argv);
     app.setApplicationName("Sorinuri");
     app.setApplicationDisplayName("소리누리");
-    app.setApplicationVersion("6.8.0");
+    app.setApplicationVersion("6.9.0");
     app.setOrganizationName("Sorinuri");
     app.setWindowIcon(QIcon(":/icons/sorinuri.ico"));
+
+    // ── 멀티 인스턴스 (새 창에서 열기) 처리 ────────────────────────
+    QCommandLineParser parser;
+    parser.addHelpOption();
+    QCommandLineOption newWindowOption(QStringList() << "n" << "new-window", "새 창에서 실행합니다.");
+    parser.addOption(newWindowOption);
+    parser.addPositionalArgument("file", "재생할 파일 경로");
+    parser.process(app);
+
+    QSharedMemory sharedMem("Sorinuri_Instance");
+    bool isNewWindow = parser.isSet(newWindowOption);
+    if (!isNewWindow && !sharedMem.create(1)) {
+        // 이미 실행 중인 인스턴스가 있으면 파일을 전달하고 종료하는 로직 (현재는 단순히 종료)
+        // (향후 LocalSocket 등을 통해 전달하도록 구현 가능)
+        return 0;
+    }
 
     // ── 다크 테마 ─────────────────────────────────────────────────
     app.setStyle("Fusion");
