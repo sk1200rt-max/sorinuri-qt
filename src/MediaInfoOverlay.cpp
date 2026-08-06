@@ -7,6 +7,8 @@
 #include <QPropertyAnimation>
 #include <QSettings>
 #include <QScrollArea>
+#include <QMouseEvent>
+#include <QEvent>
 
 // ── 색상 상수 (랜딩페이지와 동일) ─────────────────────────────────
 static const QString BG_MAIN   = "#0d0d1a";
@@ -107,6 +109,18 @@ void MediaInfoOverlay::buildUi() {
     tabVideo_    = makeTab("화질",     false);
     tabSubtitle_ = makeTab("자막",     false);
     tabPro_      = makeTab("전문 기능",false);
+
+    // 탭 클릭 가능하게: 커서 + eventFilter 설치
+    auto setupTabClick = [this](QLabel* tab) {
+        tab->setCursor(Qt::PointingHandCursor);
+        tab->setAttribute(Qt::WA_Hover, true);
+        tab->installEventFilter(this);
+    };
+    setupTabClick(tabPlaylist_);
+    setupTabClick(tabAudio_);
+    setupTabClick(tabVideo_);
+    setupTabClick(tabSubtitle_);
+    setupTabClick(tabPro_);
 
     vbox->addWidget(tabPlaylist_);
     vbox->addWidget(tabAudio_);
@@ -315,6 +329,59 @@ void MediaInfoOverlay::updateVideoInfo(int width, int height, double /*fps*/,
     videoHdr_->setText(hdrStr);
     videoHdr_->setStyleSheet(QString("color:%1;font-size:11px;font-weight:600;background:transparent;")
                               .arg((hdrStr == "SDR" || hdrStr == "—") ? TEXT_DIM : BLUE));
+}
+
+// ── 탭 클릭 eventFilter ─────────────────────────────────────────────
+bool MediaInfoOverlay::eventFilter(QObject* obj, QEvent* event) {
+    if (event->type() == QEvent::MouseButtonRelease) {
+        auto* me = static_cast<QMouseEvent*>(event);
+        if (me->button() == Qt::LeftButton) {
+            if (obj == tabPlaylist_)  { setActiveTab(tabPlaylist_);  emit tabClicked(0); return true; }
+            if (obj == tabAudio_)     { setActiveTab(tabAudio_);     emit tabClicked(1); return true; }
+            if (obj == tabVideo_)     { setActiveTab(tabVideo_);     emit tabClicked(2); return true; }
+            if (obj == tabSubtitle_)  { setActiveTab(tabSubtitle_);  emit tabClicked(3); return true; }
+            if (obj == tabPro_)       { setActiveTab(tabPro_);       emit tabClicked(4); return true; }
+        }
+    }
+    // hover 스타일
+    if (event->type() == QEvent::HoverEnter) {
+        auto* lbl = qobject_cast<QLabel*>(obj);
+        if (lbl && lbl != tabPlaylist_) {  // 현재 활성 탭은 hover 안 바꿼
+            bool isActive = lbl->styleSheet().contains("rgba(0,200,180");
+            if (!isActive)
+                lbl->setStyleSheet(QString(
+                    "color:#e0e0e0;font-size:13px;font-weight:500;"
+                    "background:rgba(255,255,255,0.06);"
+                    "border-radius:6px;padding:5px 8px;"));
+        }
+    }
+    if (event->type() == QEvent::HoverLeave) {
+        auto* lbl = qobject_cast<QLabel*>(obj);
+        if (lbl) {
+            bool isActive = lbl->styleSheet().contains("rgba(0,200,180");
+            if (!isActive)
+                lbl->setStyleSheet(QString(
+                    "color:%1;font-size:13px;font-weight:400;"
+                    "background:transparent;padding:5px 8px;").arg(TEXT_DIM));
+        }
+    }
+    return QWidget::eventFilter(obj, event);
+}
+
+void MediaInfoOverlay::setActiveTab(QLabel* activeTab) {
+    QList<QLabel*> tabs = {tabPlaylist_, tabAudio_, tabVideo_, tabSubtitle_, tabPro_};
+    for (auto* t : tabs) {
+        if (t == activeTab) {
+            t->setStyleSheet(QString(
+                "color:%1;font-size:13px;font-weight:600;"
+                "background:rgba(0,200,180,0.15);"
+                "border-radius:6px;padding:5px 8px;").arg(TEAL));
+        } else {
+            t->setStyleSheet(QString(
+                "color:%1;font-size:13px;font-weight:400;"
+                "background:transparent;padding:5px 8px;").arg(TEXT_DIM));
+        }
+    }
 }
 
 QString MediaInfoOverlay::formatChannels(int ch) const {

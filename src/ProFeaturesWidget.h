@@ -25,6 +25,7 @@ class ProFeaturesWidget : public QWidget {
 public:
     explicit ProFeaturesWidget(QWidget* parent = nullptr);
     void addTab(QWidget* w, const QString& title);
+    void setCurrentTab(int index) { if (tabWidget_) tabWidget_->setCurrentIndex(index); }
     void connectMpv(MpvCore* core);
 
     // A-B 구간 반복

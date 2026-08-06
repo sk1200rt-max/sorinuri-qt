@@ -5,12 +5,13 @@
 #include <QPropertyAnimation>
 #include <QScrollArea>
 #include <QRect>
+#include <QMouseEvent>
 
 class MpvCore;
 
 // Tab키로 토글되는 미디어 정보 오버레이 패널
 // 랜딩페이지 프리뷰 사이드바와 동일한 디자인:
-//   - 탭 목록 (재생목록/오디오/화질/자막/전문 기능)
+//   - 탭 목록 (재생목록/오디오/화질/자막/전문 기능) — 클릭 가능
 //   - 현재 오디오 카드 (원본 코덱, 출력, WASAPI, 비트퍼펙트)
 //   - 현재 영상 카드 (코덱, 해상도, 색공간, HDR)
 class MediaInfoOverlay : public QWidget {
@@ -22,21 +23,29 @@ public:
     void toggle();
     bool isOpen() const { return isVisible(); }
 
+signals:
+    // 탭 클릭 시 MainWindow에 전달 (0=재생목록, 1=오디오, 2=화질, 3=자막, 4=전문기능)
+    void tabClicked(int tabIndex);
+
 public slots:
     void updateAudioInfo(const QString& codec, int channels, int sampleRate,
                          const QString& output);
     void updateVideoInfo(int width, int height, double fps, const QString& codec);
     void onFileLoaded(const QString& path);
 
+protected:
+    bool eventFilter(QObject* obj, QEvent* event) override;
+
 private:
     void buildUi();
     void applyStyle();
+    void setActiveTab(QLabel* activeTab);
     QString formatChannels(int ch) const;
     QString formatCodecBadge(const QString& codec) const;
 
     MpvCore* core_ = nullptr;
 
-    // 탭 목록 라벨들
+    // 탭 목록 라벨들 (클릭 가능하도록 eventFilter 설치)
     QLabel* tabPlaylist_   = nullptr;
     QLabel* tabAudio_      = nullptr;
     QLabel* tabVideo_      = nullptr;
@@ -58,4 +67,11 @@ private:
     QLabel* videoHdr_      = nullptr;
 
     QPropertyAnimation* anim_ = nullptr;
+
+    // 탭 스타일 상수
+    static const QString TEAL;
+    static const QString TEXT_DIM;
+    static const QString ACTIVE_STYLE;
+    static const QString INACTIVE_STYLE;
+    static const QString HOVER_STYLE;
 };

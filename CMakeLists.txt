@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(Sorinuri VERSION 6.11.3 LANGUAGES CXX)
+project(Sorinuri VERSION 6.11.4 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -135,7 +135,11 @@ if(WIN32)
     # (RC 파일에 이미 Per-Monitor V2 manifest가 포함되어 있으므로 중복 방지)
     if(MSVC)
         set_target_properties(Sorinuri PROPERTIES
-            LINK_FLAGS "/MANIFEST:NO"
+            # MANIFEST:NO: RC 파일에 이미 Per-Monitor V2 manifest 포함됨
+            # /EXPORT: NvOptimusEnablement / AmdPowerXpressRequestHighPerformance를
+            # EXE export table에 포함시켜 NVIDIA Optimus / AMD Hybrid GPU가
+            # 노트북에서 전용 GPU를 자동 선택하도록 함
+            LINK_FLAGS "/MANIFEST:NO /EXPORT:NvOptimusEnablement /EXPORT:AmdPowerXpressRequestHighPerformance"
         )
     endif()
 else()

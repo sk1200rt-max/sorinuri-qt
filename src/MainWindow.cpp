@@ -264,6 +264,38 @@ void MainWindow::setupConnections() {
     connect(proFeatures_, &ProFeaturesWidget::closeRequested,
             this, &MainWindow::toggleProFeatures);
 
+    // ── 사이드 탭 클릭 → 해당 패널 열기 ──────────────────────────────
+    // 0=재생목록, 1=오디오, 2=화질, 3=자막, 4=전문기능
+    connect(mediaInfoOverlay_, &MediaInfoOverlay::tabClicked, this, [this](int idx) {
+        // 사이드 패널을 닫고 해당 패널 열기
+        mediaInfoOverlay_->toggle();  // 사이드 패널 닫기
+        switch (idx) {
+        case 0:  // 재생목록 → PlaylistWidget (전문기능 패널 재생목록 탭)
+            toggleProFeatures();
+            if (proFeatures_ && proFeatures_->isVisible())
+                proFeatures_->setCurrentTab(0);
+            break;
+        case 1:  // 오디오 → 전문기능 패널 오디오 탭
+            toggleProFeatures();
+            if (proFeatures_ && proFeatures_->isVisible())
+                proFeatures_->setCurrentTab(1);
+            break;
+        case 2:  // 화질 → 전문기능 패널 화질 탭
+            toggleProFeatures();
+            if (proFeatures_ && proFeatures_->isVisible())
+                proFeatures_->setCurrentTab(2);
+            break;
+        case 3:  // 자막 → 전문기능 패널 자막 탭
+            toggleProFeatures();
+            if (proFeatures_ && proFeatures_->isVisible())
+                proFeatures_->setCurrentTab(3);
+            break;
+        case 4:  // 전문기능 → ProFeaturesWidget
+            toggleProFeatures();
+            break;
+        }
+    });
+
     connect(titleBar_, &TitleBar::minimizeClicked,   this, &QMainWindow::showMinimized);
     connect(titleBar_, &TitleBar::maximizeClicked, this, [this]() {
         if (isMaximized()) {
@@ -346,8 +378,11 @@ void MainWindow::openFiles(const QStringList& paths) {
 
     bool first = true;
     for (const QString& path : paths) {
-        QFileInfo fi(path);
-        if (!fi.exists()) continue;
+        // URL(http/https/rtmp/rtsp/magnet)은 exists() 체크 없이 직접 전달
+        bool isUrl = path.startsWith("http://")  || path.startsWith("https://")
+                  || path.startsWith("rtmp://")   || path.startsWith("rtsp://")
+                  || path.startsWith("magnet:")   || path.startsWith("ftp://");
+        if (!isUrl && !QFileInfo::exists(path)) continue;
         if (first) {
             currentFilePath_ = path;
             // 음악 파일이면 자동으로 HiFi 모드로 전환

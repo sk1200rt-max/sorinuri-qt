@@ -3,7 +3,7 @@
 
 #define MyAppName "소리누리"
 #define MyAppNameEn "Sorinuri"
-#define MyAppVersion "6.11.3"
+#define MyAppVersion "6.11.4"
 #define MyAppPublisher "Sorinuri"
 #define MyAppURL "https://sorinuri.com"
 #define MyAppExeName "Sorinuri.exe"
@@ -268,6 +268,12 @@ Type: filesandordirs; Name: "{app}"
 
 [Code]
 // ============================================================================
+// Shell32 DLL 직접 호출 (파일 연결 즉시 반영)
+// ============================================================================
+procedure SHChangeNotifyDirect(wEventId: Integer; uFlags: Cardinal; dwItem1: Integer; dwItem2: Integer);
+  external 'SHChangeNotify@shell32.dll stdcall';
+
+// ============================================================================
 // Dolby Access Custom Page
 // ============================================================================
 var
@@ -422,10 +428,9 @@ begin
          '/C start explorer.exe', '',
          SW_HIDE, ewNoWait, ResultCode);
 
-    // 5단계: SHChangeNotify로 쉘에 아이콘 변경 알림
-    Exec(ExpandConstant('{sys}\RunDll32.exe'),
-         'shell32.dll,SHChangeNotify 0x8000000 0 0 0', '',
-         SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    // 5단계: SHChangeNotify 직접 호출 (파일 연결 즉시 적용)
+    // SHCNE_ASSOCCHANGED = 0x08000000, SHCNF_IDLIST = 0x0000
+    SHChangeNotifyDirect($08000000, $0000, 0, 0);
   end;
 end;
 
