@@ -26,6 +26,17 @@ public:
     explicit ProFeaturesWidget(QWidget* parent = nullptr);
     void addTab(QWidget* w, const QString& title);
     void setCurrentTab(int index) { if (tabWidget_) tabWidget_->setCurrentIndex(index); }
+    // 탭 이름으로 탭 이동 (지연 초기화로 인덱스가 가변적이므로 이름 기반 사용 필수)
+    void setCurrentTabByName(const QString& name) {
+        if (!tabWidget_) return;
+        for (int i = 0; i < tabWidget_->count(); ++i) {
+            if (tabWidget_->tabText(i).contains(name, Qt::CaseInsensitive)) {
+                tabWidget_->setCurrentIndex(i);
+                return;
+            }
+        }
+        // 탭이 없으면 첫 번째 탭(0=전문 기능) 유지
+    }
     void connectMpv(MpvCore* core);
 
     // A-B 구간 반복

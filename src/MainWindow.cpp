@@ -276,12 +276,24 @@ void MainWindow::setupConnections() {
         // 패널이 열린 상태에서 탭 이동 (50ms 지연: 레이아웃 재계산 완료 후)
         QTimer::singleShot(50, this, [this, idx]() {
             if (!proFeatures_ || !proFeatures_->isVisible()) return;
+            // 탭 이름으로 이동 (지연 초기화로 인덱스가 가변적이므로 고정 인덱스 사용 금지)
+            // MediaInfoOverlay 탭: 0=재생목록, 1=오디오, 2=화질, 3=자막, 4=전문기능
             switch (idx) {
-            case 0: proFeatures_->setCurrentTab(0); break;  // 재생목록
-            case 1: proFeatures_->setCurrentTab(1); break;  // 오디오
-            case 2: proFeatures_->setCurrentTab(2); break;  // 화질
-            case 3: proFeatures_->setCurrentTab(3); break;  // 자막
-            case 4: break;  // 전문기능 (기본 탭)
+            case 0:  // 재생목록 → 전문 기능 탭 (별도 재생목록 탭 없음)
+                proFeatures_->setCurrentTab(0);
+                break;
+            case 1:  // 오디오 → "하이엔드 오디오" 탭
+                proFeatures_->setCurrentTabByName("하이엔드 오디오");
+                break;
+            case 2:  // 화질 → "하이엔드 비디오" 탭
+                proFeatures_->setCurrentTabByName("하이엔드 비디오");
+                break;
+            case 3:  // 자막 → "자막 편집기" 탭
+                proFeatures_->setCurrentTabByName("자막 편집기");
+                break;
+            case 4:  // 전문기능 → "전문 기능" 탭
+                proFeatures_->setCurrentTabByName("전문 기능");
+                break;
             }
         });
     });
@@ -1116,7 +1128,7 @@ void MainWindow::toggleProFeatures() {
         auto* core = mpvWidget_->core();
 
         if (!whisperWidget_) {
-            whisperWidget_ = new WhisperWidget(this);
+            whisperWidget_ = new WhisperWidget(proFeatures_);
             proFeatures_->addTab(whisperWidget_, "AI 자막");
             // AI 자막 → MPV 자막 오버레이 연결
             connect(whisperWidget_, &WhisperWidget::subtitleGenerated,
@@ -1128,12 +1140,12 @@ void MainWindow::toggleProFeatures() {
         }
 
         if (!upscaleWidget_) {
-            upscaleWidget_ = new UpscaleWidget(core, this);
+            upscaleWidget_ = new UpscaleWidget(core, proFeatures_);
             proFeatures_->addTab(upscaleWidget_, "화질 개선");
         }
 
         if (!chapterWidget_) {
-            chapterWidget_ = new ChapterWidget(core, this);
+            chapterWidget_ = new ChapterWidget(core, proFeatures_);
             proFeatures_->addTab(chapterWidget_, "챕터/북마크");
             connect(chapterWidget_, &ChapterWidget::seekRequested,
                     core, [core](double sec) { core->seek(sec); });
@@ -1148,17 +1160,17 @@ void MainWindow::toggleProFeatures() {
         }
         // 하이엔드 오디오 고급 기능 (컨볼루션 룸 코렉션 + VST)
         if (!audioAdvancedWidget_) {
-            audioAdvancedWidget_ = new AudioAdvancedWidget(core, this);
+            audioAdvancedWidget_ = new AudioAdvancedWidget(core, proFeatures_);
             proFeatures_->addTab(audioAdvancedWidget_, "하이엔드 오디오");
         }
         // 하이엔드 비디오 고급 기능 (3D LUT 케리브레이션)
         if (!videoAdvancedWidget_) {
-            videoAdvancedWidget_ = new VideoAdvancedWidget(core, this);
+            videoAdvancedWidget_ = new VideoAdvancedWidget(core, proFeatures_);
             proFeatures_->addTab(videoAdvancedWidget_, "하이엔드 비디오");
         }
         // 네트워크 탐색 (SMB/NAS + 360도 VR + 캐스팅)
         if (!networkBrowserWidget_) {
-            networkBrowserWidget_ = new NetworkBrowserWidget(core, this);
+            networkBrowserWidget_ = new NetworkBrowserWidget(core, proFeatures_);
             proFeatures_->addTab(networkBrowserWidget_, "네트워크");
             // SMB 파일 열기 요청 연결
             connect(networkBrowserWidget_, &NetworkBrowserWidget::openFileRequested,
@@ -1166,18 +1178,18 @@ void MainWindow::toggleProFeatures() {
         }
         // 스마트 미디어 라이브러리
         if (!mediaLibrary_) {
-            mediaLibrary_ = new MediaLibraryWidget(this);
+            mediaLibrary_ = new MediaLibraryWidget(proFeatures_);
             proFeatures_->addTab(mediaLibrary_, "미디어 라이브러리");
             connect(mediaLibrary_, &MediaLibraryWidget::fileRequested,
                     this, [this](const QString& path) { openFiles({path}); });
         }
         if (!subtitleEditor_) {
-            subtitleEditor_ = new SubtitleEditorWidget(mpvWidget_->core(), this);
+            subtitleEditor_ = new SubtitleEditorWidget(mpvWidget_->core(), proFeatures_);
             proFeatures_->addTab(subtitleEditor_, "자막 편집기");
         }
         // 재생 통계/최근 감상 화면
         if (!statsWidget_) {
-            statsWidget_ = new QWidget(this);
+            statsWidget_ = new QWidget(proFeatures_);
             statsWidget_->setStyleSheet("background:#111; color:#ccc;");
             auto* statsLayout = new QVBoxLayout(statsWidget_);
             statsLayout->setContentsMargins(12, 12, 12, 12);
@@ -1240,7 +1252,7 @@ void MainWindow::toggleProFeatures() {
         }
         // SORINURI ORIGINALS 탭
         if (!originalsWidget_) {
-            originalsWidget_ = new OriginalsWidget(this);
+            originalsWidget_ = new OriginalsWidget(proFeatures_);
             proFeatures_->addTab(originalsWidget_, "♪ ORIGINALS");
             // 공 URL 재생 요청 연결
             connect(originalsWidget_, &OriginalsWidget::playRequested,
