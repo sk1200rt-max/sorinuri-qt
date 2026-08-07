@@ -120,6 +120,19 @@ void MpvWidget::paintGL() {
         return;
     }
 
+    // ── NVIDIA Optimus 검은 화면 수정 ────────────────────────────
+    // Optimus 환경에서 QOpenGLWidget 초기화 직후 defaultFramebufferObject()가
+    // 0을 반환하는 경우가 있음. FBO 0(기본 프레임버퍼)에 MPV가 렌더링하면
+    // Intel GPU 디스플레이 버퍼에 출력되어 NVIDIA 렌더링 결과가 화면에 안 나옴.
+    // → FBO ID가 0이면 렌더링 건너뛰고 16ms 후 재시도.
+    GLuint fboId = defaultFramebufferObject();
+    if (fboId == 0) {
+        glClearColor(0, 0, 0, 1);
+        glClear(GL_COLOR_BUFFER_BIT);
+        QTimer::singleShot(16, this, [this]() { if (renderCtx_) update(); });
+        return;
+    }
+
     // ── HiDPI 핵심: FBO 크기를 물리 픽셀(physical pixels)로 전달 ──
     // width()/height()는 논리 픽셀이므로 devicePixelRatio를 곱해야
     // 4K 250% 배율에서 영상이 전체 화면을 채움
@@ -130,7 +143,7 @@ void MpvWidget::paintGL() {
     // internal_format을 GL_RGBA8로 명시 → MPV가 FBO 포맷을 추측하며
     // rgba16f 등을 시도하다 INVALID_ENUM 오류를 반복하던 문제 해결
     mpv_opengl_fbo fbo = {
-        static_cast<int>(defaultFramebufferObject()),
+        static_cast<int>(fboId),
         physW, physH,
         0x8058 /* GL_RGBA8 */
     };

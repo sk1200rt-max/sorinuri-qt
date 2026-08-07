@@ -403,10 +403,10 @@ void MainWindow::openFiles(const QStringList& paths) {
             // 해결: 150ms로 늘려 메뉴 닫힘 처리 완료 보장
             //       + makeCurrent()로 OpenGL 컨텍스트 명시적 활성화
             QTimer::singleShot(150, this, [this, pathCopy]() {
-                // OpenGL 컨텍스트 명시적 활성화 (메뉴 닫힘으로 doneCurrent된 경우 복원)
-                mpvWidget_->makeCurrent();
+                // makeCurrent/doneCurrent 제거: MPV 렌더 스레드가 별도로 컨텍스트를 관리하므로
+                // 메인 스레드에서 makeCurrent() 호출 시 렌더 스레드와 충돌 가능
+                // → loadFile()만 호출 (MPV가 자체적으로 컨텍스트 처리)
                 mpvWidget_->loadFile(pathCopy);
-                mpvWidget_->doneCurrent();
             });
             first = false;
         } else {
