@@ -1248,19 +1248,26 @@ void MpvCore::optimizeScaleForContent(int videoW, int videoH) {
 // auto-safe 또는 기본값인 경우에만 코덱별 최적값 자동 적용.
 void MpvCore::applyOptimalHwdec(const QString& codec) {
     if (!initialized_ || codec.isEmpty()) return;
-
     currentCodec_ = codec;
+
+    // 노트북(Optimus) 환경에서는 d3d11va 강제 금지
+    // 이유: Intel GPU에서 D3D11 디바이스 생성 시 NVIDIA OpenGL 컨텍스트와 GPU 불일치 발생
+    //       → 하드웨어 디코딩 실패 및 재생 불가
+    // 해결: auto-safe 유지 (MPV가 현재 GPU에 맞는 방식을 자동 선택)
+    if (isLaptop_) {
+        qInfo() << "[MPV] 노트북 Optimus 환경 → hwdec=auto-safe 유지 (d3d11va 강제 금지)";
+        mpv_set_property_string(mpv_, "hwdec", "auto-safe");
+        return;
+    }
 
     // 사용자가 수동으로 hwdec를 설정한 경우 덮어쓰지 않음
     // (설정창에서 "소프트웨어" 또는 특정 방식을 선택한 경우)
     char* currentHwdec = mpv_get_property_string(mpv_, "hwdec");
     QString hwdecStr = currentHwdec ? QString::fromUtf8(currentHwdec) : "auto-safe";
     mpv_free(currentHwdec);
-
     // 코덱별 최적 hwdec 선택
     QString optimalHwdec = RenderEnvironment::selectHwdec(
         codec, renderEnv_.gpuVendor, renderEnv_.gpuTier);
-
     if (optimalHwdec != hwdecStr) {
         mpv_set_property_string(mpv_, "hwdec", optimalHwdec.toUtf8().constData());
         qInfo() << "[MPV] 코덱별 hwdec 최적화:" << codec

@@ -397,12 +397,16 @@ void MainWindow::openFiles(const QStringList& paths) {
             // → 컨텍스트 메뉴 닫힌 처리가 완전히 끝난 후 실행 보장.
             // 0ms: MPV 초기화 완료 후 호출되므로 타이밍 의존 불필요.
             const QString pathCopy = path;
-            // HiDPI 50ms: 컨텍스트 메뉴 닫힘 이벤트가 완전히 처리된 후 loadFile 호출
-            // 0ms는 이벤트 루프 1회전만 보장하지만, HiDPI에서 메뉴 닫힘 처리가
-            // 여러 이벤트 루프 사이클에 걸쳐 발생할 수 있음.
-            // 50ms는 어떤 PC 사양에서도 충분한 여유 시간.
-            QTimer::singleShot(50, this, [this, pathCopy]() {
+            // 150ms 지연: 우클릭 컨텍스트 메뉴 닫힘 이벤트가 완전히 처리된 후 loadFile 호출
+            // 문제: 메뉴 닫힘 → QOpenGLWidget doneCurrent() → 50ms 내 loadFile 호출 시
+            //       MPV 렌더 스레드가 OpenGL 컨텍스트를 찾지 못해 재생 실패
+            // 해결: 150ms로 늘려 메뉴 닫힘 처리 완료 보장
+            //       + makeCurrent()로 OpenGL 컨텍스트 명시적 활성화
+            QTimer::singleShot(150, this, [this, pathCopy]() {
+                // OpenGL 컨텍스트 명시적 활성화 (메뉴 닫힘으로 doneCurrent된 경우 복원)
+                mpvWidget_->makeCurrent();
                 mpvWidget_->loadFile(pathCopy);
+                mpvWidget_->doneCurrent();
             });
             first = false;
         } else {
