@@ -93,7 +93,7 @@ int main(int argc, char* argv[])
     QApplication app(argc, argv);
     app.setApplicationName("Sorinuri");
     app.setApplicationDisplayName("소리누리");
-    app.setApplicationVersion("6.11.4");
+    app.setApplicationVersion("6.11.5");
     app.setOrganizationName("Sorinuri");
     app.setWindowIcon(QIcon(":/icons/sorinuri.ico"));
 
@@ -178,17 +178,11 @@ int main(int argc, char* argv[])
     });
 
     // ── 커맨드라인 파일/URL 인수 처리 ────────────────────────────
+    // QFile::exists() 체크 제거: 한글/공백/UNC 경로에서 false 반환하는 버그 수정
+    // openFiles() 내부에서 MPV가 직접 파일 존재 여부를 처리하므로 여기서 체크 불필요
     QStringList positional = parser.positionalArguments();
     if (!positional.isEmpty()) {
-        QStringList files;
-        for (const QString& arg : positional) {
-            if (arg.startsWith("http://")  || arg.startsWith("https://") ||
-                arg.startsWith("rtmp://")  || arg.startsWith("rtsp://")  ||
-                QFile::exists(arg)) {
-                files << arg;
-            }
-        }
-        if (!files.isEmpty()) window.openFiles(files);
+        window.openFiles(positional);
     }
 
     int ret = app.exec();

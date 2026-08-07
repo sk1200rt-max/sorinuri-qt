@@ -3,7 +3,7 @@
 
 #define MyAppName "소리누리"
 #define MyAppNameEn "Sorinuri"
-#define MyAppVersion "6.11.4"
+#define MyAppVersion "6.11.5"
 #define MyAppPublisher "Sorinuri"
 #define MyAppURL "https://sorinuri.com"
 #define MyAppExeName "Sorinuri.exe"
@@ -45,6 +45,7 @@ WizardSmallImageFile=wizard-small.bmp
 CloseApplications=yes
 CloseApplicationsFilter=*.exe
 RestartApplications=no
+ChangesAssociations=yes
 
 [Languages]
 Name: "korean"; MessagesFile: "compiler:Languages\Korean.isl"

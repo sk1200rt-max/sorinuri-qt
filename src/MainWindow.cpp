@@ -267,33 +267,23 @@ void MainWindow::setupConnections() {
     // ── 사이드 탭 클릭 → 해당 패널 열기 ──────────────────────────────
     // 0=재생목록, 1=오디오, 2=화질, 3=자막, 4=전문기능
     connect(mediaInfoOverlay_, &MediaInfoOverlay::tabClicked, this, [this](int idx) {
-        // 사이드 패널을 닫고 해당 패널 열기
-        mediaInfoOverlay_->toggle();  // 사이드 패널 닫기
-        switch (idx) {
-        case 0:  // 재생목록 → PlaylistWidget (전문기능 패널 재생목록 탭)
-            toggleProFeatures();
-            if (proFeatures_ && proFeatures_->isVisible())
-                proFeatures_->setCurrentTab(0);
-            break;
-        case 1:  // 오디오 → 전문기능 패널 오디오 탭
-            toggleProFeatures();
-            if (proFeatures_ && proFeatures_->isVisible())
-                proFeatures_->setCurrentTab(1);
-            break;
-        case 2:  // 화질 → 전문기능 패널 화질 탭
-            toggleProFeatures();
-            if (proFeatures_ && proFeatures_->isVisible())
-                proFeatures_->setCurrentTab(2);
-            break;
-        case 3:  // 자막 → 전문기능 패널 자막 탭
-            toggleProFeatures();
-            if (proFeatures_ && proFeatures_->isVisible())
-                proFeatures_->setCurrentTab(3);
-            break;
-        case 4:  // 전문기능 → ProFeaturesWidget
-            toggleProFeatures();
-            break;
-        }
+        // 사이드 패널 즉시 숨김 (toggle() 애니메이션 대신 hide() 직접 호출)
+        // toggle()의 슬라이드 애니메이션 중 toggleProFeatures()가 실행되면 레이아웃 충돌 발생
+        mediaInfoOverlay_->hide();
+        // 전문기능 패널이 이미 열려 있으면 닫고, 닫혀 있으면 열고 탭 이동
+        bool wasOpen = proFeatures_ && proFeatures_->isVisible();
+        if (!wasOpen) toggleProFeatures();
+        // 패널이 열린 상태에서 탭 이동 (50ms 지연: 레이아웃 재계산 완료 후)
+        QTimer::singleShot(50, this, [this, idx]() {
+            if (!proFeatures_ || !proFeatures_->isVisible()) return;
+            switch (idx) {
+            case 0: proFeatures_->setCurrentTab(0); break;  // 재생목록
+            case 1: proFeatures_->setCurrentTab(1); break;  // 오디오
+            case 2: proFeatures_->setCurrentTab(2); break;  // 화질
+            case 3: proFeatures_->setCurrentTab(3); break;  // 자막
+            case 4: break;  // 전문기능 (기본 탭)
+            }
+        });
     });
 
     connect(titleBar_, &TitleBar::minimizeClicked,   this, &QMainWindow::showMinimized);
@@ -378,11 +368,9 @@ void MainWindow::openFiles(const QStringList& paths) {
 
     bool first = true;
     for (const QString& path : paths) {
-        // URL(http/https/rtmp/rtsp/magnet)은 exists() 체크 없이 직접 전달
-        bool isUrl = path.startsWith("http://")  || path.startsWith("https://")
-                  || path.startsWith("rtmp://")   || path.startsWith("rtsp://")
-                  || path.startsWith("magnet:")   || path.startsWith("ftp://");
-        if (!isUrl && !QFileInfo::exists(path)) continue;
+        // QFileInfo::exists() 체크 제거: 한글/공백/UNC/네트워크 경로에서 false 반환하는 버그 수정
+        // MPV가 직접 파일 존재 여부를 판단하므로 Qt 측 체크 불필요
+        if (path.trimmed().isEmpty()) continue;
         if (first) {
             currentFilePath_ = path;
             // 음악 파일이면 자동으로 HiFi 모드로 전환

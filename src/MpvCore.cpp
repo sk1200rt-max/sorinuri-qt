@@ -114,23 +114,24 @@ bool MpvCore::initialize(WId windowId) {
     // → MPV VSync 비활성화, Qt만 VSync 사용 = 이중 VSync 제거.
     check_error(mpv_set_property_string(mpv_, "opengl-swapinterval", "0"));
 
-    // ── D3D11 동기화 간격 설정 (노트북 이중 VSync 방지) ────────────────────
-    // d3d11-sync-interval=1: D3D11 백엔드에서 VSync 1회 대기 (기본값)
-    // 일부 노트북 드라이버에서 기본값이 0 또는 2로 설정되어 이중 VSync 발생
-    // 명시적으로 1로 설정하여 Qt swapInterval=1과 충돌 방지
-    check_error(mpv_set_property_string(mpv_, "d3d11-sync-interval", "1"));
+    // ── D3D11 동기화 간격: 기본값 사용 (설정 제거) ────────────────────
+    // mpv GitHub 이슈 #15196 (kasper93): d3d11-sync-interval 명시적 설정이 display sync를 깨뜨림
+    // 해결책: 설정을 제거하고 MPV 기본값 사용 (MPV가 디스플레이 주사율에 맞춰 자동 조정)
 
-    // ── 노트북 배터리 모드 감지 및 최적화 ─────────────────────────────────
-    // 배터리 모드에서 Windows가 CPU/GPU 클럭을 동적으로 낮춰 프레임 타이밍 불규칙
-    // 배터리 모드 감지 시 video-sync=audio 강제 (display-resample 금지)
+    // ── 노트북 감지 및 display-resample 금지 ───────────────────────
+    // mpv GitHub 이슈 #15196: Windows 11 24H2 + 최신 NVIDIA/AMD 드라이버에서
+    // display-resample이 주기적 끔김을 유발함 (WDDM 3.2 호환성 문제)
+    // 노트북 감지 시 (AC 연결 포함) video-sync=audio 강제
+    // 데스크톱은 applyVideoSyncByFps()에서 자동 선택
     {
         RenderEnvInfo tmpEnv = RenderEnvironment::detect();
-        if (tmpEnv.isOnBattery) {
-            qInfo() << "[MPV] 배터리 모드 감지 → video-sync=audio 강제 (프레임 타이밍 안정화)";
+        if (tmpEnv.isLaptop) {
+            // 노트북 (AC 연결 포함): display-resample 금지, audio 모드 강제
+            // 이유: NVIDIA Optimus + Windows 11 24H2에서 display-resample이 끔김 유발
+            qInfo() << "[MPV] 노트북 감지 → video-sync=audio 강제 (display-resample 금지)";
             check_error(mpv_set_property_string(mpv_, "video-sync", "audio"));
             check_error(mpv_set_property_string(mpv_, "framedrop", "vo"));
-        } else if (tmpEnv.isLaptop) {
-            qInfo() << "[MPV] 노트북 AC 연결 감지 → 일반 최적화 적용";
+            isLaptop_ = true;  // applyVideoSyncByFps()에서 display-resample 차단용
         }
     }
 
@@ -1086,6 +1087,13 @@ void MpvCore::applyVideoSyncByFps(double fps) {
     // 통합 GPU는 audio 모드가 항상 안정적
     if (renderEnv_.gpuTier == GpuTier::Integrated) {
         qInfo() << "[MPV] 통합 GPU 감지 → video-sync=audio 강제 (끊김 방지)";
+        optimalSync = "audio";
+    }
+    // 노트북 환경 (AC 연결 포함): display-resample 강제 차단
+    // mpv GitHub 이슈 #15196: Windows 11 24H2 + NVIDIA Optimus에서 display-resample이 끊김 유발
+    // initialize()에서 isLaptop_=true로 설정됨
+    if (isLaptop_) {
+        qInfo() << "[MPV] 노트북 환경 → display-resample 차단, audio 강제";
         optimalSync = "audio";
     }
 
