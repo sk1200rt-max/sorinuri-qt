@@ -837,9 +837,7 @@ void WhisperWidget::translateSRT() {
     // LibreTranslate는 단일 텍스트만 지원하므로 줄바꿈으로 구분하여 전송
     QStringList texts;
     for (const auto& e : entries_) texts << e.text;
-    QString combined = texts.join("
----SPLIT---
-");
+    QString combined = texts.join("\n---SPLIT---\n");
 
     QJsonObject body;
     body["q"] = combined;
@@ -871,7 +869,7 @@ void WhisperWidget::translateSRT() {
             return;
         }
         QString translated = doc.object()["translatedText"].toString();
-        QStringList parts = translated.split("---SPLIT---");
+        QStringList parts = translated.split("\n---SPLIT---\n");
 
         // 번역 결과를 entries_에 적용
         translatedEntries_ = entries_;

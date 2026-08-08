@@ -263,14 +263,15 @@ void SMTCManager::updateTimeline(double position, double duration) {
     if (!impl->smtc2) return;  // ISystemMediaTransportControls2 미지원
 
     // SystemMediaTransportControlsTimelineProperties 생성
-    ComPtr<ISystemMediaTransportControlsTimelinePropertiesFactory> timelinePropFactory;
-    HRESULT hr = RoGetActivationFactory(
+    // IActivationFactory를 통해 기본 인스턴스 생성
+    ComPtr<IInspectable> timelineInspectable;
+    HRESULT hr = RoActivateInstance(
         HStringReference(RuntimeClass_Windows_Media_SystemMediaTransportControlsTimelineProperties).Get(),
-        IID_PPV_ARGS(&timelinePropFactory));
+        &timelineInspectable);
     if (FAILED(hr)) return;
 
     ComPtr<ISystemMediaTransportControlsTimelineProperties> timelineProps;
-    hr = timelinePropFactory->CreateInstance(nullptr, nullptr, &timelineProps);
+    hr = timelineInspectable.As(&timelineProps);
     if (FAILED(hr)) return;
 
     // 100나노초 단위 (Windows TimeSpan)
