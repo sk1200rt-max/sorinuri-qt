@@ -238,16 +238,22 @@ bool MpvCore::initialize(WId windowId) {
     }
 
     // ── 오디오: WASAPI (저장된 모드 적용) ──────────────────────────────
-    // QSettings에서 저장된 독점 모드 값을 읽어 적용 (기본값: false = 공유 모드)
-    // 이렇게 해야 설정에서 독점 모드를 활성화한 사용자가 다음 실행 시도 유지됨
+    // QSettings에서 저장된 독점 모드 값을 읽어 적용
+    // 노트북 기본값: false (공유 모드) → 내장 스피커 WASAPI 독점 모드 실패 방지
+    // 데스크톱 기본값: true (독점 모드) → 멀티체널 자동 인식 최적화
+    // 사용자가 설정에서 명시적으로 변경한 경우는 저장된 값을 우선 적용
     {
         QSettings s("Sorinuri", "SorinuriPlayer");
-        const bool savedExclusive = s.value("audio/exclusive", true).toBool();  // 기본값 true: 독점 모드 (멀티채널 자동 인식)
+        // 노트북 감지 시 기본값을 false로 설정
+        // 이미 저장된 값이 있으면 저장된 값을 사용 (사용자 선택 존중)
+        const bool defaultExclusive = !isLaptop_;  // 데스크톱=true, 노트북=false
+        const bool savedExclusive = s.value("audio/exclusive", defaultExclusive).toBool();
         check_error(mpv_set_property_string(mpv_, "ao", "wasapi"));
         check_error(mpv_set_property_string(mpv_, "audio-exclusive",
             savedExclusive ? "yes" : "no"));
         qInfo() << "[MPV] 오디오 모드:"
-                << (savedExclusive ? "독점 (Exclusive)" : "공유 (Shared)");
+                << (savedExclusive ? "독점 (Exclusive)" : "공유 (Shared)")
+                << (isLaptop_ ? "[노트북 기본: 공유]" : "[데스크톱 기본: 독점]");
     }
     // 패스스루: 돌비 애트모스/DTS:X 원본 비트스트림 리시버로 전송
     // (독점 모드에서만 실질적으로 동작)
@@ -944,11 +950,20 @@ void MpvCore::setMotionSmoothing(bool enabled) {
     if (!initialized_) return;
     if (enabled) {
         // 프레임 보간 활성화: oversample 방식 (가장 안정적, 아티팩트 없음)
-        // video-sync=display-resample 이 필요하지만 audio sync를 깨뜨리지 않도록
-        // interpolation만 켜고 tscale은 oversample(부드러운 보간) 사용
         mpv_set_property_string(mpv_, "interpolation", "yes");
         mpv_set_property_string(mpv_, "tscale", "oversample");
-        mpv_set_property_string(mpv_, "video-sync", "display-resample");
+        // ── 노트북 환경: display-resample 금지 ──────────────────────
+        // mpv GitHub #15196: Windows 11 24H2 + NVIDIA Optimus에서
+        // display-resample이 주기적 끊김을 유발함 (WDDM 3.2 호환성 문제)
+        // 노트북에서는 interpolation+tscale만 활성화하고 video-sync는 audio 유지
+        if (!isLaptop_) {
+            mpv_set_property_string(mpv_, "video-sync", "display-resample");
+        } else {
+            // 노트북: display-resample 대신 audio 유지 (끊김 방지)
+            // interpolation=yes + video-sync=audio 조합으로 보간 효과는 유지
+            mpv_set_property_string(mpv_, "video-sync", "audio");
+            qInfo() << "[MPV] 모션 스무딩: 노트북 → display-resample 차단, audio 유지";
+        }
     } else {
         // 모션 스무딩 비활성화: 원래 audio sync 모드로 복원
         mpv_set_property_string(mpv_, "interpolation", "no");
@@ -1070,7 +1085,10 @@ void MpvCore::applyVideoSyncByFps(double fps) {
     mpv_free(interpVal);
 
     if (motionSmoothingOn) {
-        qInfo() << "[MPV] video-sync: 모션 스무딩 활성화 → display-resample 유지";
+        // 노트북에서는 display-resample이 이미 차단되어 있으므로 안전하게 return
+        // 데스크톱에서는 display-resample을 유지하여 모션 스무딩 효과 보장
+        qInfo() << "[MPV] video-sync: 모션 스무딩 활성화 →"
+                << (isLaptop_ ? "audio 유지 (노트북)" : "display-resample 유지");
         return;
     }
 

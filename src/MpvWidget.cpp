@@ -293,14 +293,14 @@ void MpvWidget::onUpdate(void* ctx) {
 
 void MpvWidget::maybeUpdate() {
     if (!renderCtx_) return;
-    if (window()->isMinimized()) {
-        makeCurrent();
-        paintGL();
-        context()->swapBuffers(context()->surface());
-        doneCurrent();
-    } else {
-        update();
-    }
+    // 최소화 시 렌더링 완전 중단
+    // 이전 코드: isMinimized() 시 makeCurrent()+paintGL()+swapBuffers() 직접 호용
+    // 문제: Qt 콤포지팅 파이프라인을 우회하여 Optimus 환경에서
+    //   Intel GPU 디스플레이 버퍼에 잘못 렌더링하는 문제 발생 가능
+    // 해결: 최소화 시 MPV에게 렌더링 완전 중단
+    //   MPV는 렌더링 콜백이 없으면 자체적으로 대기
+    if (window()->isMinimized()) return;
+    update();
 }
 
 void MpvWidget::setAiSubtitle(const QString& text, int confidence) {

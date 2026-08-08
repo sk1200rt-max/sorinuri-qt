@@ -1300,6 +1300,32 @@ bool MainWindow::nativeEvent(const QByteArray& type, void* msg, qintptr* result)
     if (type == "windows_generic_MSG") {
         MSG* m = static_cast<MSG*>(msg);
 
+        // ── 절전/화면 잠금 후 복교 시 OpenGL 콘텍스트 갱신 ─────────────
+        // Windows Modern Standby 복교 시 D3D11/OpenGL 콘텍스트가 무효화될 수 있음
+        // PBT_APMRESUMESUSPEND: 절전 복교 (S3 Sleep 후 재개)
+        // PBT_APMRESUMEAUTOMATIC: 자동 절전 복교 (Modern Standby)
+        // PBT_APMRESUMECRITICAL: 임계 전원 복교
+        if (m->message == WM_POWERBROADCAST) {
+            if (m->wParam == PBT_APMRESUMESUSPEND ||
+                m->wParam == PBT_APMRESUMEAUTOMATIC ||
+                m->wParam == PBT_APMRESUMECRITICAL) {
+                qInfo() << "[MainWindow] 절전 복교 감지 → 렌더링 콘텍스트 갱신";
+                // 500ms 지연 후 갱신: 드라이버가 콘텍스트를 완전히 복원할 시간 확보
+                QTimer::singleShot(500, this, [this]() {
+                    if (mpvWidget_) {
+                        // Qt에게 위젯 재렌더링 요청
+                        mpvWidget_->update();
+                        // 스크린 변경 시간 주었으므로 GPU 설정 재감지
+                        mpvWidget_->core()->redetectGpuAndApply();
+                        qInfo() << "[MainWindow] 절전 복교 후 렌더링 재시작 완료";
+                    }
+                });
+            }
+            // WM_POWERBROADCAST는 반드시 TRUE를 반환해야 함 (Qt 포럼 참고)
+            *result = TRUE;
+            return true;
+        }
+
         // Alt+F4: FramelessWindowHint이 시스템 메시지를 막으므로 직접 처리
         if (m->message == WM_SYSKEYDOWN && m->wParam == VK_F4) {
             close();
@@ -1861,10 +1887,15 @@ void MainWindow::loadSettings() {
     int vol = settings_.value("audio/volume", 100).toInt();
     mpvWidget_->core()->setVolume(vol);
     controlBar_->setVolume(vol);
-    // audio-exclusive 및 passthrough: 기본값 true (Exclusive 모드 기본)
+    // audio-exclusive: 노트북 기본값 false (공유 모드), 데스크톱 기본값 true (독점 모드)
+    // 노트북 내장 스피커는 WASAPI 독점 모드를 지원하지 않는 경우가 많음
     // 실패 시 audio-fallback-to-null으로 영상 재생 보장
-    if (settings_.value("audio/exclusive", true).toBool())
-        mpvWidget_->core()->setAudioExclusive(true);
+    {
+        const bool isLaptop = mpvWidget_->core()->isLaptop();
+        const bool defaultExclusive = !isLaptop;  // 데스크톱=true, 노트북=false
+        if (settings_.value("audio/exclusive", defaultExclusive).toBool())
+            mpvWidget_->core()->setAudioExclusive(true);
+    }
     if (settings_.value("audio/passthrough", true).toBool()) {
         QStringList codecs;
         if (settings_.value("audio/pt_ac3",    true).toBool()) codecs << "ac3";

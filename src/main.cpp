@@ -93,7 +93,7 @@ int main(int argc, char* argv[])
     QApplication app(argc, argv);
     app.setApplicationName("Sorinuri");
     app.setApplicationDisplayName("소리누리");
-    app.setApplicationVersion("6.11.8");
+    app.setApplicationVersion("6.11.9");
     app.setOrganizationName("Sorinuri");
     app.setWindowIcon(QIcon(":/icons/sorinuri.ico"));
 
@@ -156,14 +156,19 @@ int main(int argc, char* argv[])
     ipcServer.listen(IPC_SERVER_NAME);
     QObject::connect(&ipcServer, &QLocalServer::newConnection, [&]() {
         QLocalSocket* client = ipcServer.nextPendingConnection();
-        QObject::connect(client, &QLocalSocket::readyRead, [&window, client]() {
-            QByteArray buf = client->readAll();
-            if (buf.size() < 4) return;
-            QDataStream ps(buf);
+        // 누적 버퍼: readyRead가 여러 번 호출될 수 있음 (분할 수신 처리)
+        // 헤더(4바이트 길이) + 데이터 전체가 도착할 때까지 누적
+        QByteArray* accumBuf = new QByteArray();
+        QObject::connect(client, &QLocalSocket::readyRead, [&window, client, accumBuf]() {
+            accumBuf->append(client->readAll());
+            // 헤더(4바이트) 수신 대기
+            if (accumBuf->size() < 4) return;
+            QDataStream ps(*accumBuf);
             quint32 len = 0;
             ps >> len;
-            if ((quint32)buf.size() < 4 + len) return;
-            QByteArray data = buf.mid(4, len);
+            // 전체 패킷이 도착할 때까지 대기
+            if ((quint32)accumBuf->size() < 4 + len) return;
+            QByteArray data = accumBuf->mid(4, len);
             QDataStream ds(data);
             QStringList files;
             ds >> files;
@@ -173,6 +178,11 @@ int main(int argc, char* argv[])
                 window.activateWindow();
                 window.openFiles(files);
             }
+            delete accumBuf;
+            client->deleteLater();
+        });
+        QObject::connect(client, &QLocalSocket::disconnected, [client, accumBuf]() {
+            delete accumBuf;
             client->deleteLater();
         });
     });

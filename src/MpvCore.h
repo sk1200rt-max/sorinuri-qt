@@ -109,6 +109,8 @@ public:
 
     // MPV 초기화 완료 여부 (MpvWidget::isMpvInitialized()에서 사용)
     bool isInitialized() const { return initialized_; }
+    // 노트북 여부 (WASAPI 기본값, display-resample 차단 등에 사용)
+    bool isLaptop() const { return isLaptop_; }
 
     // 속성 직접 설정
     void     setProperty(const QString& name, const QVariant& value);

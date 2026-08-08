@@ -266,8 +266,8 @@ void MediaInfoOverlay::updateAudioInfo(const QString& codec, int channels,
     audioOutput_->setStyleSheet(QString("color:%1;font-size:11px;font-weight:600;background:transparent;")
                                  .arg(isPassthrough ? TEAL : TEXT_MAIN));
 
-    QSettings s("가온미디어", "소리누리");
-    bool exclusive = s.value("audio/exclusive", true).toBool();
+    QSettings s("Sorinuri", "SorinuriPlayer");
+    bool exclusive = s.value("audio/exclusive", false).toBool();  // 기본값 false: 노트북 공유 모드 일치
     audioWasapi_->setText(exclusive ? "독점" : "공유");
     audioWasapi_->setStyleSheet(QString("color:%1;font-size:11px;font-weight:600;background:transparent;")
                                  .arg(exclusive ? TEAL : TEXT_DIM));
