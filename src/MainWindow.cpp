@@ -1002,6 +1002,47 @@ void MainWindow::dropEvent(QDropEvent* e) {
 
 void MainWindow::keyPressEvent(QKeyEvent* e) {
     auto* core = mpvWidget_->core();
+
+    // ── 단축키 커스터마이징 실시간 적용 ──────────────────────────────────────
+    // ShortcutConfigWidget에 저장된 커스텀 단축키가 있으면 우선 처리
+    if (shortcutConfigWidget_) {
+        QKeySequence pressed(static_cast<int>(e->modifiers()) | e->key());
+        // 커스텀 단축키 매핑 처리
+        const auto& entries = shortcutConfigWidget_->entries();
+        for (const auto& entry : entries) {
+            QKeySequence activeKey = entry.customKey.isEmpty() ? entry.defaultKey : entry.customKey;
+            if (activeKey == pressed) {
+                // 커스텀 단축키가 기본 단축키와 다른 경우에만 여기서 처리
+                if (!entry.customKey.isEmpty() && entry.customKey != entry.defaultKey) {
+                    // 커스텀 단축키로 매핑된 기능 실행
+                    if      (entry.id == "play_pause")   core->togglePause();
+                    else if (entry.id == "seek_back5")   { core->seek(-5, true); if (osdWidget_) osdWidget_->showSeek(core->position(), totalDuration_); }
+                    else if (entry.id == "seek_fwd5")    { core->seek(5, true);  if (osdWidget_) osdWidget_->showSeek(core->position(), totalDuration_); }
+                    else if (entry.id == "seek_back60")  { core->seek(-60, true); if (osdWidget_) osdWidget_->showSeek(core->position(), totalDuration_); }
+                    else if (entry.id == "seek_fwd60")   { core->seek(60, true);  if (osdWidget_) osdWidget_->showSeek(core->position(), totalDuration_); }
+                    else if (entry.id == "vol_up")       { core->setVolume(qMin(core->volume()+5, 200)); if (osdWidget_) osdWidget_->showVolume(core->volume(), false); }
+                    else if (entry.id == "vol_down")     { core->setVolume(qMax(core->volume()-5, 0));   if (osdWidget_) osdWidget_->showVolume(core->volume(), false); }
+                    else if (entry.id == "fullscreen")   toggleFullscreen();
+                    else if (entry.id == "mute")         core->setMuted(!core->getProperty("mute").toBool());
+                    else if (entry.id == "media_info")   mediaInfoOverlay_->toggle();
+                    else if (entry.id == "pro_panel")    toggleProFeatures();
+                    else if (entry.id == "screenshot")   { core->command({"screenshot", "video"}); if (osdWidget_) osdWidget_->showInfo("화면 캡처 저장"); }
+                    else if (entry.id == "open_file")    onOpenFile();
+                    else if (entry.id == "open_url")     onOpenUrl();
+                    else if (entry.id == "settings")     onSettingsRequested();
+                    else if (entry.id == "shortcut_help") shortcutOverlay_->toggle();
+                    else if (entry.id == "playlist_prev") core->command({"playlist-prev"});
+                    else if (entry.id == "playlist_next") core->command({"playlist-next"});
+                    else if (entry.id == "speed_up")     { core->command({"add", "speed", "0.1"}); if (osdWidget_) osdWidget_->showSpeed(core->getProperty("speed").toDouble()); }
+                    else if (entry.id == "speed_down")   { core->command({"add", "speed", "-0.1"}); if (osdWidget_) osdWidget_->showSpeed(core->getProperty("speed").toDouble()); }
+                    else if (entry.id == "screen_record") { if (screenRecorder_) screenRecorder_->toggleRecording(); }
+                    e->accept();
+                    return;
+                }
+            }
+        }
+    }
+
     switch (e->key()) {
     case Qt::Key_Space:  core->togglePause(); break;
     case Qt::Key_Return:

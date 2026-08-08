@@ -274,6 +274,24 @@ jobs:
             Write-Host "yt-dlp 다운로드 실패 (선택적 기능): $_"
           }
 
+          # ffmpeg 다운로드 (화면 녹화 기능용)
+          Write-Host "ffmpeg 다운로드 중..."
+          try {
+            # ffmpeg 최신 Windows 빌드 (gyan.dev 공식 빌드)
+            $ffmpegUrl = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
+            Invoke-WebRequest -Uri $ffmpegUrl -OutFile "ffmpeg-build.zip" -TimeoutSec 180
+            Expand-Archive -Path "ffmpeg-build.zip" -DestinationPath "ffmpeg-extract" -Force
+            $ffmpegExe = Get-ChildItem -Path "ffmpeg-extract" -Filter "ffmpeg.exe" -Recurse | Select-Object -First 1
+            if ($ffmpegExe) {
+              Copy-Item $ffmpegExe.FullName "dist/Sorinuri-Portable/ffmpeg.exe"
+              Copy-Item $ffmpegExe.FullName "dist/ffmpeg.exe"
+              Write-Host "ffmpeg 다운로드 완료: $([math]::Round((Get-Item dist/Sorinuri-Portable/ffmpeg.exe).Length/1MB,1)) MB"
+            }
+            Remove-Item "ffmpeg-build.zip", "ffmpeg-extract" -Recurse -Force -ErrorAction SilentlyContinue
+          } catch {
+            Write-Host "ffmpeg 다운로드 실패 (선택적 기능): $_"
+          }
+
           # 디버그 배치 파일
           if (Test-Path "소리누리-디버그.bat") {
             Copy-Item "소리누리-디버그.bat" dist/Sorinuri-Portable/
@@ -382,7 +400,7 @@ jobs:
 
       - name: Generate version-staging.json
         env:
-          APP_VERSION: "6.15.0"
+          APP_VERSION: "6.16.0"
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
         run: python3 scripts/make_version_json.py "$APP_VERSION" "$DEPLOY_HOST" staging
 
@@ -392,7 +410,7 @@ jobs:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
-          APP_VERSION: "6.15.0"
+          APP_VERSION: "6.16.0"
         run: |
           if [ -z "$SSH_KEY" ] || [ -z "$DEPLOY_HOST" ]; then
             echo "배포 Secrets 미설정 - 건너뜀"

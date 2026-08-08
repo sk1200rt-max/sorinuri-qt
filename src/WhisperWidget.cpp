@@ -26,6 +26,13 @@
 #include <QPainterPath>
 #include <QMouseEvent>
 #include <QTimer>
+#include <QNetworkRequest>
+#include <QNetworkReply>
+#include <QNetworkAccessManager>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
+#include <QSettings>
 #include <QRandomGenerator>
 #include <QFont>
 #include <QFrame>
@@ -546,6 +553,40 @@ void WhisperWidget::buildHistoryTab(QWidget* parent) {
     rowActions->addWidget(btnCopy);
     root->addLayout(rowActions);
 
+    // ── 자동 번역 행 ──────────────────────────────────────────────────────
+    auto* rowTranslate = new QHBoxLayout;
+    rowTranslate->setSpacing(6);
+    auto* lblTranslateTo = new QLabel("번역 언어:", parent);
+    lblTranslateTo->setStyleSheet("color:#888; font-size:11px;");
+    lblTranslateTo->setFixedWidth(60);
+    cmbTranslateTo_ = new QComboBox(parent);
+    cmbTranslateTo_->addItem("한국어", "ko");
+    cmbTranslateTo_->addItem("English", "en");
+    cmbTranslateTo_->addItem("日本語", "ja");
+    cmbTranslateTo_->addItem("中文", "zh");
+    cmbTranslateTo_->addItem("Español", "es");
+    cmbTranslateTo_->addItem("Français", "fr");
+    cmbTranslateTo_->addItem("Deutsch", "de");
+    cmbTranslateTo_->setStyleSheet(
+        "QComboBox{background:#1e1e1e;border:1px solid #333;border-radius:3px;padding:3px 6px;color:#ccc;font-size:11px;}"
+        "QComboBox::drop-down{border:none;}"
+        "QComboBox QAbstractItemView{background:#1e1e1e;color:#ccc;}");
+    btnTranslate_ = new QPushButton("🌐 자동 번역");
+    btnTranslate_->setObjectName("actionBtn");
+    btnTranslate_->setStyleSheet(
+        "QPushButton#actionBtn{background:#1a3a5c;color:#4fc3f7;border:1px solid #4fc3f7;"
+        "border-radius:3px;padding:4px 12px;font-size:11px;}"
+        "QPushButton#actionBtn:hover{background:#1e4a6e;}"
+        "QPushButton#actionBtn:disabled{background:#1a1a1a;color:#444;border-color:#333;}");
+    auto* lblTranslateNote = new QLabel("LibreTranslate API 사용", parent);
+    lblTranslateNote->setStyleSheet("color:#444; font-size:10px;");
+    rowTranslate->addWidget(lblTranslateTo);
+    rowTranslate->addWidget(cmbTranslateTo_);
+    rowTranslate->addWidget(btnTranslate_);
+    rowTranslate->addWidget(lblTranslateNote);
+    rowTranslate->addStretch();
+    root->addLayout(rowTranslate);
+
     // 시그널 연결
     connect(editSearch_, &QLineEdit::textChanged, this, &WhisperWidget::onSearchChanged);
     connect(btnFilterAll_,  &QPushButton::clicked, this, [this](){ btnFilterAll_->setChecked(true); btnFilterHigh_->setChecked(false); btnFilterLow_->setChecked(false); onFilterChanged(0); });
@@ -553,6 +594,7 @@ void WhisperWidget::buildHistoryTab(QWidget* parent) {
     connect(btnFilterLow_,  &QPushButton::clicked, this, [this](){ btnFilterAll_->setChecked(false); btnFilterHigh_->setChecked(false); btnFilterLow_->setChecked(true); onFilterChanged(2); });
     connect(btnSRT,  &QPushButton::clicked, this, &WhisperWidget::exportSRT);
     connect(btnCopy, &QPushButton::clicked, this, &WhisperWidget::copyAll);
+    connect(btnTranslate_, &QPushButton::clicked, this, &WhisperWidget::translateSRT);
     connect(lstHistory_, &QListWidget::itemDoubleClicked, this, [this](QListWidgetItem* item){
         int idx = lstHistory_->row(item);
         if (idx >= 0 && idx < entries_.size())
@@ -766,6 +808,110 @@ void WhisperWidget::exportSRT() {
     f.close();
     QMessageBox::information(this, "SRT 내보내기 완료",
         QString("%1개 자막 항목을 저장했습니다:\n").arg(sorted.size()) + srtPath);
+}
+
+
+// ── 자막 자동 번역 (LibreTranslate API) ──────────────────────────────────────
+void WhisperWidget::translateSRT() {
+    if (entries_.isEmpty()) {
+        QMessageBox::information(this, "자동 번역", "번역할 자막 데이터가 없습니다.");
+        return;
+    }
+    if (!translateNam_) translateNam_ = new QNetworkAccessManager(this);
+
+    // LibreTranslate 공개 인스턴스 (API 키 불필요)
+    // 설정에서 커스텀 URL/키 지원
+    QSettings s("GaonCommunication", "Sorinuri");
+    translateApiUrl_ = s.value("whisper/translateApiUrl",
+        "https://libretranslate.com/translate").toString();
+    translateApiKey_ = s.value("whisper/translateApiKey", "").toString();
+
+    QString targetLang = cmbTranslateTo_ ? cmbTranslateTo_->currentData().toString() : "ko";
+
+    if (btnTranslate_) {
+        btnTranslate_->setEnabled(false);
+        btnTranslate_->setText("번역 중...");
+    }
+
+    // 모든 자막 텍스트를 하나의 배열로 묶어 일괄 번역 요청
+    // LibreTranslate는 단일 텍스트만 지원하므로 줄바꿈으로 구분하여 전송
+    QStringList texts;
+    for (const auto& e : entries_) texts << e.text;
+    QString combined = texts.join("
+---SPLIT---
+");
+
+    QJsonObject body;
+    body["q"] = combined;
+    body["source"] = "auto";
+    body["target"] = targetLang;
+    body["format"] = "text";
+    if (!translateApiKey_.isEmpty()) body["api_key"] = translateApiKey_;
+
+    QNetworkRequest req(QUrl(translateApiUrl_));
+    req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+
+    auto* reply = translateNam_->post(req, QJsonDocument(body).toJson());
+    connect(reply, &QNetworkReply::finished, this, [this, reply, targetLang]() {
+        reply->deleteLater();
+        if (btnTranslate_) {
+            btnTranslate_->setEnabled(true);
+            btnTranslate_->setText("🌐 자동 번역");
+        }
+        if (reply->error() != QNetworkReply::NoError) {
+            QMessageBox::warning(this, "번역 실패",
+                "번역 API 오류: " + reply->errorString() +
+                "\n\nLibreTranslate 서버에 접속할 수 없습니다.\n"
+                "설정에서 API URL을 확인하거나 나중에 다시 시도하세요.");
+            return;
+        }
+        QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+        if (!doc.isObject() || !doc.object().contains("translatedText")) {
+            QMessageBox::warning(this, "번역 실패", "번역 결과를 파싱할 수 없습니다.");
+            return;
+        }
+        QString translated = doc.object()["translatedText"].toString();
+        QStringList parts = translated.split("---SPLIT---");
+
+        // 번역 결과를 entries_에 적용
+        translatedEntries_ = entries_;
+        for (int i = 0; i < parts.size() && i < translatedEntries_.size(); ++i) {
+            translatedEntries_[i].text = parts[i].trimmed();
+        }
+
+        // 번역된 SRT 저장
+        QString defaultPath = mediaPath_.isEmpty() ? ""
+            : QFileInfo(mediaPath_).dir().filePath(
+                QFileInfo(mediaPath_).baseName() + "_" + targetLang + ".srt");
+        QString srtPath = QFileDialog::getSaveFileName(
+            this, "번역된 SRT 저장", defaultPath, "SRT 자막 (*.srt)");
+        if (srtPath.isEmpty()) return;
+
+        QFile f(srtPath);
+        if (!f.open(QIODevice::WriteOnly | QIODevice::Text)) {
+            QMessageBox::warning(this, "저장 실패", "파일을 저장할 수 없습니다.");
+            return;
+        }
+        QTextStream out(&f);
+        out.setEncoding(QStringConverter::Utf8);
+        for (int i = 0; i < translatedEntries_.size(); ++i) {
+            const auto& e = translatedEntries_[i];
+            out << (i+1) << "\n";
+            out << toSrtTime(e.startSec) << " --> " << toSrtTime(e.endSec) << "\n";
+            out << e.text << "\n\n";
+        }
+        f.close();
+        QMessageBox::information(this, "번역 완료",
+            QString("%1개 자막을 %2로 번역하여 저장했습니다:\n").arg(translatedEntries_.size()).arg(targetLang) + srtPath);
+    });
+}
+
+void WhisperWidget::applyTranslation(const QJsonArray& /*translations*/) {
+    // 향후 확장용 (현재는 translateSRT에서 직접 처리)
+}
+
+QString WhisperWidget::toSrtTime(double sec) const {
+    return ::toSrtTime(sec);  // static 함수 호출
 }
 
 void WhisperWidget::copyAll() {

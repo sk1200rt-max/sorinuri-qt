@@ -375,7 +375,48 @@ void MusicWidget::setupUI(){
     };
     btnShowLyrics_=makeTabBtn("가사");btnShowEq_=makeTabBtn("EQ");btnShowPlaylist_=makeTabBtn("재생목록");
     btnShowLyrics_->setChecked(true);
-    tabRow->addWidget(btnShowLyrics_);tabRow->addWidget(btnShowEq_);tabRow->addWidget(btnShowPlaylist_);tabRow->addStretch();
+    tabRow->addWidget(btnShowLyrics_);tabRow->addWidget(btnShowEq_);tabRow->addWidget(btnShowPlaylist_);
+    tabRow->addStretch();
+    // ── LRC 싱크 오프셋 +/- 버튼 ────────────────────────────────────────
+    auto* lblOffset = new QLabel("싱크:", this);
+    lblOffset->setStyleSheet("color:#555; font-size:10px;");
+    auto makeSyncBtn = [this](const QString& text) -> QPushButton* {
+        auto* btn = new QPushButton(text, this);
+        btn->setFixedSize(22, 22);
+        btn->setStyleSheet(
+            "QPushButton{background:#1e1e1e;color:#888;border:1px solid #333;"
+            "border-radius:3px;font-size:10px;font-weight:700;padding:0;}"
+            "QPushButton:hover{background:#2a2a2a;color:#00c8b4;border-color:#00c8b4;}"
+        );
+        btn->setFocusPolicy(Qt::NoFocus);
+        return btn;
+    };
+    auto* btnSyncMinus = makeSyncBtn("-");
+    auto* btnSyncPlus  = makeSyncBtn("+");
+    auto* btnSyncReset = makeSyncBtn("↺");
+    btnSyncReset->setToolTip("싱크 오프셋 초기화");
+    tabRow->addWidget(lblOffset);
+    tabRow->addWidget(btnSyncMinus);
+    tabRow->addWidget(btnSyncPlus);
+    tabRow->addWidget(btnSyncReset);
+    // 싱크 오프셋 버튼 연결 (500ms 단위)
+    connect(btnSyncMinus, &QPushButton::clicked, this, [this]() {
+        if (!lyricsWidget_) return;
+        double newOffset = lyricsWidget_->syncOffset() - 500.0;
+        lyricsWidget_->setSyncOffset(newOffset);
+        lyricsWidget_->saveSyncOffset(currentMeta_.filePath);
+    });
+    connect(btnSyncPlus, &QPushButton::clicked, this, [this]() {
+        if (!lyricsWidget_) return;
+        double newOffset = lyricsWidget_->syncOffset() + 500.0;
+        lyricsWidget_->setSyncOffset(newOffset);
+        lyricsWidget_->saveSyncOffset(currentMeta_.filePath);
+    });
+    connect(btnSyncReset, &QPushButton::clicked, this, [this]() {
+        if (!lyricsWidget_) return;
+        lyricsWidget_->setSyncOffset(0.0);
+        lyricsWidget_->saveSyncOffset(currentMeta_.filePath);
+    });
     rightPanel->addLayout(tabRow);
     rightStack_=new QStackedWidget(this);rightStack_->setStyleSheet("background:#141414;border-radius:8px;");
     lyricsWidget_=new LyricsWidget(this);eqPanel_=new EqPanel(this);playlistPanel_=new PlaylistPanel(this);
@@ -592,11 +633,15 @@ void MusicWidget::loadMeta(const MusicMeta& meta){
         .arg(rateBadge_->text()).arg(bitBadge_->text());
     if(meta.hasReplayGain) status+=QString("  ·  ReplayGain: %1dB").arg(meta.replayGain,0,'f',1);
     statusBar_->setText(status);
-    if(lyricsWidget_) lyricsWidget_->loadForTrack(
-        meta.title, meta.artist, meta.filePath,
-        duration_,
-        meta.album
-    );
+    if(lyricsWidget_) {
+        // 파일별 싱크 오프셋 자동 불러오기
+        lyricsWidget_->loadSyncOffset(meta.filePath);
+        lyricsWidget_->loadForTrack(
+            meta.title, meta.artist, meta.filePath,
+            duration_,
+            meta.album
+        );
+    }
     update();
 }
 

@@ -15,7 +15,7 @@ public:
     // 현재 앱 버전
     // ⚠️ 주의: CMakeLists.txt의 MyAppVersion 및 워크플로우의 APP_VERSION과 반드시 일치해야 함
     // 버전 업데이트 시 세 곳 모두 수정 필수
-    static QString currentVersion() { return "6.15.0"; }
+    static QString currentVersion() { return "6.16.0"; }
 
     // 버전 체크 시작 (비동기, 앱 시작 후 3초 지연)
     void checkForUpdates();

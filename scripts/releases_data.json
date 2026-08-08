@@ -1,5 +1,14 @@
 [
   {
+    "version": "6.16.0",
+    "date": "2026-08-08",
+    "title": "SMTC 앨범아트 썸네일 · SMTC 타임라인 · 자막 자동 번역 · 단축키 실시간 적용 · LRC 싱크 오프셋 UI · ffmpeg 번들",
+    "desc": "SMTC 앨범아트 썸네일 (임시 파일 경유 방식), ISystemMediaTransportControls2 타임라인, LibreTranslate 자막 자동 번역 API, 단축키 커스터마이징 실시간 적용, LRC 가사 싱크 오프셋 +/- 버튼, 화면 녹화 ffmpeg 자동 번들",
+    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.16.0.exe",
+    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.16.0-Portable.zip",
+    "tags": []
+  },
+  {
     "version": "6.15.0",
     "date": "2026-08-08",
     "title": "단축키 커스터마이징 · 화면 녹화 · LRC 싱크 오프셋 · Dolby Vision · Anime4K 셰이더",

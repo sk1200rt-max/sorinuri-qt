@@ -4,6 +4,8 @@
 #include <QTimer>
 #include <QStringList>
 #include <QVector>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
 
 class QLabel;
 class QComboBox;
@@ -102,6 +104,7 @@ private slots:
     void onFilterChanged(int filter);   // 0=all, 1=high, 2=low
     void exportSRT();
     void copyAll();
+    void translateSRT();  // 자동 번역 API 호출
 
 private:
     void buildUI();
@@ -160,4 +163,13 @@ private:
     double          mediaDuration_  = 0.0;
     QTimer*         elapsedTimer_   = nullptr;
     int             elapsedSec_     = 0;
+    // 자동 번역
+    QNetworkAccessManager* translateNam_ = nullptr;
+    QPushButton*    btnTranslate_   = nullptr;
+    QComboBox*      cmbTranslateTo_ = nullptr;
+    QVector<SubtitleEntry> translatedEntries_;
+    QString         translateApiUrl_;  // LibreTranslate API URL
+    QString         translateApiKey_;  // 선택적 API 키
+    void            applyTranslation(const QJsonArray& translations);
+    QString         toSrtTime(double sec) const;
 };

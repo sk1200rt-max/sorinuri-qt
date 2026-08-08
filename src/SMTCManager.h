@@ -56,8 +56,9 @@ private:
     bool    initialized_ = false;
     void*   smtcPtr_     = nullptr;  // ISystemMediaTransportControls* (void*로 헤더 의존성 제거)
     QTimer* timelineTimer_ = nullptr;
-    double  currentPos_  = 0.0;
-    double  currentDur_  = 0.0;
+    double  currentPos_       = 0.0;
+    double  currentDur_       = 0.0;
+    QString albumArtTempPath_;  // 임시 앉범아트 파일 경로
 
     void cleanup();
 };
