@@ -2,10 +2,11 @@
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QGridLayout>
+#include <QGroupBox>
+#include <QCheckBox>
 #include <QLabel>
 #include <QPushButton>
 #include <QComboBox>
-#include <QCheckBox>
 #include <QLineEdit>
 #include <QFileDialog>
 #include <QMessageBox>

@@ -8,6 +8,8 @@ class QPushButton;
 class QComboBox;
 class QSpinBox;
 class QLineEdit;
+class QCheckBox;
+class QGroupBox;
 
 /**
  * ScreenRecorder - 화면 녹화 위젯
