@@ -848,8 +848,10 @@ void WhisperWidget::translateSRT() {
 
     QNetworkRequest req(QUrl(translateApiUrl_));
     req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    req.setHeader(QNetworkRequest::UserAgentHeader, "Sorinuri/6.16.0");
 
-    auto* reply = translateNam_->post(req, QJsonDocument(body).toJson());
+    QByteArray postData = QJsonDocument(body).toJson(QJsonDocument::Compact);
+    auto* reply = translateNam_->post(req, postData);
     connect(reply, &QNetworkReply::finished, this, [this, reply, targetLang]() {
         reply->deleteLater();
         if (btnTranslate_) {
