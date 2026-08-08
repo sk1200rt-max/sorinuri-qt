@@ -40,6 +40,10 @@ protected:
 
 private slots:
     void maybeUpdate();
+    // Qt6 공식 권장: OpenGL 컨텍스트 파괴 시 renderCtx_ 안전 해제
+    // 절전 복귀, 외부 모니터 연결/해제, reparent 시 컨텍스트가 파괴될 수 있음
+    // aboutToBeDestroyed 시그널에 연결하여 리소스 정리
+    void onContextAboutToBeDestroyed();
 
 private:
     static void onUpdate(void* ctx);

@@ -1307,23 +1307,33 @@ bool MainWindow::nativeEvent(const QByteArray& type, void* msg, qintptr* result)
         // PBT_APMRESUMESUSPEND: 절전 복교 (S3 Sleep 후 재개)
         // PBT_APMRESUMEAUTOMATIC: 자동 절전 복교 (Modern Standby)
         // PBT_APMRESUMECRITICAL: 임계 전원 복교
+        // ── 전원 이벤트 통합 처리 (WM_POWERBROADCAST) ───────────────────────
+        // 주의: WM_POWERBROADCAST는 반드시 TRUE 반환해야 함 (Windows 문서)
+        // 배터리 모드 전환(PBT_APMPOWERSTATUSCHANGE)과 절전 복귀를
+        // 하나의 if 블록에서 모두 처리하여 early-return 충돌 방지
         if (m->message == WM_POWERBROADCAST) {
+            // ─ 절전 복귀: 렌더링 컨텍스트 갱신 ─────────────────────────────
             if (m->wParam == PBT_APMRESUMESUSPEND ||
                 m->wParam == PBT_APMRESUMEAUTOMATIC ||
                 m->wParam == PBT_APMRESUMECRITICAL) {
-                qInfo() << "[MainWindow] 절전 복교 감지 → 렌더링 콘텍스트 갱신";
-                // 500ms 지연 후 갱신: 드라이버가 콘텍스트를 완전히 복원할 시간 확보
+                qInfo() << "[MainWindow] 절전 복귀 감지 → 렌더링 컨텍스트 갱신 예약";
+                // 500ms 지연: 드라이버가 컨텍스트를 완전히 복원할 시간 확보
                 QTimer::singleShot(500, this, [this]() {
                     if (mpvWidget_) {
-                        // Qt에게 위젯 재렌더링 요청
                         mpvWidget_->update();
-                        // 스크린 변경 시간 주었으므로 GPU 설정 재감지
                         mpvWidget_->core()->redetectGpuAndApply();
-                        qInfo() << "[MainWindow] 절전 복교 후 렌더링 재시작 완료";
+                        qInfo() << "[MainWindow] 절전 복귀 후 렌더링 재시작 완료";
                     }
                 });
             }
-            // WM_POWERBROADCAST는 반드시 TRUE를 반환해야 함 (Qt 포럼 참고)
+            // ─ 배터리 모드 전환: 타이머 해상도 유지 ─────────────────────────
+            // Windows 10 2004+: 배터리 모드 전환 시 타이머 해상도가 낮아질 수 있음
+            // timeBeginPeriod(1) 재호출로 1ms 해상도 강제 유지 → 프레임 타이밍 안정화
+            if (m->wParam == PBT_APMPOWERSTATUSCHANGE) {
+                qInfo() << "[MainWindow] 전원 상태 변경 감지 → 타이머 해상도 재설정";
+                timeBeginPeriod(1);
+            }
+            // WM_POWERBROADCAST는 반드시 TRUE 반환 (Windows 문서 요구사항)
             *result = TRUE;
             return true;
         }
@@ -1361,17 +1371,6 @@ bool MainWindow::nativeEvent(const QByteArray& type, void* msg, qintptr* result)
                     qInfo() << "[MainWindow] 디스플레이 변경 후 렌더링 재초기화 완료";
                 }
             });
-        }
-
-        // ── 배터리 모드 전환 시 타이머 해상도 유지 ──────────────────
-        // PBT_APMPOWERSTATUSCHANGE: 전원 어댑터 연결/해제 (배터리 ↔ AC 전환)
-        // Windows 10 2004+에서 배터리 모드 전환 시 타이머 해상도가 낮아질 수 있음
-        // timeBeginPeriod(1) 재호출로 1ms 해상도 강제 유지 → 프레임 타이밍 안정화
-        if (m->message == WM_POWERBROADCAST &&
-            m->wParam == PBT_APMPOWERSTATUSCHANGE) {
-            qInfo() << "[MainWindow] 전원 상태 변경 감지 → 타이머 해상도 재설정";
-            // timeBeginPeriod는 timeapi.h 필요 (windows.h에 포함됨)
-            timeBeginPeriod(1);
         }
 
         // Alt+F4: FramelessWindowHint이 시스템 메시지를 막으므로 직접 처리

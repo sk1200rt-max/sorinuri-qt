@@ -83,6 +83,11 @@ int main(int argc, char* argv[])
     fmt.setProfile(QSurfaceFormat::CoreProfile);
     fmt.setSwapBehavior(QSurfaceFormat::DoubleBuffer);  // 노트북 통합 GPU 호환성
     fmt.setSwapInterval(1);  // Qt VSync만 사용 (이중 VSync 충돌 방지)
+    // Qt6 공식 권장: depth/stencil 버퍼 명시 요청
+    // depth 24: 일부 Intel GPU에서 depth buffer 미설정 시 depth testing 실패 방지
+    // stencil 8: 스텐슬 버퍼 요청 (클리핑 마스크 등)
+    fmt.setDepthBufferSize(24);
+    fmt.setStencilBufferSize(8);
     QSurfaceFormat::setDefaultFormat(fmt);
 
     // ── Qt 플러그인 경로 고정 (포터블 실행 속도 핵심) ─────────────
@@ -93,7 +98,7 @@ int main(int argc, char* argv[])
     QApplication app(argc, argv);
     app.setApplicationName("Sorinuri");
     app.setApplicationDisplayName("소리누리");
-    app.setApplicationVersion("6.12.0");
+    app.setApplicationVersion("6.13.0");
     app.setOrganizationName("Sorinuri");
     app.setWindowIcon(QIcon(":/icons/sorinuri.ico"));
 

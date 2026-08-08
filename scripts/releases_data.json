@@ -1,5 +1,14 @@
 [
   {
+    "version": "6.13.0",
+    "date": "2026-08-08",
+    "title": "OpenGL 컨텍스트 안전 복구 · depth/stencil 버퍼 · 전원 이벤트 통합 처리",
+    "desc": "Qt6 공식 권장 방식(aboutToBeDestroyed)으로 절전/모니터 전환 시 renderCtx_ 안전 해제 및 자동 재생성, depth/stencil 버퍼 명시 요청으로 Intel GPU depth testing 안정화, WM_POWERBROADCAST 블록 통합으로 배터리 전환 타이머 해상도 유지 버그 수정",
+    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.13.0.exe",
+    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.13.0-Portable.zip",
+    "tags": []
+  },
+  {
     "version": "6.12.0",
     "date": "2026-08-08",
     "title": "오디오 핫플러그 · 외부 모니터 복원 · Intel HEVC 안전 폴백 · 배터리 타이머 안정화",

@@ -60,6 +60,23 @@ MpvWidget::~MpvWidget() {
     doneCurrent();
 }
 
+// ── OpenGL 컨텍스트 파괴 시 renderCtx_ 안전 해제 ───────────────────────────────────
+// Qt6 공식 권장 방식: aboutToBeDestroyed 시그널 핸들러
+// 절전 복귀, 외부 모니터 연결/해제, reparent 시 컨텍스트가 파괴될 수 있음
+// 이 슬롯에서 renderCtx_를 안전하게 해제하면 다음 initializeGL()에서 재생성됨
+void MpvWidget::onContextAboutToBeDestroyed() {
+    qInfo() << "[MpvWidget] OpenGL 컨텍스트 파괴 감지 → renderCtx_ 안전 해제";
+    // makeCurrent()는 이미 컨텍스트가 파괴 중이라 호출 불필요
+    // DirectConnection으로 호출되므로 이미 컨텍스트는 현재이며 유효함
+    if (renderCtx_) {
+        // MPV 렌더 콜백 제거 (파괴된 컨텍스트로 콜백 호출 방지)
+        mpv_render_context_set_update_callback(renderCtx_, nullptr, nullptr);
+        mpv_render_context_free(renderCtx_);
+        renderCtx_ = nullptr;
+        qInfo() << "[MpvWidget] renderCtx_ 해제 완료";
+    }
+}
+
 void MpvWidget::initializeGL() {
     if (!core_->initialize(0)) {
         qCritical() << "[MpvWidget] MPV 초기화 실패";
@@ -82,6 +99,15 @@ void MpvWidget::initializeGL() {
                                            reinterpret_cast<void*>(this));
 
     qInfo() << "[MpvWidget] OpenGL render context 초기화 완료";
+
+    // ── Qt6 공식 권장: OpenGL 컨텍스트 파괴 시 renderCtx_ 안전 해제 ───────────────
+    // 절전/화면 잠금 복귀, 외부 모니터 연결/해제, reparent 시
+    // QOpenGLContext가 파괴되면 renderCtx_는 유효하지 않은 상태가 됨
+    // aboutToBeDestroyed 시그널에 연결하여 renderCtx_ 안전 해제
+    // 참고: https://doc.qt.io/qt-6/qopenglwidget.html#resource-initialization-and-cleanup
+    connect(context(), &QOpenGLContext::aboutToBeDestroyed,
+            this, &MpvWidget::onContextAboutToBeDestroyed,
+            Qt::DirectConnection);  // DirectConnection: 파괴 시점에 동기 호출 보장
 
     // HiDPI 근본 수정: initializeGL() 완료 후 mpvInitialized 시그널 emit
     // → MainWindow가 pendingStartupFiles_를 처리하는 트리거
