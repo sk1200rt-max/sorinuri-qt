@@ -184,9 +184,14 @@ if(WIN32)
         target_compile_definitions(Sorinuri PRIVATE WEBVIEW2_NOT_AVAILABLE)
     endif()
     # WRL (Windows Runtime C++ Template Library) - WebView2 COM 인터페이스용
-    # WindowsApp.lib: SMTC(ISystemMediaTransportControlsInterop) WinRT 인터페이스
-    # RuntimeObject.lib: RoInitialize, RoGetActivationFactory
-    target_link_libraries(Sorinuri PRIVATE ole32 oleaut32 shlwapi winmm RuntimeObject)  # winmm: timeBeginPeriod (타이머 해상도 1ms, 노트북 끊김 방지)
+    # RuntimeObject.lib: RoInitialize, RoGetActivationFactory (SMTC WinRT)
+    # runtimeobject.lib: Windows SDK 이름 (MSVC 소문자)
+    target_link_libraries(Sorinuri PRIVATE ole32 oleaut32 shlwapi winmm runtimeobject)  # winmm: timeBeginPeriod (타이머 해상도 1ms, 노트북 끊김 방지)
+    # SMTC: ISystemMediaTransportControlsInterop 인터페이스 헤더 포함
+    target_compile_definitions(Sorinuri PRIVATE
+        WINVER=0x0A00
+        _WIN32_WINNT=0x0A00
+    )
 endif()
 
 # Windows: DLL 복사

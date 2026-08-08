@@ -1342,11 +1342,11 @@ void MainWindow::toggleProFeatures() {
                 out.setEncoding(QStringConverter::Utf8);
                 out << "\"파일명\",\"전체 경로\",\"재생 횟수\",\"마지막 재생\"\n";
                 for (const auto& [fpath, count, last, key] : entries) {
+                    QString fn   = QFileInfo(fpath).fileName(); fn.replace('"', "''");
+                    QString fp   = fpath;                       fp.replace('"', "''");
+                    QString dt   = last.left(16);               dt.replace('T', ' ');
                     out << QString("\"%1\",\"%2\",%3,\"%4\"\n")
-                           .arg(QFileInfo(fpath).fileName().replace('"', "''"))
-                           .arg(fpath.replace('"', "''"))
-                           .arg(count)
-                           .arg(last.left(16).replace('T', ' '));
+                           .arg(fn).arg(fp).arg(count).arg(dt);
                 }
                 f.close();
             });
@@ -1365,11 +1365,11 @@ void MainWindow::toggleProFeatures() {
                 out << "[\n";
                 for (int i = 0; i < entries.size(); ++i) {
                     const auto& [fpath, count, last, key] = entries[i];
+                    QString fn2  = QFileInfo(fpath).fileName(); fn2.replace('"', "''");
+                    QString fp2  = fpath; fp2.replace('\\', "/"); fp2.replace('"', "''");
+                    QString dt2  = last.left(16); dt2.replace('T', ' ');
                     out << QString("  {\"file\": \"%1\", \"path\": \"%2\", \"count\": %3, \"last_played\": \"%4\"}%5\n")
-                           .arg(QFileInfo(fpath).fileName().replace('"', "''"))
-                           .arg(fpath.replace('\\', "/").replace('"', "''"))
-                           .arg(count)
-                           .arg(last.left(16).replace('T', ' '))
+                           .arg(fn2).arg(fp2).arg(count).arg(dt2)
                            .arg(i < entries.size()-1 ? "," : "");
                 }
                 out << "]\n";
