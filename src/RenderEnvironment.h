@@ -340,11 +340,18 @@ public:
             }
         }
 
-        // H.265/HEVC: GTX 900 이상에서 지원
+        // H.265/HEVC: GPU 세대별 안전 처리
+        // - Intel HD (Haswell~Skylake): HEVC 드라이버 버그로 시스템 프리즈 발생 → 소프트웨어
+        // - Intel Iris/UHD (Kaby Lake+): d3d11va 직접 접근 시 Optimus 충돌 가능 → copy 방식
+        // - NVIDIA/AMD: d3d11va 직접 사용 (안정적)
         if (codecLower.contains("hevc") || codecLower.contains("h265") ||
             codecLower.contains("h.265")) {
             if (tier == GpuTier::Integrated && vendor == GpuVendor::IntelHD) {
-                return "no";  // 구형 Intel HD: HEVC 소프트웨어
+                return "no";  // 구형 Intel HD (Haswell~Skylake): HEVC 소프트웨어 강제
+            }
+            if (tier == GpuTier::Integrated &&
+                (vendor == GpuVendor::IntelIris)) {
+                return "d3d11va-copy";  // Intel Iris/UHD: copy 방식으로 Optimus 충돌 방지
             }
             return "d3d11va";
         }
