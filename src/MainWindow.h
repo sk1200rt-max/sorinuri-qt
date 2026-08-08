@@ -24,6 +24,8 @@
 #include "OttWidget.h"
 #include "ProFeaturesWidget.h"
 #include "ShortcutOverlay.h"
+#include "ShortcutConfigWidget.h"
+#include "ScreenRecorder.h"
 #include "MediaInfoOverlay.h"
 #include "MusicWidget.h"
 #include "HiFiEngine.h"
@@ -165,6 +167,8 @@ private:
     AdManager*            adManager_            = nullptr;  // 광고 관리자
     SplashAdWidget*       splashAdWidget_       = nullptr;  // 시작 화면 광고
     SMTCManager*          smtcManager_          = nullptr;  // Windows 잠금 화면 미디어 컨트롤
+    ShortcutConfigWidget* shortcutConfigWidget_  = nullptr;  // 단축키 커스터마이징 UI
+    ScreenRecorder*       screenRecorder_        = nullptr;  // 화면 녹화
 
     // 멀티체널 안내 상태 (파일당 한 번만 표시)
     bool   multichannelPromptShown_ = false;

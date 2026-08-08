@@ -88,4 +88,15 @@ private:
 
     // 검색 단계 추적 (1=signature, 2=search fallback)
     int               searchStep_         = 0;
+
+    // 싱크 오프셋 (밀리초 단위, 양수=늦게, 음수=일직 표시)
+    double            syncOffsetMs_       = 0.0;
+
+public:
+    // 싱크 오프셋 조정 (+/-밀리초)
+    void   setSyncOffset(double ms) { syncOffsetMs_ = ms; update(); }
+    double syncOffset() const { return syncOffsetMs_; }
+    // 오프셋 저장/불러오기 (파일 경로 기반 QSettings)
+    void   saveSyncOffset(const QString& filePath);
+    void   loadSyncOffset(const QString& filePath);
 };

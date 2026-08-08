@@ -12,6 +12,8 @@
 #include <QUrl>
 #include <QUrlQuery>
 #include <QRegularExpression>
+#include <QSettings>
+#include <QCryptographicHash>
 #include <algorithm>
 #include <cmath>
 
@@ -328,7 +330,8 @@ void LyricsWidget::parseLrc(const QString& lrcText) {
 
 // ─── 재생 위치 업데이트 ──────────────────────────────────────────────────────
 void LyricsWidget::setPosition(double posSecs) {
-    posMs_ = posSecs * 1000.0;
+    // 싱크 오프셋 적용: 양수=늦게 표시(가사를 늦게 출력), 음수=일찍 표시
+    posMs_ = posSecs * 1000.0 + syncOffsetMs_;
     int newIdx = findCurrentLine(posMs_);
     if (newIdx != currentIdx_) {
         currentIdx_ = newIdx;
@@ -353,6 +356,25 @@ int LyricsWidget::findCurrentLine(double posMs) const {
         else break;
     }
     return idx;
+}
+
+// ─── 싱크 오프셋 저장/불러오기 ─────────────────────────────────────────────────
+void LyricsWidget::saveSyncOffset(const QString& filePath) {
+    if (filePath.isEmpty()) return;
+    QSettings s("GaonCommunication", "Sorinuri");
+    QString key = "lrc_offset/" + QString::fromUtf8(
+        QCryptographicHash::hash(filePath.toUtf8(), QCryptographicHash::Md5).toHex());
+    if (syncOffsetMs_ != 0.0)
+        s.setValue(key, syncOffsetMs_);
+    else
+        s.remove(key);
+}
+void LyricsWidget::loadSyncOffset(const QString& filePath) {
+    if (filePath.isEmpty()) { syncOffsetMs_ = 0.0; return; }
+    QSettings s("GaonCommunication", "Sorinuri");
+    QString key = "lrc_offset/" + QString::fromUtf8(
+        QCryptographicHash::hash(filePath.toUtf8(), QCryptographicHash::Md5).toHex());
+    syncOffsetMs_ = s.value(key, 0.0).toDouble();
 }
 
 // ─── 가사 초기화 ─────────────────────────────────────────────────────────────

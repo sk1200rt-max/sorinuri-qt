@@ -1393,6 +1393,30 @@ void MainWindow::toggleProFeatures() {
         if (originalsWidget_)
             originalsWidget_->setCurrentFile(currentFilePath_);
     }
+    // ── 단축키 커스터마이징 탭 ─────────────────────────────────────────────────────────────────────
+    if (!shortcutConfigWidget_) {
+        shortcutConfigWidget_ = new ShortcutConfigWidget(proFeatures_);
+        proFeatures_->addTab(shortcutConfigWidget_, "⌨ 단축키");
+        // 단축키 변경 시 MainWindow에 알림
+        connect(shortcutConfigWidget_, &ShortcutConfigWidget::shortcutsChanged,
+                this, [this]() {
+                    if (osdWidget_) osdWidget_->showInfo("⌨ 단축키 설정 저장됨", 2000);
+                });
+    }
+    // ── 화면 녹화 탭 ─────────────────────────────────────────────────────────────────────
+    if (!screenRecorder_) {
+        screenRecorder_ = new ScreenRecorder(proFeatures_);
+        proFeatures_->addTab(screenRecorder_, "🎥 화면 녹화");
+        // 녹화 완료 시 OSD 알림
+        connect(screenRecorder_, &ScreenRecorder::recordingStarted,
+                this, [this](const QString&) {
+                    if (osdWidget_) osdWidget_->showInfo("🔴 화면 녹화 시작", 2000);
+                });
+        connect(screenRecorder_, &ScreenRecorder::recordingStopped,
+                this, [this](const QString& path) {
+                    if (osdWidget_) osdWidget_->showInfo("✅ 녹화 완료: " + QFileInfo(path).fileName(), 3000);
+                });
+    }
     proFeatures_->setVisible(isProFeaturesOpen_);
 }
 

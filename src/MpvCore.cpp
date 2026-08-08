@@ -211,6 +211,17 @@ bool MpvCore::initialize(WId windowId) {
         // ── 색상 관리 ─────────────────────────────────────────────
         // target-colorspace-hint: 모든 환경에서 활성화 (부하 없음)
         check_error(mpv_set_property_string(mpv_, "target-colorspace-hint", "yes"));
+        // Dolby Vision 동적 메타데이터: Windows 11 + D3D11 환경에서 활성화
+        // vo=gpu-next + d3d11 조합 시 Dolby Vision Profile 5/8 지원
+        // 구형 Intel GPU 제외 (드라이버 호환성 문제)
+        if (env.gpuVendor != RenderEnvInfo::GpuVendor::IntelHD &&
+            env.gpuVendor != RenderEnvInfo::GpuVendor::IntelIris) {
+            check_error(mpv_set_property_string(mpv_, "tone-mapping-mode", "auto"));
+        }
+        // HDR 디스플레이에서 target-peak 자동 설정 (디스플레이 최대 밝기 활용)
+        if (hdrDisplay) {
+            check_error(mpv_set_property_string(mpv_, "target-peak", "auto"));
+        }
         // ICC 프로파일 자동 적용 (캘리브레이션 모니터 지원, 일반 모니터 무영향)
         check_error(mpv_set_property_string(mpv_, "icc-profile-auto", "yes"));
         check_error(mpv_set_property_string(mpv_, "icc-intent", "relative-colorimetric"));

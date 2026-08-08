@@ -1,5 +1,14 @@
 [
   {
+    "version": "6.15.0",
+    "date": "2026-08-08",
+    "title": "단축키 커스터마이징 · 화면 녹화 · LRC 싱크 오프셋 · Dolby Vision · Anime4K 셰이더",
+    "desc": "단축키 커스터마이징 UI (⌨ 단축키 탭), 화면 녹화 (ffmpeg gdigrab), LRC 가사 싱크 오프셋 저장/불러오기, Dolby Vision 동적 메타데이터 강화 (target-peak auto), Anime4K GLSL 셰이더 번들 지원",
+    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.15.0.exe",
+    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.15.0-Portable.zip",
+    "tags": []
+  },
+  {
     "version": "6.14.0",
     "date": "2026-08-08",
     "title": "SMTC 잠금 화면 연동 · Anime4K · 재생 통계 CSV/JSON · 자막 편집기 완성 · Whisper SRT 개선",
