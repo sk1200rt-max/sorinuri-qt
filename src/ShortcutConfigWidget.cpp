@@ -242,6 +242,17 @@ void ShortcutConfigWidget::onCellDoubleClicked(int row, int /*col*/) {
     startCapture(row);
 }
 
+void ShortcutConfigWidget::onResetRow() {
+    // 현재 선택된 행의 단축키를 기본값으로 초기화
+    int row = table_ ? table_->currentRow() : -1;
+    if (row < 0 || row >= entries_.size()) return;
+    entries_[row].customKey = QKeySequence();
+    populateTable();
+    if (lblStatus_) lblStatus_->setText(
+        QString("'%1' 단축키를 기본값으로 초기화했습니다. 저장 버튼을 눌러 적용하세요.")
+        .arg(entries_[row].description));
+}
+
 void ShortcutConfigWidget::startCapture(int row) {
     if (row < 0 || row >= entries_.size()) return;
     captureRow_ = row;
