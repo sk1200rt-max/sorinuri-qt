@@ -4,7 +4,7 @@
 #define MyAppName "소리누리"
 #define MyAppNameEn "Sorinuri"
 #define MyAppVersion "6.11.9"
-#define MyAppPublisher "Sorinuri"
+#define MyAppPublisher "Gaon Communication"
 #define MyAppURL "https://sorinuri.com"
 #define MyAppExeName "Sorinuri.exe"
 #define MyAppDescription "소리누리 - 전문 동영상/오디오 플레이어"

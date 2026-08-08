@@ -12,11 +12,11 @@ BEGIN
     BEGIN
         BLOCK "041204B0"
         BEGIN
-            VALUE "CompanyName",      "Sorinuri"
-            VALUE "FileDescription",  "Sorinuri Media Player"
+            VALUE "CompanyName",      "Gaon Communication"
+            VALUE "FileDescription",  "Sorinuri Media Player by Gaon Communication"
             VALUE "FileVersion",      "6.11.9.0"
             VALUE "InternalName",     "Sorinuri"
-            VALUE "LegalCopyright",   "Copyright (C) 2026 Sorinuri"
+            VALUE "LegalCopyright",   "Copyright (C) 2026 Gaon Communication"
             VALUE "OriginalFilename", "Sorinuri.exe"
             VALUE "ProductName",      "Sorinuri"
             VALUE "ProductVersion",   "6.11.9.0"
