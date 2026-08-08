@@ -157,8 +157,10 @@ void UpscaleWidget::buildUI() {
     btnLanczos_ = new QPushButton("Lanczos");
     btnESRGAN_  = new QPushButton("Real-ESRGAN");
     btnRIFE_    = new QPushButton("RIFE 프레임보간");
+    btnAnime4K_ = new QPushButton("Anime4K");
+    btnAnime4K_->setToolTip("애니메이션 전용 업스케일\nGLSL 셔이더 기반 선명도 향상");
 
-    for (auto* btn : {btnOff_, btnNvidia_, btnAmd_, btnLanczos_, btnESRGAN_, btnRIFE_}) {
+    for (auto* btn : {btnOff_, btnNvidia_, btnAmd_, btnLanczos_, btnESRGAN_, btnRIFE_, btnAnime4K_}) {
         btn->setObjectName("modeBtn");
         btn->setCheckable(true);
         rowMode->addWidget(btn);
@@ -170,12 +172,13 @@ void UpscaleWidget::buildUI() {
 
     // 버튼 그룹
     auto* grp = new QButtonGroup(this);
-    grp->addButton(btnOff_,    (int)UpscaleMode::Off);
-    grp->addButton(btnNvidia_, (int)UpscaleMode::NvidiaRTX);
-    grp->addButton(btnAmd_,    (int)UpscaleMode::AmdFSR);
-    grp->addButton(btnLanczos_,(int)UpscaleMode::Lanczos);
-    grp->addButton(btnESRGAN_, (int)UpscaleMode::RealESRGAN);
-    grp->addButton(btnRIFE_,   (int)UpscaleMode::RIFE);
+    grp->addButton(btnOff_,     (int)UpscaleMode::Off);
+    grp->addButton(btnNvidia_,  (int)UpscaleMode::NvidiaRTX);
+    grp->addButton(btnAmd_,     (int)UpscaleMode::AmdFSR);
+    grp->addButton(btnLanczos_, (int)UpscaleMode::Lanczos);
+    grp->addButton(btnESRGAN_,  (int)UpscaleMode::RealESRGAN);
+    grp->addButton(btnRIFE_,    (int)UpscaleMode::RIFE);
+    grp->addButton(btnAnime4K_, (int)UpscaleMode::Anime4K);
     connect(grp, QOverload<int>::of(&QButtonGroup::idClicked), this, [this](int id){
         setMode((UpscaleMode)id);
     });
@@ -394,7 +397,7 @@ void UpscaleWidget::applyToMpv() {
         break;
     }
     case UpscaleMode::RIFE: {
-        // RIFE 프레임 보간 GLSL 셋어 적용
+        // RIFE 프레임 보간 GLSL 셔이더 적용
         core_->setProperty("vo",    QString("gpu-next"));
         core_->setProperty("hwdec", QString("auto"));
         // 프레임 보간: video-sync=display-resample + interpolation
@@ -405,10 +408,46 @@ void UpscaleWidget::applyToMpv() {
         if (QFile::exists(shaderPath)) {
             core_->command({"change-list", "glsl-shaders", "set", shaderPath});
         } else {
-            // 셋어 없어도 MPV 내장 interpolation으로 동작
+            // 셔이더 없어도 MPV 내장 interpolation으로 동작
             core_->command({"change-list", "glsl-shaders", "clr", ""});
         }
         if (lblStatus_) lblStatus_->setText("✅ RIFE 프레임 보간 활성화");
+        break;
+    }
+    case UpscaleMode::Anime4K: {
+        // Anime4K GLSL 셔이더 - 애니메이션 전용 업스케일
+        // 애니메이션 특유의 라인 아트 선명도를 유지하면서 해상도 향상
+        // 사용 셔이더: Anime4K/Anime4K-Lossless-Upscale-CNN-x2-M.glsl
+        // 셔이더 파일이 없으면 MPV 내장 ewa_lanczossharp으로 폴백
+        core_->setProperty("vo",    QString("gpu-next"));
+        core_->setProperty("hwdec", QString("auto-safe"));
+        // 애니메이션 최적화: deband 끄기 (라인 아트 밴딩 방지)
+        core_->setProperty("deband", false);
+        // 셔이더 로드 시도
+        QString shaderDir = QCoreApplication::applicationDirPath() + "/shaders/";
+        // Anime4K 셔이더 우선순위 목록
+        QStringList anime4kShaders = {
+            shaderDir + "Anime4K_Upscale_CNN_x2_M.glsl",
+            shaderDir + "Anime4K_Restore_CNN_M.glsl",
+            shaderDir + "anime4k.glsl",
+            shaderDir + "anime4k-upscale.glsl"
+        };
+        QString foundShader;
+        for (const QString& s : anime4kShaders) {
+            if (QFile::exists(s)) { foundShader = s; break; }
+        }
+        if (!foundShader.isEmpty()) {
+            core_->command({"change-list", "glsl-shaders", "set", foundShader});
+            if (lblStatus_) lblStatus_->setText("✅ Anime4K 셔이더 적용");
+        } else {
+            // 셔이더 없으면 MPV 내장 애니메이션 최적화 알고리즘 사용
+            core_->command({"change-list", "glsl-shaders", "clr", ""});
+            core_->setProperty("scale",        QString("ewa_lanczossharp"));
+            core_->setProperty("cscale",       QString("ewa_lanczossharp"));
+            core_->setProperty("dscale",       QString("mitchell"));
+            core_->setProperty("linear-downscaling", false);
+            if (lblStatus_) lblStatus_->setText("⚠️ 셔이더 없음 - 내장 애니메이션 모드");
+        }
         break;
     }
     }

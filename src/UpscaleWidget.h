@@ -6,7 +6,7 @@ class QPushButton;
 class QSlider;
 class MpvCore;
 
-enum class UpscaleMode { Off, NvidiaRTX, AmdFSR, Lanczos, RealESRGAN, RIFE };
+enum class UpscaleMode { Off, NvidiaRTX, AmdFSR, Lanczos, RealESRGAN, RIFE, Anime4K };
 
 class UpscaleWidget : public QWidget {
     Q_OBJECT
@@ -42,6 +42,7 @@ private:
     QPushButton* btnLanczos_   = nullptr;
     QPushButton* btnESRGAN_    = nullptr;
     QPushButton* btnRIFE_      = nullptr;
+    QPushButton* btnAnime4K_   = nullptr;  // Anime4K GLSL 셔이더
     QSlider*     sldStrength_ = nullptr;
     QLabel*      lblStrVal_   = nullptr;
     QPushButton* btnCompare_  = nullptr;

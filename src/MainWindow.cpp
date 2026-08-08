@@ -237,6 +237,42 @@ void MainWindow::setupConnections() {
     connect(core, &MpvCore::videoInfoChanged,   this, &MainWindow::onVideoInfoChanged);
     connect(core, &MpvCore::tracksChanged,      this, &MainWindow::onTracksChanged);
 
+    // ── SMTC (Windows 잠금 화면 미디어 컨트롤) 초기화 및 연결 ─────────────
+    // ISystemMediaTransportControlsInterop::GetForWindow()로 Win32 HWND 기반 초기화
+    // 재생/일시정지/이전/다음 버튼 → MPV 명령 연결
+    smtcManager_ = new SMTCManager(this);
+    // HWND는 show() 후에 유효하므로 singleShot(0)으로 이벤트 루프 후 초기화
+    QTimer::singleShot(0, this, [this]() {
+        if (smtcManager_->initialize(reinterpret_cast<void*>(winId()))) {
+            qInfo() << "[MainWindow] SMTC 초기화 성공";
+        } else {
+            qWarning() << "[MainWindow] SMTC 초기화 실패 (Windows 10+ 필요)";
+        }
+    });
+    // SMTC 버튼 → MPV 명령 연결
+    connect(smtcManager_, &SMTCManager::playRequested,
+            core, &MpvCore::play);
+    connect(smtcManager_, &SMTCManager::pauseRequested,
+            core, &MpvCore::pause);
+    connect(smtcManager_, &SMTCManager::stopRequested,
+            core, &MpvCore::stop);
+    connect(smtcManager_, &SMTCManager::nextRequested,
+            [core]() { core->command({"playlist-next"}); });
+    connect(smtcManager_, &SMTCManager::previousRequested,
+            [core]() { core->command({"playlist-prev"}); });
+    // 재생 상태 → SMTC 업데이트
+    connect(core, &MpvCore::playbackStarted, smtcManager_,
+            [this]() { if (smtcManager_) smtcManager_->setPlaying(true); });
+    connect(core, &MpvCore::playbackPaused, smtcManager_,
+            [this]() { if (smtcManager_) smtcManager_->setPlaying(false); });
+    connect(core, &MpvCore::playbackStopped, smtcManager_,
+            [this]() { if (smtcManager_) smtcManager_->setStopped(); });
+    // 재생 위치 → SMTC 타임라인 업데이트 (positionChanged는 초 단위)
+    connect(core, &MpvCore::positionChanged, smtcManager_,
+            [this](double pos) {
+                if (smtcManager_) smtcManager_->updateTimeline(pos, totalDuration_);
+            });
+
     // 실시간 렌더링 품질 강등/복원 시그널 → OSD로 사용자에게 알림
     // 프레임 드롭 감지 시 자동으로 deband/scale 강등하면 OSD로 표시
     connect(core, &MpvCore::renderQualityDegraded, this, [this](const QString& reason) {
@@ -521,6 +557,24 @@ void MainWindow::onFileLoaded(const QString& path) {
     // ORIGINALS 탭 재생 중 표시 갱신
     if (originalsWidget_)
         originalsWidget_->setCurrentFile(path);
+
+    // ── SMTC 메타데이터 업데이트 ─────────────────────────────────────────────────────────────────────
+    // 재생 시작 시 Windows 잠금 화면/알림 센터에 제목·아티스트·앉범아트 표시
+    // 200ms 지연: MPV가 메타데이터를 완전히 로드한 후 읽음
+    if (smtcManager_ && smtcManager_->isEnabled()) {
+        QTimer::singleShot(200, this, [this, path]() {
+            auto* core = mpvWidget_->core();
+            QString title  = core->getProperty("media-title").toString();
+            QString artist = core->getProperty("metadata/by-key/artist").toString();
+            QString album  = core->getProperty("metadata/by-key/album").toString();
+            if (title.isEmpty()) title = QFileInfo(path).completeBaseName();
+            // 앉범아트: 음악 모드에서는 MusicWidget의 상태를 활용
+            QPixmap art = AlbumArtExtractor::extract(path);
+            smtcManager_->updateMetadata(title, artist, album, art);
+            smtcManager_->setPlaying(true);
+        });
+    }
+
     if (isMusicMode_) {
         // 음악 모드: 메타데이터 로드 (파일 로드 후 MPV가 태그를 읽은 시점)
         QTimer::singleShot(200, this, [this, path]() { loadMusicMeta(path); });
@@ -1248,13 +1302,81 @@ void MainWindow::toggleProFeatures() {
 
             statsLayout->addWidget(statsTable, 1);
 
-            // 재생 통계 요약
+            // ── 요약 통계 행 ─────────────────────────────────────────────────────────────────────
+            int totalCount = 0;
+            for (const auto& [path, count, last, key] : entries) totalCount += count;
             auto* summaryLabel = new QLabel(
-                QString("전체 재생 기록: %1개 파일").arg(entries.size()), statsWidget_);
+                QString("전체 재생 기록: %1개 파일  |  누적 재생 횟수: %2회")
+                    .arg(entries.size()).arg(totalCount),
+                statsWidget_);
             summaryLabel->setStyleSheet("color:#666; font-size:11px; background:transparent;");
             statsLayout->addWidget(summaryLabel);
 
-                        proFeatures_->addTab(statsWidget_, "재생 통계");
+            // ── CSV / JSON 내보내기 버튼 행 ─────────────────────────────────────────────────────────────────────
+            auto* exportRow = new QHBoxLayout;
+            exportRow->addStretch();
+            auto* btnExportCsv = new QPushButton("CSV 내보내기", statsWidget_);
+            auto* btnExportJson = new QPushButton("JSON 내보내기", statsWidget_);
+            const QString exportBtnStyle =
+                "QPushButton { background:#1e1e1e; color:#aaa; border:1px solid #333;"
+                "border-radius:4px; padding:4px 14px; font-size:11px; }"
+                "QPushButton:hover { background:#2a2a2a; color:#fff; }";
+            btnExportCsv->setStyleSheet(exportBtnStyle);
+            btnExportJson->setStyleSheet(exportBtnStyle);
+            btnExportCsv->setFocusPolicy(Qt::NoFocus);
+            btnExportJson->setFocusPolicy(Qt::NoFocus);
+            exportRow->addWidget(btnExportCsv);
+            exportRow->addWidget(btnExportJson);
+            statsLayout->addLayout(exportRow);
+
+            // CSV 내보내기
+            connect(btnExportCsv, &QPushButton::clicked, this, [entries]() {
+                QString path = QFileDialog::getSaveFileName(
+                    nullptr, "재생 통계 CSV 내보내기", "",
+                    "CSV 파일 (*.csv)"
+                );
+                if (path.isEmpty()) return;
+                QFile f(path);
+                if (!f.open(QIODevice::WriteOnly | QIODevice::Text)) return;
+                QTextStream out(&f);
+                out.setEncoding(QStringConverter::Utf8);
+                out << "\"파일명\",\"전체 경로\",\"재생 횟수\",\"마지막 재생\"\n";
+                for (const auto& [fpath, count, last, key] : entries) {
+                    out << QString("\"%1\",\"%2\",%3,\"%4\"\n")
+                           .arg(QFileInfo(fpath).fileName().replace('"', "''"))
+                           .arg(fpath.replace('"', "''"))
+                           .arg(count)
+                           .arg(last.left(16).replace('T', ' '));
+                }
+                f.close();
+            });
+
+            // JSON 내보내기
+            connect(btnExportJson, &QPushButton::clicked, this, [entries]() {
+                QString path = QFileDialog::getSaveFileName(
+                    nullptr, "재생 통계 JSON 내보내기", "",
+                    "JSON 파일 (*.json)"
+                );
+                if (path.isEmpty()) return;
+                QFile f(path);
+                if (!f.open(QIODevice::WriteOnly | QIODevice::Text)) return;
+                QTextStream out(&f);
+                out.setEncoding(QStringConverter::Utf8);
+                out << "[\n";
+                for (int i = 0; i < entries.size(); ++i) {
+                    const auto& [fpath, count, last, key] = entries[i];
+                    out << QString("  {\"file\": \"%1\", \"path\": \"%2\", \"count\": %3, \"last_played\": \"%4\"}%5\n")
+                           .arg(QFileInfo(fpath).fileName().replace('"', "''"))
+                           .arg(fpath.replace('\\', "/").replace('"', "''"))
+                           .arg(count)
+                           .arg(last.left(16).replace('T', ' '))
+                           .arg(i < entries.size()-1 ? "," : "");
+                }
+                out << "]\n";
+                f.close();
+            });
+
+            proFeatures_->addTab(statsWidget_, "재생 통계");
         }
         // SORINURI ORIGINALS 탭
         if (!originalsWidget_) {

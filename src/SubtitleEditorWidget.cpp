@@ -13,6 +13,8 @@
 #include <QDir>
 #include <QMessageBox>
 #include <QFontDatabase>
+#include <QFileDialog>
+#include <QTimer>
 
 SubtitleEditorWidget::SubtitleEditorWidget(MpvCore* core, QWidget* parent)
     : QWidget(parent), core_(core)
@@ -121,13 +123,29 @@ void SubtitleEditorWidget::buildUI() {
     connect(btnApply_,  &QPushButton::clicked, this, &SubtitleEditorWidget::onApplyEdit);
     connect(btnReload_, &QPushButton::clicked, this, &SubtitleEditorWidget::onReloadSubtitle);
     connect(btnSave_,   &QPushButton::clicked, this, [this]() {
-        if (filePath_.isEmpty()) return;
+        if (filePath_.isEmpty()) {
+            // 원본 파일 없으면 다른 이름으로 저장
+            QString savePath = QFileDialog::getSaveFileName(
+                this, "자막 저장", "",
+                "자막 파일 (*.srt *.ass *.ssa *.vtt);;SRT (*.srt);;ASS/SSA (*.ass *.ssa);;VTT (*.vtt)"
+            );
+            if (savePath.isEmpty()) return;
+            filePath_ = savePath;
+        }
         QFile f(filePath_);
         if (f.open(QIODevice::WriteOnly | QIODevice::Text)) {
             QTextStream out(&f);
             out.setEncoding(QStringConverter::Utf8);
             out << editor_->toPlainText();
             f.close();
+            lblFile_->setText(QFileInfo(filePath_).fileName() + " [저장됨]");
+            QTimer::singleShot(2000, this, [this](){
+                if (!filePath_.isEmpty())
+                    lblFile_->setText(QFileInfo(filePath_).fileName());
+            });
+        } else {
+            QMessageBox::warning(this, "저장 실패",
+                "파일을 저장할 수 없습니다:\n" + filePath_);
         }
     });
 

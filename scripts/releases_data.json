@@ -1,5 +1,14 @@
 [
   {
+    "version": "6.14.0",
+    "date": "2026-08-08",
+    "title": "SMTC 잠금 화면 연동 · Anime4K · 재생 통계 CSV/JSON · 자막 편집기 완성 · Whisper SRT 개선",
+    "desc": "Windows 잠금 화면/알림 센터 미디어 컨트롤(SMTC) 완전 연동, Anime4K GLSL 셰이더 업스케일 모드 추가, 재생 통계 CSV/JSON 내보내기, 자막 편집기 다른 이름 저장 완성, Whisper SRT 표준 타임코드(HH:MM:SS,mmm) 수정 및 저장 다이얼로그 추가",
+    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.14.0.exe",
+    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.14.0-Portable.zip",
+    "tags": []
+  },
+  {
     "version": "6.13.0",
     "date": "2026-08-08",
     "title": "OpenGL 컨텍스트 안전 복구 · depth/stencil 버퍼 · 전원 이벤트 통합 처리",

@@ -43,6 +43,7 @@
 #include "AdManager.h"
 #include "SplashAdWidget.h"
 #include "OriginalsWidget.h"
+#include "SMTCManager.h"
 #include <QTcpServer>
 #include <QTcpSocket>
 #include <QHostAddress>
@@ -163,6 +164,7 @@ private:
     OriginalsWidget*      originalsWidget_      = nullptr;  // SORINURI ORIGINALS 탭
     AdManager*            adManager_            = nullptr;  // 광고 관리자
     SplashAdWidget*       splashAdWidget_       = nullptr;  // 시작 화면 광고
+    SMTCManager*          smtcManager_          = nullptr;  // Windows 잠금 화면 미디어 컨트롤
 
     // 멀티체널 안내 상태 (파일당 한 번만 표시)
     bool   multichannelPromptShown_ = false;

@@ -20,6 +20,8 @@
 #include <QTextStream>
 #include <QClipboard>
 #include <QApplication>
+#include <QFileDialog>
+#include <QMessageBox>
 #include <QPainter>
 #include <QPainterPath>
 #include <QMouseEvent>
@@ -718,21 +720,52 @@ void WhisperWidget::onSpeakerToggled(bool on)   { cfg_.speakerDiarize = on; }
 void WhisperWidget::onSearchChanged(const QString& t) { searchText_ = t; refreshHistoryList(); }
 void WhisperWidget::onFilterChanged(int f)      { filterMode_ = f; refreshHistoryList(); }
 
+// SRT 표준 타임코드: HH:MM:SS,mmm 형식
+static QString toSrtTime(double sec) {
+    int ms  = qRound(sec * 1000) % 1000;
+    int s   = (int)sec % 60;
+    int m   = ((int)sec / 60) % 60;
+    int h   = (int)sec / 3600;
+    return QString("%1:%2:%3,%4")
+        .arg(h, 2, 10, QChar('0'))
+        .arg(m, 2, 10, QChar('0'))
+        .arg(s, 2, 10, QChar('0'))
+        .arg(ms, 3, 10, QChar('0'));
+}
+
 void WhisperWidget::exportSRT() {
-    if (entries_.isEmpty() || mediaPath_.isEmpty()) return;
-    QString srtPath = QFileInfo(mediaPath_).dir().filePath(
-        QFileInfo(mediaPath_).baseName() + ".srt");
+    if (entries_.isEmpty()) {
+        QMessageBox::information(this, "SRT 내보내기", "자막 데이터가 없습니다.");
+        return;
+    }
+    // 저장 경로 선택 다이얼로그
+    QString defaultPath = mediaPath_.isEmpty() ? ""
+        : QFileInfo(mediaPath_).dir().filePath(QFileInfo(mediaPath_).baseName() + ".srt");
+    QString srtPath = QFileDialog::getSaveFileName(
+        this, "SRT 자막 저장", defaultPath,
+        "SRT 자막 (*.srt)"
+    );
+    if (srtPath.isEmpty()) return;
     QFile f(srtPath);
-    if (!f.open(QIODevice::WriteOnly | QIODevice::Text)) return;
+    if (!f.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QMessageBox::warning(this, "저장 실패", "파일을 저장할 수 없습니다:\n" + srtPath);
+        return;
+    }
     QTextStream out(&f);
+    out.setEncoding(QStringConverter::Utf8);
     QVector<SubtitleEntry> sorted = entries_;
-    std::sort(sorted.begin(), sorted.end(), [](const SubtitleEntry& a, const SubtitleEntry& b){ return a.startSec < b.startSec; });
+    std::sort(sorted.begin(), sorted.end(),
+        [](const SubtitleEntry& a, const SubtitleEntry& b){ return a.startSec < b.startSec; });
     for (int i = 0; i < sorted.size(); ++i) {
         const auto& e = sorted[i];
         out << (i+1) << "\n";
-        out << formatTime(e.startSec).replace(':',':') << " --> " << formatTime(e.endSec) << "\n";
+        // SRT 표준 형식: HH:MM:SS,mmm --> HH:MM:SS,mmm
+        out << toSrtTime(e.startSec) << " --> " << toSrtTime(e.endSec) << "\n";
         out << e.text << "\n\n";
     }
+    f.close();
+    QMessageBox::information(this, "SRT 내보내기 완료",
+        QString("%1개 자막 항목을 저장했습니다:\n").arg(sorted.size()) + srtPath);
 }
 
 void WhisperWidget::copyAll() {
