@@ -1466,19 +1466,19 @@ void MainWindow::toggleProFeatures() {
             voiceControlWidget_ = new VoiceControlWidget(proFeatures_);
             // 음성 명령 시그널 연결
             connect(voiceControlWidget_, &VoiceControlWidget::commandPlay,
-                    this, [this](){ mpvWidget_->core()->command("cycle pause"); });
+                    this, [this](){ mpvWidget_->core()->command({"cycle", "pause"}); });
             connect(voiceControlWidget_, &VoiceControlWidget::commandPause,
-                    this, [this](){ mpvWidget_->core()->command("cycle pause"); });
+                    this, [this](){ mpvWidget_->core()->command({"cycle", "pause"}); });
             connect(voiceControlWidget_, &VoiceControlWidget::commandStop,
-                    this, [this](){ mpvWidget_->core()->command("stop"); });
+                    this, [this](){ mpvWidget_->core()->command({"stop"}); });
             connect(voiceControlWidget_, &VoiceControlWidget::commandNext,
-                    this, [this](){ mpvWidget_->core()->command("playlist-next"); });
+                    this, [this](){ mpvWidget_->core()->command({"playlist-next"}); });
             connect(voiceControlWidget_, &VoiceControlWidget::commandPrev,
-                    this, [this](){ mpvWidget_->core()->command("playlist-prev"); });
+                    this, [this](){ mpvWidget_->core()->command({"playlist-prev"}); });
             connect(voiceControlWidget_, &VoiceControlWidget::commandVolume,
                     this, [this](int v){ mpvWidget_->core()->setProperty("volume", v); });
             connect(voiceControlWidget_, &VoiceControlWidget::commandMute,
-                    this, [this](){ mpvWidget_->core()->command("cycle mute"); });
+                    this, [this](){ mpvWidget_->core()->command({"cycle", "mute"}); });
             connect(voiceControlWidget_, &VoiceControlWidget::commandSeek,
                     this, [this](double s){ mpvWidget_->core()->seek(s, false); });
             connect(voiceControlWidget_, &VoiceControlWidget::commandFullscreen,
