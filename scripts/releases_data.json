@@ -4,8 +4,8 @@
     "date": "2026-08-09",
     "title": "클라우드 연동 완성 및 AI 기능 강화",
     "desc": "OneDrive/Google Drive UI 패널, Last.fm 설정 탭, AI 태깅 분위기·BPM 필터, Whisper 모델 번들, WebDAV 즐겨찾기, AI 장면 감지 민감도 조절 추가",
-    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.18.0.exe",
-    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.18.0-Portable.zip",
+    "installer": "https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v6.18.0/Sorinuri-Setup-6.18.0.exe",
+    "portable": "https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v6.18.0/Sorinuri-Qt-6.18.0-Portable.zip",
     "tags": []
   },
   {
@@ -13,8 +13,8 @@
     "date": "2026-08-09",
     "title": "AI 기능 및 클라우드 연동",
     "desc": "AI 자동 장면 감지, AI 오디오 태깅, Whisper 음성 명령 제어, WebDAV/Nextcloud 스트리밍, Last.fm 스크로블링, OneDrive/Google Drive 연동 추가",
-    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.17.0.exe",
-    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.17.0-Portable.zip",
+    "installer": "https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v6.17.0/Sorinuri-Setup-6.17.0.exe",
+    "portable": "https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v6.17.0/Sorinuri-Qt-6.17.0-Portable.zip",
     "tags": []
   },
   {
@@ -22,8 +22,8 @@
     "date": "2026-08-08",
     "title": "SMTC 앨범아트 썸네일 · SMTC 타임라인 · 자막 자동 번역 · 단축키 실시간 적용 · LRC 싱크 오프셋 UI · ffmpeg 번들",
     "desc": "SMTC 앨범아트 썸네일 (임시 파일 경유 방식), ISystemMediaTransportControls2 타임라인, LibreTranslate 자막 자동 번역 API, 단축키 커스터마이징 실시간 적용, LRC 가사 싱크 오프셋 +/- 버튼, 화면 녹화 ffmpeg 자동 번들",
-    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.16.0.exe",
-    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.16.0-Portable.zip",
+    "installer": "https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v6.16.0/Sorinuri-Setup-6.16.0.exe",
+    "portable": "https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v6.16.0/Sorinuri-Qt-6.16.0-Portable.zip",
     "tags": []
   },
   {
@@ -31,8 +31,8 @@
     "date": "2026-08-08",
     "title": "단축키 커스터마이징 · 화면 녹화 · LRC 싱크 오프셋 · Dolby Vision · Anime4K 셰이더",
     "desc": "단축키 커스터마이징 UI (⌨ 단축키 탭), 화면 녹화 (ffmpeg gdigrab), LRC 가사 싱크 오프셋 저장/불러오기, Dolby Vision 동적 메타데이터 강화 (target-peak auto), Anime4K GLSL 셰이더 번들 지원",
-    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.15.0.exe",
-    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.15.0-Portable.zip",
+    "installer": "https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v6.15.0/Sorinuri-Setup-6.15.0.exe",
+    "portable": "https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v6.15.0/Sorinuri-Qt-6.15.0-Portable.zip",
     "tags": []
   },
   {
@@ -40,8 +40,8 @@
     "date": "2026-08-08",
     "title": "SMTC 잠금 화면 연동 · Anime4K · 재생 통계 CSV/JSON · 자막 편집기 완성 · Whisper SRT 개선",
     "desc": "Windows 잠금 화면/알림 센터 미디어 컨트롤(SMTC) 완전 연동, Anime4K GLSL 셰이더 업스케일 모드 추가, 재생 통계 CSV/JSON 내보내기, 자막 편집기 다른 이름 저장 완성, Whisper SRT 표준 타임코드(HH:MM:SS,mmm) 수정 및 저장 다이얼로그 추가",
-    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.14.0.exe",
-    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.14.0-Portable.zip",
+    "installer": "https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v6.14.0/Sorinuri-Setup-6.14.0.exe",
+    "portable": "https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v6.14.0/Sorinuri-Qt-6.14.0-Portable.zip",
     "tags": []
   },
   {
@@ -49,8 +49,8 @@
     "date": "2026-08-08",
     "title": "OpenGL 컨텍스트 안전 복구 · depth/stencil 버퍼 · 전원 이벤트 통합 처리",
     "desc": "Qt6 공식 권장 방식(aboutToBeDestroyed)으로 절전/모니터 전환 시 renderCtx_ 안전 해제 및 자동 재생성, depth/stencil 버퍼 명시 요청으로 Intel GPU depth testing 안정화, WM_POWERBROADCAST 블록 통합으로 배터리 전환 타이머 해상도 유지 버그 수정",
-    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.13.0.exe",
-    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.13.0-Portable.zip",
+    "installer": "https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v6.13.0/Sorinuri-Setup-6.13.0.exe",
+    "portable": "https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v6.13.0/Sorinuri-Qt-6.13.0-Portable.zip",
     "tags": []
   },
   {
@@ -58,8 +58,8 @@
     "date": "2026-08-08",
     "title": "오디오 핫플러그 · 외부 모니터 복원 · Intel HEVC 안전 폴백 · 배터리 타이머 안정화",
     "desc": "헤드폰/스피커 연결·해제 시 WASAPI 오디오 자동 재초기화(WM_DEVICECHANGE), 외부 모니터 연결·해제 시 검은 화면 수정(WM_DISPLAYCHANGE), Intel 구형 GPU HEVC 프리즈 방지(d3d11va-copy 폴백), 배터리 모드 전환 시 타이머 해상도 1ms 유지",
-    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.12.0.exe",
-    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.12.0-Portable.zip",
+    "installer": "https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v6.12.0/Sorinuri-Setup-6.12.0.exe",
+    "portable": "https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v6.12.0/Sorinuri-Qt-6.12.0-Portable.zip",
     "tags": []
   },
   {
@@ -67,8 +67,8 @@
     "date": "2026-08-08",
     "title": "노트북 환경 완벽 최적화 · 절전 복귀 화면 복원 · WASAPI 호환성 향상",
     "desc": "Windows 절전/잠금 후 복귀 시 화면 자동 복원(WM_POWERBROADCAST), 노트북 내장 스피커 WASAPI 공유 모드 기본 적용, 모션 스무딩 시 프레임 끊김 수정(display-resample 차단), IPC 누적 버퍼 방식으로 다중 파일 열기 안정성 개선, NVIDIA Optimus 렌더링 최적화",
-    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.11.9.exe",
-    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.11.9-Portable.zip",
+    "installer": "https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v6.11.9/Sorinuri-Setup-6.11.9.exe",
+    "portable": "https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v6.11.9/Sorinuri-Qt-6.11.9-Portable.zip",
     "tags": [
       "노트북",
       "Optimus",
@@ -80,8 +80,8 @@
     "date": "2026-08-07",
     "title": "NVIDIA Optimus 검은 화면 근본 수정",
     "desc": "paintGL에서 FBO ID 0 체크로 Optimus 환경 검은 화면 근본 수정, Intel+NVIDIA hwdec 충돌 수정, 파일 열기 150ms 지연 안정화",
-    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.11.8.exe",
-    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.11.8-Portable.zip",
+    "installer": "https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v6.11.8/Sorinuri-Setup-6.11.8.exe",
+    "portable": "https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v6.11.8/Sorinuri-Qt-6.11.8-Portable.zip",
     "tags": [
       "Optimus",
       "렌더링",
@@ -93,8 +93,8 @@
     "date": "2026-08-06",
     "title": "파일 열기 150ms 지연 · Intel+NVIDIA hwdec 충돌 수정 · 파일 연결 개선",
     "desc": "파일 열기 자동 재생 150ms 지연 추가, Intel 내장 + NVIDIA 외장 GPU 환경 hwdec 충돌 수정, 파일 연결 ChangesAssociations=yes 적용",
-    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.11.7.exe",
-    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.11.7-Portable.zip",
+    "installer": "https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v6.11.7/Sorinuri-Setup-6.11.7.exe",
+    "portable": "https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v6.11.7/Sorinuri-Qt-6.11.7-Portable.zip",
     "tags": [
       "노트북",
       "파일연결",
@@ -106,8 +106,8 @@
     "date": "2026-08-05",
     "title": "탭 창 분리 버그 수정 · 탭 이름 기반 이동",
     "desc": "proFeatures_ 부모로 변경하여 탭 창 분리 버그 수정, 탭 이름 기반 이동 로직 개선",
-    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.11.6.exe",
-    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.11.6-Portable.zip",
+    "installer": "https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v6.11.6/Sorinuri-Setup-6.11.6.exe",
+    "portable": "https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v6.11.6/Sorinuri-Qt-6.11.6-Portable.zip",
     "tags": [
       "UI",
       "버그수정"
@@ -118,8 +118,8 @@
     "date": "2026-08-04",
     "title": "기술 문서 기반 수정 · 노트북 display-resample 금지",
     "desc": "QFile::exists 제거, SHChangeNotify 적용, d3d11-sync-interval 제거, 노트북 display-resample 금지",
-    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.11.5.exe",
-    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.11.5-Portable.zip",
+    "installer": "https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v6.11.5/Sorinuri-Setup-6.11.5.exe",
+    "portable": "https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v6.11.5/Sorinuri-Qt-6.11.5-Portable.zip",
     "tags": [
       "노트북",
       "최적화"
@@ -130,8 +130,8 @@
     "date": "2026-08-03",
     "title": "파일 열기 자동 재생 · 사이드 탭 클릭 · NVIDIA Optimus 링커 플래그",
     "desc": "파일 열기 자동 재생, 사이드 탭 클릭 처리 개선, NVIDIA Optimus NvOptimusEnablement 링커 플래그 추가",
-    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.11.4.exe",
-    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.11.4-Portable.zip",
+    "installer": "https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v6.11.4/Sorinuri-Setup-6.11.4.exe",
+    "portable": "https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v6.11.4/Sorinuri-Qt-6.11.4-Portable.zip",
     "tags": [
       "Optimus",
       "UI",
@@ -143,8 +143,8 @@
     "date": "2026-08-02",
     "title": "OriginalsWidget 전면 재작성 · 썸네일 델리게이트",
     "desc": "OriginalsWidget 전면 재작성, 썸네일 델리게이트 추가, Most Vexing Parse 수정",
-    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.11.3.exe",
-    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.11.3-Portable.zip",
+    "installer": "https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v6.11.3/Sorinuri-Setup-6.11.3.exe",
+    "portable": "https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v6.11.3/Sorinuri-Qt-6.11.3-Portable.zip",
     "tags": [
       "ORIGINALS",
       "UI"
@@ -155,8 +155,8 @@
     "date": "2026-08-01",
     "title": "사이드 메뉴 UI 버그 · 자막 트랙 선택 · 파일 연결 수정",
     "desc": "사이드 메뉴 UI 숨김 버그 수정, 자막 트랙 선택(MPV_FORMAT_INT64), 노트북 프레임 끊김 수정, 파일 연결 수정",
-    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.11.1.exe",
-    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.11.1-Portable.zip",
+    "installer": "https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v6.11.1/Sorinuri-Setup-6.11.1.exe",
+    "portable": "https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v6.11.1/Sorinuri-Qt-6.11.1-Portable.zip",
     "tags": [
       "자막",
       "파일연결",
@@ -168,8 +168,8 @@
     "date": "2026-07-31",
     "title": "SORINURI ORIGINALS 탭 추가",
     "desc": "SORINURI ORIGINALS 탭 추가(songs.json fetch, 카테고리 필터, 검색), 곡 더블클릭 즉시 재생, 전체 재생 M3U 로드",
-    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.11.0.exe",
-    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.11.0-Portable.zip",
+    "installer": "https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v6.11.0/Sorinuri-Setup-6.11.0.exe",
+    "portable": "https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v6.11.0/Sorinuri-Qt-6.11.0-Portable.zip",
     "tags": [
       "ORIGINALS",
       "신규기능"
@@ -180,8 +180,8 @@
     "date": "2026-07-25",
     "title": "구간 클립 저장 · HTTP 리모컨 · DSD 재생 · EQ 프리셋 · M3U #EXTINF",
     "desc": "A-B 구간 클립 저장(MP4), 스마트폰 Wi-Fi HTTP 리모컨, DSD 네이티브 재생(DoP), EQ 프리셋 저장/불러오기, M3U #EXTINF 메타데이터 지원",
-    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.10.0.exe",
-    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.10.0-Portable.zip",
+    "installer": "https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v6.10.0/Sorinuri-Setup-6.10.0.exe",
+    "portable": "https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v6.10.0/Sorinuri-Qt-6.10.0-Portable.zip",
     "tags": [
       "신규기능",
       "오디오",
@@ -193,8 +193,8 @@
     "date": "2026-07-15",
     "title": "VST3 · 미디어 라이브러리 DB · SMTC · 스크린샷 설정 · M3U · 멀티 인스턴스 · 작업표시줄 진행률",
     "desc": "Windows VST3 실제 호스팅, 미디어 라이브러리 SQLite DB 완성, WM_APPCOMMAND 미디어 키 연동, 재생목록 M3U 저장/불러오기, 스크린샷 저장 폴더/형식 설정, 멀티 인스턴스(--new-window), ITaskbarList3 작업표시줄 진행률",
-    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.9.0.exe",
-    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.9.0-Portable.zip",
+    "installer": "https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v6.9.0/Sorinuri-Setup-6.9.0.exe",
+    "portable": "https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v6.9.0/Sorinuri-Qt-6.9.0-Portable.zip",
     "tags": [
       "VST3",
       "라이브러리",
@@ -206,8 +206,8 @@
     "date": "2026-07-01",
     "title": "설치 시 파일 형식 연결 체크박스",
     "desc": "Inno Setup 설치 마법사에 동영상 13종 / 오디오 12종 파일 형식 연결 옵션 체크박스 추가 (opt-in 방식)",
-    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.8.0.exe",
-    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.8.0-Portable.zip",
+    "installer": "https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v6.8.0/Sorinuri-Setup-6.8.0.exe",
+    "portable": "https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v6.8.0/Sorinuri-Qt-6.8.0-Portable.zip",
     "tags": [
       "설치",
       "파일연결"
@@ -218,8 +218,8 @@
     "date": "2026-06-20",
     "title": "MediaInfoOverlay geometry 기반 슬라이드 수정",
     "desc": "Tab키 미디어 정보 오버레이 패널 표시 문제 근본 수정, HiDPI 250% 환경 호환성 개선",
-    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.7.9.exe",
-    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.7.9-Portable.zip",
+    "installer": "https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v6.7.9/Sorinuri-Setup-6.7.9.exe",
+    "portable": "https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v6.7.9/Sorinuri-Qt-6.7.9-Portable.zip",
     "tags": [
       "HiDPI",
       "버그수정"

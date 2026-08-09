@@ -50,8 +50,8 @@ def save_releases(releases):
 def add_release(releases, new_ver, title, desc, installer_mb, portable_mb):
     """릴리즈 목록 맨 앞에 새 항목 추가 (중복 버전은 업데이트)"""
     today = datetime.date.today().strftime("%Y-%m-%d")
-    installer_url = f"https://sorinuri.com/downloads/Sorinuri-Setup-{new_ver}.exe"
-    portable_url  = f"https://sorinuri.com/downloads/Sorinuri-Qt-{new_ver}-Portable.zip"
+    installer_url = f"https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v{new_ver}/Sorinuri-Setup-{new_ver}.exe"
+    portable_url  = f"https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v{new_ver}/Sorinuri-Qt-{new_ver}-Portable.zip"
 
     new_entry = {
         "version":   new_ver,
@@ -340,8 +340,8 @@ def build_changelog_html(releases, current_ver):
 def update_index_html(html, new_ver, releases, installer_mb, portable_mb):
     """index.html 내 버전·링크·릴리즈 노트 갱신"""
     today = datetime.date.today().strftime("%Y-%m-%d")
-    installer_url = f"https://sorinuri.com/downloads/Sorinuri-Setup-{new_ver}.exe"
-    portable_url  = f"https://sorinuri.com/downloads/Sorinuri-Qt-{new_ver}-Portable.zip"
+    installer_url = f"https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v{new_ver}/Sorinuri-Setup-{new_ver}.exe"
+    portable_url  = f"https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v{new_ver}/Sorinuri-Qt-{new_ver}-Portable.zip"
 
     # 1. 타이틀·메타
     html = re.sub(
@@ -360,11 +360,11 @@ def update_index_html(html, new_ver, releases, installer_mb, portable_mb):
     # 3. 히어로 섹션
     html = re.sub(r'v[\d\.]+ 최신 업데이트 출시', f'v{new_ver} 최신 업데이트 출시', html)
     html = re.sub(
-        r'href="https://sorinuri\.com/downloads/Sorinuri-Setup-[\d\.]+\.exe" class="btn-primary"',
+        r'href="https://(?:sorinuri\.com/downloads|github\.com/[^"]+/releases/download/[^"]+)/Sorinuri-Setup-[\d\.]+\.exe" class="btn-primary"',
         f'href="{installer_url}" class="btn-primary"', html
     )
     html = re.sub(
-        r'href="https://sorinuri\.com/downloads/Sorinuri-Qt-[\d\.]+-Portable\.zip" class="btn-secondary"',
+        r'href="https://(?:sorinuri\.com/downloads|github\.com/[^"]+/releases/download/[^"]+)/Sorinuri-Qt-[\d\.]+-Portable\.zip" class="btn-secondary"',
         f'href="{portable_url}" class="btn-secondary"', html
     )
     if installer_mb:
@@ -390,11 +390,11 @@ def update_index_html(html, new_ver, releases, installer_mb, portable_mb):
 
     # 5. 다운로드 섹션
     html = re.sub(
-        r'href="https://sorinuri\.com/downloads/Sorinuri-Setup-[\d\.]+\.exe" class="dl-btn primary"',
+        r'href="https://(?:sorinuri\.com/downloads|github\.com/[^"]+/releases/download/[^"]+)/Sorinuri-Setup-[\d\.]+\.exe" class="dl-btn primary"',
         f'href="{installer_url}" class="dl-btn primary"', html
     )
     html = re.sub(
-        r'href="https://sorinuri\.com/downloads/Sorinuri-Qt-[\d\.]+-Portable\.zip" class="dl-btn secondary"',
+        r'href="https://(?:sorinuri\.com/downloads|github\.com/[^"]+/releases/download/[^"]+)/Sorinuri-Qt-[\d\.]+-Portable\.zip" class="dl-btn secondary"',
         f'href="{portable_url}" class="dl-btn secondary"', html
     )
     if installer_mb:
