@@ -2,6 +2,7 @@
 #include "RenderEnvironment.h"
 #include <QDebug>
 #include <QSettings>
+#include <QThread>
 #include <QMetaObject>
 #include <QFile>
 #include <QDateTime>
@@ -44,7 +45,21 @@ MpvCore::MpvCore(QObject* parent) : QObject(parent) {
 }
 
 MpvCore::~MpvCore() {
-    if (eventTimer_) eventTimer_->stop();
+    if (eventTimer_) { eventTimer_->stop(); }
+    if (spectrumTimer_) { spectrumTimer_->stop(); }
+    if (frameDropTimer_) { frameDropTimer_->stop(); }
+    if (mpv_ && initialized_) {
+        // ── WASAPI 독점 모드 명시적 해제 ──
+        // 종료 시 audio-exclusive=no를 먼저 설정하지 않으면
+        // WASAPI가 오디오 장치를 점유한 상태로 종료되어
+        // 다른 앱(브라우저, VLC 등)에서 소리가 안 나오는 문제 발생
+        mpv_set_property_string(mpv_, "audio-exclusive", "no");
+        // 재생 중이면 먼저 정지
+        const char* stopArgs[] = { "stop", nullptr };
+        mpv_command(mpv_, stopArgs);
+        // 오디오 장치 해제 대기 (mpv 내부 정리 시간)
+        QThread::msleep(80);
+    }
     if (mpv_) mpv_terminate_destroy(mpv_);
 }
 
