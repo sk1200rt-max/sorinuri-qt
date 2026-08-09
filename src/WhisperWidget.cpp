@@ -846,7 +846,8 @@ void WhisperWidget::translateSRT() {
     body["format"] = "text";
     if (!translateApiKey_.isEmpty()) body["api_key"] = translateApiKey_;
 
-    QNetworkRequest req(QUrl(translateApiUrl_));
+    QUrl apiUrl(translateApiUrl_);
+    QNetworkRequest req(apiUrl);
     req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
     req.setHeader(QNetworkRequest::UserAgentHeader, "Sorinuri/6.16.0");
 
