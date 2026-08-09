@@ -53,12 +53,9 @@ MpvCore::~MpvCore() {
         // 종료 시 audio-exclusive=no를 먼저 설정하지 않으면
         // WASAPI가 오디오 장치를 점유한 상태로 종료되어
         // 다른 앱(브라우저, VLC 등)에서 소리가 안 나오는 문제 발생
+        // 주의: mpv_terminate_destroy 전에 stop 명령을 보내면
+        // 종료 시퀀스 교란으로 충돌 발생 가능 → audio-exclusive만 해제
         mpv_set_property_string(mpv_, "audio-exclusive", "no");
-        // 재생 중이면 먼저 정지
-        const char* stopArgs[] = { "stop", nullptr };
-        mpv_command(mpv_, stopArgs);
-        // 오디오 장치 해제 대기 (mpv 내부 정리 시간)
-        QThread::msleep(80);
     }
     if (mpv_) mpv_terminate_destroy(mpv_);
 }
@@ -263,23 +260,21 @@ bool MpvCore::initialize(WId windowId) {
             env.ditherMode.toUtf8().constData()));
     }
 
-    // ── 오디오: WASAPI (저장된 모드 적용) ──────────────────────────────
-    // QSettings에서 저장된 독점 모드 값을 읽어 적용
-    // 노트북 기본값: false (공유 모드) → 내장 스피커 WASAPI 독점 모드 실패 방지
-    // 데스크톱 기본값: true (독점 모드) → 멀티체널 자동 인식 최적화
-    // 사용자가 설정에서 명시적으로 변경한 경우는 저장된 값을 우선 적용
+    // ── 오디오: WASAPI 독점 모드 (기본값: 독점) ──────────────────────────
+    // 독점 모드: Windows 미디어 미서를 우회하여 원본 비트스트림 출력
+    //   - Dolby/DTS 패스스루 동작 보장
+    //   - 리샘플링 없이 원본 음질 유지
+    //   - 5.1/7.1 멀티채널 원본 출력
+    // 독점 모드 실패 시 ao-reload 자동복구가 공유 모드로 폴백 처리
+    // 사용자가 설정에서 명시적으로 공유 모드로 변경 가능
     {
         QSettings s("Sorinuri", "SorinuriPlayer");
-        // 노트북 감지 시 기본값을 false로 설정
-        // 이미 저장된 값이 있으면 저장된 값을 사용 (사용자 선택 존중)
-        const bool defaultExclusive = !isLaptop_;  // 데스크톱=true, 노트북=false
-        const bool savedExclusive = s.value("audio/exclusive", defaultExclusive).toBool();
+        const bool savedExclusive = s.value("audio/exclusive", true).toBool();  // 기본값: 독점
         check_error(mpv_set_property_string(mpv_, "ao", "wasapi"));
         check_error(mpv_set_property_string(mpv_, "audio-exclusive",
             savedExclusive ? "yes" : "no"));
-        qInfo() << "[MPV] 오디오 모드:"
-                << (savedExclusive ? "독점 (Exclusive)" : "공유 (Shared)")
-                << (isLaptop_ ? "[노트북 기본: 공유]" : "[데스크톱 기본: 독점]");
+        qInfo() << "[MPV] WASAPI 모드:"
+                << (savedExclusive ? "독점 (Exclusive) - 원본 음질" : "공유 (Shared) - 사용자 설정");
     }
     // 패스스루: 돌비 애트모스/DTS:X 원본 비트스트림 리시버로 전송
     // (독점 모드에서만 실질적으로 동작)
@@ -702,25 +697,6 @@ void MpvCore::loadFile(const QString& path, bool append) {
         // audio-channels=auto: 파일마다 채널 수 자동 감지 (이전 파일 설정 초기화)
         // WASAPI 독점 모드에서 5.1/7.1 PCM 멀티채널 자동 출력 보장
         mpv_set_property_string(mpv_, "audio-channels", "auto");
-
-        // ── HDMI/광출력 장치 감지 → 노트북이라도 독점 모드 자동 활성화 ──
-        // 노트북 기본값은 공유 모드(내장 스피커 호환)이지만,
-        // HDMI 홈시어터/리시버 연결 시에는 독점 모드가 필수:
-        //   1) 공유 모드에서 Windows가 오디오를 리샘플링 → 음성 왜곡/음량 저하
-        //   2) 패스스루(Dolby/DTS 비트스트림)는 독점 모드에서만 동작
-        if (isLaptop_) {
-            const bool hdmiConnected = deviceLikelySupportsPassthrough();
-            if (hdmiConnected) {
-                // HDMI/광출력 감지 → 독점 모드로 자동 전환
-                QSettings s("Sorinuri", "SorinuriPlayer");
-                // 사용자가 명시적으로 공유 모드를 선택한 경우는 존중
-                // ("audio/exclusive" 키가 없으면 HDMI 자동 감지 결과 사용)
-                if (!s.contains("audio/exclusive")) {
-                    mpv_set_property_string(mpv_, "audio-exclusive", "yes");
-                    qInfo() << "[MPV] HDMI/광출력 감지 → 독점 모드 자동 활성화 (노트북)";
-                }
-            }
-        }
 
         if (deviceLikelySupportsPassthrough()) {
             if (passthroughEnabled_)

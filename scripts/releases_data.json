@@ -1,5 +1,14 @@
 [
   {
+    "version": "6.18.2",
+    "date": "2026-08-09",
+    "title": "WASAPI 독점 모드 복원 및 단축키 추가",
+    "desc": "WASAPI 기본값을 독점 모드(원본 음질)로 복원. Ctrl+Shift+E로 독점/공유 모드 즉시 전환. 소리누리 종료 후 다른 앱 소리 안 나오는 문제 수정.",
+    "installer": "https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v6.18.2/Sorinuri-Setup-6.18.2.exe",
+    "portable": "https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v6.18.2/Sorinuri-Qt-6.18.2-Portable.zip",
+    "tags": []
+  },
+  {
     "version": "6.18.1",
     "date": "2026-08-09",
     "title": "HDMI 홈시어터 음성 왜곡 수정",

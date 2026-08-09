@@ -1227,6 +1227,31 @@ void MainWindow::keyPressEvent(QKeyEvent* e) {
     case Qt::Key_Question:
         shortcutOverlay_->toggle();
         break;
+    case Qt::Key_E:
+        // Ctrl+Shift+E: WASAPI 독점/공유 모드 즉시 전환
+        if ((e->modifiers() & Qt::ControlModifier) && (e->modifiers() & Qt::ShiftModifier)) {
+            if (core) {
+                const bool currentExclusive =
+                    core->getProperty("audio-exclusive").toString() == "yes";
+                const bool newExclusive = !currentExclusive;
+                core->setAudioExclusive(newExclusive);
+                // QSettings에 저장 (다음 실행 시 유지)
+                QSettings s("Sorinuri", "SorinuriPlayer");
+                s.setValue("audio/exclusive", newExclusive);
+                // OSD로 현재 모드 표시
+                if (osdWidget_)
+                    osdWidget_->showInfo(newExclusive
+                        ? "WASAPI 독점 모드 (원본 음질)"
+                        : "WASAPI 공유 모드 (다중 앱 동시 재생)");
+                qInfo() << "[MainWindow] 단축키 Ctrl+Shift+E → WASAPI"
+                        << (newExclusive ? "독점" : "공유") << "모드 전환";
+            }
+            e->accept();
+            return;
+        }
+        // Ctrl+Shift 없이 E만 누른 경우: 자막 폰트 크기 감소 (기존 동작)
+        if (core) core->command({"add", "sub-scale", "-0.1"});
+        break;
     default: QMainWindow::keyPressEvent(e); break;
     }
 }
@@ -2193,29 +2218,10 @@ void MainWindow::loadSettings() {
     // 노트북 내장 스피커는 WASAPI 독점 모드를 지원하지 않는 경우가 많음
     // 실패 시 audio-fallback-to-null으로 영상 재생 보장
     {
-        const bool isLaptop = mpvWidget_->core()->isLaptop();
-        // ── HDMI/광출력 연결 감지 → 노트북이라도 독점 모드 자동 활성화 ──
-        // 노트북 기본값은 공유 모드(내장 스피커 호환)이지만,
-        // HDMI 홈시어터/리시버 연결 시 공유 모드에서 Windows 리샘플링으로 음성 왜곡 발생
-        // 사용자가 명시적으로 설정한 경우("audio/exclusive" 키 존재)는 그 값을 우선 적용
-        bool exclusiveToApply;
-        if (settings_.contains("audio/exclusive")) {
-            // 사용자 명시 설정 우선
-            exclusiveToApply = settings_.value("audio/exclusive").toBool();
-        } else if (isLaptop) {
-            // 노트북: HDMI 연결 여부 감지 후 자동 결정
-            // deviceLikelySupportsPassthrough()는 MPV 초기화 후 호출 가능
-            const bool hdmiConnected = mpvWidget_->core()->deviceLikelySupportsPassthrough();
-            exclusiveToApply = hdmiConnected;  // HDMI=독점, 내장스피커=공유
-            if (hdmiConnected)
-                qInfo() << "[MainWindow] 앱 시작 시 HDMI 감지 → 독점 모드 자동 활성화";
-            else
-                qInfo() << "[MainWindow] 앱 시작 시 내장 스피커 감지 → 공유 모드 유지";
-        } else {
-            // 데스크톱: 기본 독점 모드
-            exclusiveToApply = true;
-        }
-        if (exclusiveToApply)
+        // WASAPI 독점 모드: 기본값 true (독점)
+        // 독점 모드 실패 시 ao-reload 자동복구가 공유 모드로 폴백 처리
+        // 노트북/데스크톱 구분 없이 동일하게 적용 (단순화)
+        if (settings_.value("audio/exclusive", true).toBool())
             mpvWidget_->core()->setAudioExclusive(true);
     }
     if (settings_.value("audio/passthrough", true).toBool()) {
