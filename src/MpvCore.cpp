@@ -687,6 +687,26 @@ void MpvCore::loadFile(const QString& path, bool append) {
         // audio-channels=auto: 파일마다 채널 수 자동 감지 (이전 파일 설정 초기화)
         // WASAPI 독점 모드에서 5.1/7.1 PCM 멀티채널 자동 출력 보장
         mpv_set_property_string(mpv_, "audio-channels", "auto");
+
+        // ── HDMI/광출력 장치 감지 → 노트북이라도 독점 모드 자동 활성화 ──
+        // 노트북 기본값은 공유 모드(내장 스피커 호환)이지만,
+        // HDMI 홈시어터/리시버 연결 시에는 독점 모드가 필수:
+        //   1) 공유 모드에서 Windows가 오디오를 리샘플링 → 음성 왜곡/음량 저하
+        //   2) 패스스루(Dolby/DTS 비트스트림)는 독점 모드에서만 동작
+        if (isLaptop_) {
+            const bool hdmiConnected = deviceLikelySupportsPassthrough();
+            if (hdmiConnected) {
+                // HDMI/광출력 감지 → 독점 모드로 자동 전환
+                QSettings s("Sorinuri", "SorinuriPlayer");
+                // 사용자가 명시적으로 공유 모드를 선택한 경우는 존중
+                // ("audio/exclusive" 키가 없으면 HDMI 자동 감지 결과 사용)
+                if (!s.contains("audio/exclusive")) {
+                    mpv_set_property_string(mpv_, "audio-exclusive", "yes");
+                    qInfo() << "[MPV] HDMI/광출력 감지 → 독점 모드 자동 활성화 (노트북)";
+                }
+            }
+        }
+
         if (deviceLikelySupportsPassthrough()) {
             if (passthroughEnabled_)
                 mpv_set_property_string(mpv_, "audio-spdif", spdifCodecs_.toUtf8().constData());

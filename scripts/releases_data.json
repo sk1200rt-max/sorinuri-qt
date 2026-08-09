@@ -1,5 +1,14 @@
 [
   {
+    "version": "6.18.1",
+    "date": "2026-08-09",
+    "title": "HDMI 홈시어터 음성 왜곡 수정",
+    "desc": "노트북 + HDMI 홈시어터 연결 시 음성 왜곡·음량 저하 수정: HDMI 감지 시 WASAPI 독점 모드 자동 활성화, HDMI 연결/해제 시 실시간 모드 전환",
+    "installer": "https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v6.18.1/Sorinuri-Setup-6.18.1.exe",
+    "portable": "https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v6.18.1/Sorinuri-Qt-6.18.1-Portable.zip",
+    "tags": []
+  },
+  {
     "version": "6.18.0",
     "date": "2026-08-09",
     "title": "클라우드 연동 완성 및 AI 기능 강화",
