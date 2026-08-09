@@ -3,6 +3,7 @@
 #include <QVector>
 #include <QPixmap>
 #include <QLabel>
+#include <QProcess>
 
 class QPushButton;
 class QListWidget;
@@ -82,10 +83,15 @@ public slots:
     void jumpToChapter(int idx);
     void onPositionChanged(double sec);
     void generateThumbnails(const QString& filePath);
+    // AI 장면 전환 감지
+    void detectScenes(const QString& filePath);
 
 signals:
     void seekRequested(double sec);
     void chaptersChanged();
+
+private slots:
+    void onSceneDetectFinished(int exitCode, QProcess::ExitStatus status);
 
 private:
     void buildUI();
@@ -98,6 +104,10 @@ private:
     double           duration_      = 0.0;
     double           currentPos_    = 0.0;
     QString          mediaPath_;
+
+    // AI 장면 감지
+    QProcess*        sceneProcess_  = nullptr;
+    QPushButton*     btnDetect_     = nullptr;
 
     // UI 컴포넌트
     ChapterTimeline* timeline_      = nullptr;

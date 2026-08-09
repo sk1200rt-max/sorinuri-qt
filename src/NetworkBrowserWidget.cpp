@@ -1,6 +1,7 @@
 #include "NetworkBrowserWidget.h"
 #include "MpvCore.h"
 #include <QVBoxLayout>
+#include <QRegularExpression>
 #include <QNetworkInterface>
 #include <QAbstractSocket>
 #include <QNetworkAccessManager>
@@ -59,11 +60,13 @@ void NetworkBrowserWidget::setupUI()
     auto* tabs = new QTabWidget(this);
     tabs->setDocumentMode(true);
 
-    auto* smbPage = new QWidget(); buildSmbTab(smbPage);
-    auto* vrPage  = new QWidget(); build360Tab(vrPage);
-    auto* castPage= new QWidget(); buildCastTab(castPage);
+    auto* smbPage  = new QWidget(); buildSmbTab(smbPage);
+    auto* vrPage   = new QWidget(); build360Tab(vrPage);
+    auto* castPage = new QWidget(); buildCastTab(castPage);
+    auto* davPage  = new QWidget(); buildWebDavTab(davPage);
 
     tabs->addTab(smbPage,  "SMB/NAS");
+    tabs->addTab(davPage,  "☁ WebDAV");
     tabs->addTab(vrPage,   "360° VR");
     tabs->addTab(castPage, "캐스팅");
 
@@ -475,4 +478,218 @@ void NetworkBrowserWidget::saveSettings()
         settings_.setValue("network/vr360_enabled", vr360Check_->isChecked());
     if (castUrlEdit_)
         settings_.setValue("network/cast_ip", castUrlEdit_->text());
+}
+
+// ─── WebDAV / Nextcloud 스트리밍 탭 ─────────────────────────────────────────
+void NetworkBrowserWidget::buildWebDavTab(QWidget* parent)
+{
+    auto* layout = new QVBoxLayout(parent);
+    layout->setContentsMargins(12, 12, 12, 12);
+    layout->setSpacing(8);
+
+    // 헤더
+    auto* lblHdr = new QLabel("☁  WebDAV / Nextcloud 스트리밍");
+    lblHdr->setStyleSheet("color: #00D4B4; font-size: 13px; font-weight: bold;");
+    layout->addWidget(lblHdr);
+
+    auto* lblDesc = new QLabel("Nextcloud, ownCloud, 개인 NAS의 WebDAV 주소를 입력하여 미디어를 스트리밍합니다.");
+    lblDesc->setStyleSheet("color: #666; font-size: 11px;");
+    lblDesc->setWordWrap(true);
+    layout->addWidget(lblDesc);
+
+    // 서버 URL
+    auto* grpConn = new QGroupBox("서버 연결");
+    auto* connLayout = new QVBoxLayout(grpConn);
+
+    auto* rowUrl = new QHBoxLayout;
+    rowUrl->addWidget(new QLabel("서버 URL:"));
+    davUrlEdit_ = new QLineEdit;
+    davUrlEdit_->setPlaceholderText("https://nextcloud.example.com/remote.php/dav/files/user/");
+    rowUrl->addWidget(davUrlEdit_, 1);
+    connLayout->addLayout(rowUrl);
+
+    auto* rowUser = new QHBoxLayout;
+    rowUser->addWidget(new QLabel("사용자명:"));
+    davUserEdit_ = new QLineEdit;
+    davUserEdit_->setPlaceholderText("username");
+    rowUser->addWidget(davUserEdit_, 1);
+    connLayout->addLayout(rowUser);
+
+    auto* rowPass = new QHBoxLayout;
+    rowPass->addWidget(new QLabel("비밀번호:"));
+    davPassEdit_ = new QLineEdit;
+    davPassEdit_->setEchoMode(QLineEdit::Password);
+    davPassEdit_->setPlaceholderText("password or app token");
+    rowPass->addWidget(davPassEdit_, 1);
+    connLayout->addLayout(rowPass);
+
+    auto* rowBtns = new QHBoxLayout;
+    auto* btnConnect = new QPushButton("🔗  연결");
+    btnConnect->setStyleSheet(
+        "QPushButton { background: #1a3a2a; color: #00D4B4; border: 1px solid #00D4B4;"
+        "  border-radius: 4px; padding: 6px 16px; }"
+        "QPushButton:hover { background: #1e4a3a; }");
+    auto* btnSave = new QPushButton("💾  저장");
+    rowBtns->addWidget(btnConnect);
+    rowBtns->addWidget(btnSave);
+    rowBtns->addStretch();
+    connLayout->addLayout(rowBtns);
+
+    layout->addWidget(grpConn);
+
+    // 파일 목록
+    auto* grpFiles = new QGroupBox("파일 목록");
+    auto* filesLayout = new QVBoxLayout(grpFiles);
+
+    davStatusLabel_ = new QLabel("서버에 연결하여 파일 목록을 불러오세요");
+    davStatusLabel_->setStyleSheet("color: #666; font-size: 11px;");
+    filesLayout->addWidget(davStatusLabel_);
+
+    davFileList_ = new QListWidget;
+    davFileList_->setStyleSheet(
+        "QListWidget { background: #0d0d0d; border: 1px solid #1e1e1e; border-radius: 4px; }"
+        "QListWidget::item { padding: 6px 8px; border-bottom: 1px solid #1a1a1a; }"
+        "QListWidget::item:selected { background: #1a3a2a; color: #00D4B4; }");
+    filesLayout->addWidget(davFileList_);
+
+    auto* btnPlay = new QPushButton("▶  선택 파일 재생");
+    btnPlay->setStyleSheet(
+        "QPushButton { background: #1a3a2a; color: #00D4B4; border: none;"
+        "  border-radius: 4px; padding: 8px; font-size: 12px; }"
+        "QPushButton:hover { background: #1e4a3a; }");
+    filesLayout->addWidget(btnPlay);
+
+    layout->addWidget(grpFiles, 1);
+
+    // 시그널 연결
+    connect(btnConnect, &QPushButton::clicked, this, [this]() {
+        QString url  = davUrlEdit_->text().trimmed();
+        QString user = davUserEdit_->text().trimmed();
+        QString pass = davPassEdit_->text();
+
+        if (url.isEmpty()) {
+            davStatusLabel_->setText("서버 URL을 입력하세요");
+            return;
+        }
+
+        davStatusLabel_->setText("연결 중...");
+        davFileList_->clear();
+
+        // WebDAV PROPFIND 요청으로 파일 목록 가져오기
+        auto* mgr = new QNetworkAccessManager(this);
+        QNetworkRequest req(QUrl(url));
+        req.setRawHeader("Depth", "1");
+        req.setRawHeader("Content-Type", "application/xml");
+
+        // Basic 인증
+        if (!user.isEmpty()) {
+            QString credentials = user + ":" + pass;
+            req.setRawHeader("Authorization",
+                "Basic " + credentials.toUtf8().toBase64());
+        }
+
+        // PROPFIND 요청
+        QByteArray body = "<?xml version=\"1.0\" encoding=\"utf-8\"?>"
+            "<D:propfind xmlns:D=\"DAV:\">"
+            "<D:prop><D:displayname/><D:getcontenttype/><D:getcontentlength/></D:prop>"
+            "</D:propfind>";
+
+        auto* reply = mgr->sendCustomRequest(req, "PROPFIND", body);
+        connect(reply, &QNetworkReply::finished, this, [this, reply, url, user, pass, mgr]() {
+            reply->deleteLater();
+            mgr->deleteLater();
+
+            if (reply->error() != QNetworkReply::NoError) {
+                davStatusLabel_->setText("연결 실패: " + reply->errorString());
+                return;
+            }
+
+            QString xml = QString::fromUtf8(reply->readAll());
+            davBaseUrl_  = url;
+            davUser_     = user;
+            davPass_     = pass;
+
+            // XML 파싱 - href 및 displayname 추출
+            davFileList_->clear();
+            QRegularExpression hrefRe(R"(<D:href>([^<]+)</D:href>)");
+            QRegularExpression nameRe(R"(<D:displayname>([^<]+)</D:displayname>)");
+            QRegularExpression typeRe(R"(<D:getcontenttype>([^<]+)</D:getcontenttype>)");
+
+            auto hrefIt = hrefRe.globalMatch(xml);
+            auto nameIt = nameRe.globalMatch(xml);
+            auto typeIt = typeRe.globalMatch(xml);
+
+            QStringList hrefs, names, types;
+            while (hrefIt.hasNext()) hrefs << hrefIt.next().captured(1);
+            while (nameIt.hasNext()) names << nameIt.next().captured(1);
+            while (typeIt.hasNext()) types << typeIt.next().captured(1);
+
+            // 미디어 파일만 필터링
+            static const QStringList MEDIA_EXTS = {
+                "mp4","mkv","avi","mov","wmv","mp3","flac","wav","aac","m4a","ogg","opus"
+            };
+
+            int count = 0;
+            for (int i = 0; i < hrefs.size(); ++i) {
+                QString href = hrefs[i];
+                QString ext  = QFileInfo(href).suffix().toLower();
+                if (!MEDIA_EXTS.contains(ext)) continue;
+
+                QString name = (i < names.size()) ? names[i] : QFileInfo(href).fileName();
+                QString type = (i < types.size()) ? types[i] : "";
+
+                QString icon = type.startsWith("video") ? "🎬" : "🎵";
+                auto* item = new QListWidgetItem(icon + "  " + name);
+                item->setData(Qt::UserRole, href);
+                davFileList_->addItem(item);
+                count++;
+            }
+
+            davStatusLabel_->setText(QString("파일 %1개 발견").arg(count));
+        });
+    });
+
+    connect(btnSave, &QPushButton::clicked, this, [this]() {
+        settings_.setValue("webdav/url",  davUrlEdit_->text());
+        settings_.setValue("webdav/user", davUserEdit_->text());
+        // 비밀번호는 평문 저장 (실제 서비스에서는 Windows Credential Manager 사용 권장)
+        settings_.setValue("webdav/pass", davPassEdit_->text());
+        davStatusLabel_->setText("설정이 저장되었습니다");
+    });
+
+    connect(davFileList_, &QListWidget::itemDoubleClicked, this, [this](QListWidgetItem* item) {
+        QString href = item->data(Qt::UserRole).toString();
+        if (href.isEmpty()) return;
+
+        // 전체 URL 구성
+        QUrl baseUrl(davBaseUrl_);
+        QString fullUrl;
+        if (href.startsWith("http")) {
+            fullUrl = href;
+        } else {
+            fullUrl = baseUrl.scheme() + "://" + baseUrl.host();
+            if (baseUrl.port() > 0) fullUrl += ":" + QString::number(baseUrl.port());
+            fullUrl += href;
+        }
+
+        // Basic 인증 포함 URL 생성
+        if (!davUser_.isEmpty()) {
+            QUrl u(fullUrl);
+            u.setUserName(davUser_);
+            u.setPassword(davPass_);
+            fullUrl = u.toString();
+        }
+
+        emit fileRequested(fullUrl);
+    });
+
+    connect(btnPlay, &QPushButton::clicked, this, [this]() {
+        auto* item = davFileList_->currentItem();
+        if (item) emit davFileList_->itemDoubleClicked(item);
+    });
+
+    // 저장된 설정 복원
+    davUrlEdit_->setText(settings_.value("webdav/url").toString());
+    davUserEdit_->setText(settings_.value("webdav/user").toString());
+    davPassEdit_->setText(settings_.value("webdav/pass").toString());
 }

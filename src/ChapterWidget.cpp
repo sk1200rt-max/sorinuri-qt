@@ -5,6 +5,10 @@
 #include "ChapterWidget.h"
 #include "MpvCore.h"
 #include <QVBoxLayout>
+#include <QProcess>
+#include <QRegularExpression>
+#include <QFile>
+#include <QCoreApplication>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPushButton>
@@ -334,6 +338,14 @@ void ChapterWidget::buildUI() {
     panelRoot->addLayout(rowBtns);
     panelRoot->addSpacing(8);
 
+    // AI 장면 감지 버튼
+    btnDetect_ = new QPushButton("🤖  AI 장면 자동 감지");
+    btnDetect_->setObjectName("btnDetect");
+    btnDetect_->setToolTip("ffmpeg으로 영상의 장면 전환을 자동 감지하여 챕터를 생성합니다");
+    panelRoot->addSpacing(4);
+    panelRoot->addWidget(btnDetect_);
+    panelRoot->addSpacing(8);
+
     // 단축키 힌트
     auto* lblHint = new QLabel("단축키: B 북마크 추가  |  [ ] 챕터 이동");
     lblHint->setObjectName("hint");
@@ -357,6 +369,9 @@ void ChapterWidget::buildUI() {
     connect(btnRemoveBm_, &QPushButton::clicked, this, [this](){
         int row = lstChapters_->currentRow();
         if (row >= 0) removeBookmark(row);
+    });
+    connect(btnDetect_, &QPushButton::clicked, this, [this](){
+        if (!mediaPath_.isEmpty()) detectScenes(mediaPath_);
     });
 }
 
@@ -450,4 +465,90 @@ void ChapterWidget::refreshTimeline() {
 
 QString ChapterWidget::formatTime(double sec) const {
     return formatTimeStatic(sec);
+}
+
+// ─── AI 장면 전환 감지 ────────────────────────────────────────────────────────
+void ChapterWidget::detectScenes(const QString& filePath) {
+    if (sceneProcess_ && sceneProcess_->state() != QProcess::NotRunning) {
+        sceneProcess_->kill();
+    }
+
+    // ffmpeg.exe 경로: 앱 디렉토리 또는 PATH에서 탐색
+    QString ffmpegPath = QCoreApplication::applicationDirPath() + "/ffmpeg.exe";
+    if (!QFile::exists(ffmpegPath)) ffmpegPath = "ffmpeg";
+
+    if (btnDetect_) {
+        btnDetect_->setEnabled(false);
+        btnDetect_->setText("🔍  분석 중...");
+    }
+
+    // ffmpeg -vf "select='gt(scene,0.35)',showinfo" 로 장면 전환 타임코드 추출
+    // 출력 예: [Parsed_showinfo_1 @ ...] n:0 pts:0 pts_time:0.000 ...
+    sceneProcess_ = new QProcess(this);
+    sceneProcess_->setProcessChannelMode(QProcess::MergedChannels);
+    connect(sceneProcess_, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, &ChapterWidget::onSceneDetectFinished);
+
+    QStringList args;
+    args << "-i" << filePath
+         << "-vf" << "select='gt(scene,0.35)',showinfo"
+         << "-vsync" << "vfr"
+         << "-f" << "null"
+         << "-";
+    sceneProcess_->start(ffmpegPath, args);
+}
+
+void ChapterWidget::onSceneDetectFinished(int exitCode, QProcess::ExitStatus /*status*/) {
+    Q_UNUSED(exitCode)
+
+    if (btnDetect_) {
+        btnDetect_->setEnabled(true);
+        btnDetect_->setText("🤖  AI 장면 자동 감지");
+    }
+
+    if (!sceneProcess_) return;
+    QString output = QString::fromLocal8Bit(sceneProcess_->readAllStandardOutput());
+    sceneProcess_->deleteLater();
+    sceneProcess_ = nullptr;
+
+    // pts_time:숫자 패턴으로 타임코드 추출
+    QRegularExpression re(R"(pts_time:(\d+\.?\d*))");
+    QRegularExpressionMatchIterator it = re.globalMatch(output);
+
+    // 기존 AI 감지 챕터 제거 (북마크는 유지)
+    chapters_.erase(std::remove_if(chapters_.begin(), chapters_.end(),
+        [](const Chapter& c){ return !c.isBookmark && c.title.startsWith("장면 "); }), chapters_.end());
+
+    int sceneIdx = 1;
+    double lastSec = -5.0;  // 최소 5초 간격 필터
+    while (it.hasNext()) {
+        QRegularExpressionMatch m = it.next();
+        double sec = m.captured(1).toDouble();
+        if (sec - lastSec < 5.0) continue;  // 너무 짧은 장면 제외
+        lastSec = sec;
+        Chapter ch;
+        ch.startSec = sec;
+        ch.title    = QString("장면 %1").arg(sceneIdx++);
+        chapters_.append(ch);
+    }
+
+    if (chapters_.isEmpty()) {
+        // 장면 감지 결과 없으면 균등 분할 (10분 단위)
+        if (duration_ > 0) {
+            double interval = 600.0;
+            for (double t = interval; t < duration_; t += interval) {
+                Chapter ch;
+                ch.startSec = t;
+                ch.title    = QString("장면 %1").arg(sceneIdx++);
+                chapters_.append(ch);
+            }
+        }
+    }
+
+    std::sort(chapters_.begin(), chapters_.end(),
+        [](const Chapter& a, const Chapter& b){ return a.startSec < b.startSec; });
+
+    refreshList();
+    refreshTimeline();
+    emit chaptersChanged();
 }

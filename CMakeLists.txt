@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(Sorinuri VERSION 6.16.0 LANGUAGES CXX)
+project(Sorinuri VERSION 6.17.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -123,6 +123,12 @@ set(SOURCES
     src/RenderEnvironment.h
     src/SMTCManager.cpp
     src/SMTCManager.h
+    src/VoiceControlWidget.cpp
+    src/VoiceControlWidget.h
+    src/ScrobbleManager.cpp
+    src/ScrobbleManager.h
+    src/CloudDriveManager.cpp
+    src/CloudDriveManager.h
     resources/resources.qrc
 )
 

@@ -15,11 +15,12 @@
  *
  * 탭 구성:
  *  1. SMB/NAS    - UNC 경로(\\server\share) 직접 입력 및 즐겨찾기
- *  2. 360도 VR   - 현재 재생 중인 영상에 360도 구면 투영 적용
- *  3. 캐스팅     - 크롬캐스트/AirPlay 송출 (URL 기반)
+ *  2. ☁ WebDAV  - Nextcloud/ownCloud/개인 NAS WebDAV 스트리밍 (v6.17.0 신규)
+ *  3. 360도 VR   - 현재 재생 중인 영상에 360도 구면 투영 적용
+ *  4. 캐스팅     - 크롬캐스트/AirPlay 송출 (URL 기반)
  *
  * 기존 코드에 영향 없는 독립 모듈.
- * 파일 열기는 openFileRequested 시그널을 통해 MainWindow에 위임.
+ * 파일 열기는 openFileRequested / fileRequested 시그널을 통해 MainWindow에 위임.
  */
 class MpvCore;
 
@@ -31,6 +32,7 @@ public:
 signals:
     void openFileRequested(const QString& path);   // SMB 경로 열기 요청
     void castRequested(const QString& url);         // 캐스팅 요청
+    void fileRequested(const QString& url);         // WebDAV 파일 재생 요청
 
 public slots:
     void loadSettings();
@@ -48,6 +50,7 @@ private:
     void buildSmbTab(QWidget* parent);
     void build360Tab(QWidget* parent);
     void buildCastTab(QWidget* parent);
+    void buildWebDavTab(QWidget* parent);  // v6.17.0 신규
 
     MpvCore*  core_     = nullptr;
     QSettings settings_;
@@ -68,4 +71,14 @@ private:
     QLineEdit*   castUrlEdit_      = nullptr;
     QPushButton* castStartBtn_     = nullptr;
     QLabel*      castStatusLabel_  = nullptr;
+
+    // WebDAV 탭 (v6.17.0 신규)
+    QLineEdit*   davUrlEdit_       = nullptr;
+    QLineEdit*   davUserEdit_      = nullptr;
+    QLineEdit*   davPassEdit_      = nullptr;
+    QListWidget* davFileList_      = nullptr;
+    QLabel*      davStatusLabel_   = nullptr;
+    QString      davBaseUrl_;
+    QString      davUser_;
+    QString      davPass_;
 };

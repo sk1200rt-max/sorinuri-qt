@@ -1,6 +1,11 @@
 #include "MediaLibraryWidget.h"
 #include "AlbumArtExtractor.h"
 #include <QPainter>
+#include <QProcess>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QCoreApplication>
+#include <QFile>
 #include <QPainterPath>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -106,9 +111,20 @@ void MediaLibraryWidget::setupUI() {
         "QPushButton:hover { color: #4fc3f7; }");
     connect(btnRefresh, &QPushButton::clicked, this, &MediaLibraryWidget::refresh);
 
+    // AI 오디오 태깅 버튼
+    btnAnalyze_ = new QPushButton("🤖 AI 태깅", toolbar);
+    btnAnalyze_->setToolTip("음악 파일의 BPM, 분위기, 장르를 AI가 자동 분석합니다");
+    btnAnalyze_->setStyleSheet(
+        "QPushButton { background: #1a3a2a; color: #00D4B4; border: none; border-radius: 3px;"
+        "  padding: 6px 12px; font-size: 12px; }"
+        "QPushButton:hover { background: #1e4a3a; }"
+        "QPushButton:disabled { color: #444; background: #111; }");
+    connect(btnAnalyze_, &QPushButton::clicked, this, &MediaLibraryWidget::onAnalyzeAll);
+
     tbLayout->addWidget(searchEdit_, 1);
     tbLayout->addWidget(btnAdd);
     tbLayout->addWidget(btnRefresh);
+    tbLayout->addWidget(btnAnalyze_);
     mainLayout->addWidget(toolbar);
 
     // 탭 (비디오 / 음악)
@@ -183,8 +199,17 @@ void MediaLibraryWidget::setupDatabase() {
                "  title TEXT,"
                "  type TEXT,"
                "  duration REAL,"
-               "  added_at INTEGER"
-               ")");
+               "  added_at INTEGER,"
+               "  bpm REAL DEFAULT 0,"
+               "  mood TEXT DEFAULT '',"
+               "  genre TEXT DEFAULT '',"
+               "  ai_tagged INTEGER DEFAULT 0"
+               ")");"
+        // 기존 DB에 컨럼 없으면 추가 (ALTER TABLE 실패 시 무시)
+        q.exec("ALTER TABLE media ADD COLUMN bpm REAL DEFAULT 0");
+        q.exec("ALTER TABLE media ADD COLUMN mood TEXT DEFAULT ''");
+        q.exec("ALTER TABLE media ADD COLUMN genre TEXT DEFAULT ''");
+        q.exec("ALTER TABLE media ADD COLUMN ai_tagged INTEGER DEFAULT 0");
     }
 }
 
@@ -372,4 +397,149 @@ QPixmap MediaLibraryWidget::makeThumbnailFromAlbumArt(const QString& path) {
 
 void MediaLibraryWidget::onThumbnailLoaded(const QString& path, const QPixmap& thumb) {
     thumbCache_[path] = thumb;
+}
+
+// ─── AI 오디오 자동 태깅 ─────────────────────────────────────────────────────
+void MediaLibraryWidget::onAnalyzeAll() {
+    if (audioFiles_.isEmpty()) {
+        statusLabel_->setText("분석할 음악 파일이 없습니다. 먼저 폴더를 추가하세요.");
+        return;
+    }
+
+    // 미분석 파일만 큐에 추가
+    auto db = QSqlDatabase::database("library");
+    analyzeQueue_.clear();
+    if (db.isOpen()) {
+        QSqlQuery q(db);
+        for (const QString& f : audioFiles_) {
+            q.prepare("SELECT ai_tagged FROM media WHERE path=?");
+            q.addBindValue(f);
+            q.exec();
+            if (q.next() && q.value(0).toInt() == 0) {
+                analyzeQueue_.append(f);
+            }
+        }
+    } else {
+        analyzeQueue_ = audioFiles_;
+    }
+
+    if (analyzeQueue_.isEmpty()) {
+        statusLabel_->setText("모든 파일이 이미 분석되었습니다.");
+        return;
+    }
+
+    analyzeTotal_ = analyzeQueue_.size();
+    analyzeDone_  = 0;
+    btnAnalyze_->setEnabled(false);
+    btnAnalyze_->setText("분석 중...");
+    progressBar_->setRange(0, analyzeTotal_);
+    progressBar_->setValue(0);
+    progressBar_->show();
+    analyzeNextFile();
+}
+
+void MediaLibraryWidget::analyzeNextFile() {
+    if (analyzeQueue_.isEmpty()) {
+        // 완료
+        if (btnAnalyze_) {
+            btnAnalyze_->setEnabled(true);
+            btnAnalyze_->setText("🤖 AI 태깅");
+        }
+        progressBar_->hide();
+        statusLabel_->setText(QString("AI 태깅 완료: %1개 파일 분석됨").arg(analyzeDone_));
+        return;
+    }
+
+    QString filePath = analyzeQueue_.takeFirst();
+
+    // ffprobe로 장르/BPM 메타데이터 추출
+    QString ffprobePath = QCoreApplication::applicationDirPath() + "/ffprobe.exe";
+    if (!QFile::exists(ffprobePath)) ffprobePath = "ffprobe";
+
+    analyzeProcess_ = new QProcess(this);
+    connect(analyzeProcess_, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, [this, filePath](int exitCode, QProcess::ExitStatus status) {
+        Q_UNUSED(exitCode)
+        Q_UNUSED(status)
+
+        QString output;
+        if (analyzeProcess_) {
+            output = QString::fromLocal8Bit(analyzeProcess_->readAllStandardOutput());
+            analyzeProcess_->deleteLater();
+            analyzeProcess_ = nullptr;
+        }
+
+        // 메타데이터 파싱 (ffprobe JSON 출력)
+        double bpm = 0.0;
+        QString genre, mood;
+
+        QJsonDocument doc = QJsonDocument::fromJson(output.toUtf8());
+        if (!doc.isNull()) {
+            QJsonObject tags = doc.object()
+                .value("format").toObject()
+                .value("tags").toObject();
+            genre = tags.value("genre").toString();
+            QString bpmStr = tags.value("BPM").toString();
+            if (bpmStr.isEmpty()) bpmStr = tags.value("bpm").toString();
+            if (bpmStr.isEmpty()) bpmStr = tags.value("TBPM").toString();
+            bpm = bpmStr.toDouble();
+        }
+
+        // 분위기 추론 (BPM + 장르 기반 휴리스틱)
+        mood = inferMood(bpm, genre);
+
+        // DB 업데이트
+        auto db = QSqlDatabase::database("library");
+        if (db.isOpen()) {
+            QSqlQuery q(db);
+            q.prepare("UPDATE media SET bpm=?, mood=?, genre=?, ai_tagged=1 WHERE path=?");
+            q.addBindValue(bpm);
+            q.addBindValue(mood);
+            q.addBindValue(genre);
+            q.addBindValue(filePath);
+            q.exec();
+        }
+
+        analyzeDone_++;
+        progressBar_->setValue(analyzeDone_);
+        statusLabel_->setText(QString("AI 분석 중... %1/%2").arg(analyzeDone_).arg(analyzeTotal_));
+
+        // 다음 파일 처리
+        analyzeNextFile();
+    });
+
+    QStringList args;
+    args << "-v" << "quiet"
+         << "-print_format" << "json"
+         << "-show_format"
+         << filePath;
+    analyzeProcess_->start(ffprobePath, args);
+}
+
+void MediaLibraryWidget::onAnalyzeFinished(int exitCode, QProcess::ExitStatus status) {
+    Q_UNUSED(exitCode) Q_UNUSED(status)
+    // analyzeNextFile 람다에서 처리됨
+}
+
+QString MediaLibraryWidget::inferMood(double bpm, const QString& genre) const {
+    QString g = genre.toLower();
+
+    // 장르 기반 분위기
+    if (g.contains("classical") || g.contains("클래식")) return "평온";
+    if (g.contains("jazz"))                               return "여유";
+    if (g.contains("metal") || g.contains("punk"))       return "격렬";
+    if (g.contains("ambient") || g.contains("chill"))    return "몽환";
+    if (g.contains("blues"))                              return "감성";
+    if (g.contains("hip") || g.contains("rap"))          return "활기";
+
+    // BPM 기반 분위기
+    if (bpm > 0) {
+        if (bpm < 70)  return "평온";
+        if (bpm < 100) return "여유";
+        if (bpm < 130) return "활기";
+        if (bpm < 160) return "신남";
+        return "격렬";
+    }
+
+    return "알 수 없음";
 }

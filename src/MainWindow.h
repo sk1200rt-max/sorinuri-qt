@@ -46,6 +46,9 @@
 #include "SplashAdWidget.h"
 #include "OriginalsWidget.h"
 #include "SMTCManager.h"
+#include "ScrobbleManager.h"
+#include "CloudDriveManager.h"
+#include "VoiceControlWidget.h"
 #include <QTcpServer>
 #include <QTcpSocket>
 #include <QHostAddress>
@@ -169,6 +172,9 @@ private:
     SMTCManager*          smtcManager_          = nullptr;  // Windows 잠금 화면 미디어 컨트롤
     ShortcutConfigWidget* shortcutConfigWidget_  = nullptr;  // 단축키 커스터마이징 UI
     ScreenRecorder*       screenRecorder_        = nullptr;  // 화면 녹화
+    VoiceControlWidget*   voiceControlWidget_    = nullptr;  // AI 음성 명령 제어
+    ScrobbleManager*      scrobbleManager_       = nullptr;  // Last.fm 스크로블링
+    CloudDriveManager*    cloudDriveManager_     = nullptr;  // 클라우드 드라이브 연동
 
     // 멀티체널 안내 상태 (파일당 한 번만 표시)
     bool   multichannelPromptShown_ = false;

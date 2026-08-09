@@ -242,6 +242,16 @@ void MainWindow::setupConnections() {
     // 재생/일시정지/이전/다음 버튼 → MPV 명령 연결
     smtcManager_ = new SMTCManager(this);
     // HWND는 show() 후에 유효하므로 singleShot(0)으로 이벤트 루프 후 초기화
+
+    // ScrobbleManager 초기화 (Last.fm 스크로블링)
+    scrobbleManager_ = new ScrobbleManager(this);
+
+    // CloudDriveManager 초기화
+    cloudDriveManager_ = new CloudDriveManager(this);
+    connect(cloudDriveManager_, &CloudDriveManager::downloadUrlReady,
+            this, [this](const QString& url, const QString& /*name*/) {
+        openFiles({url});
+    });
     QTimer::singleShot(0, this, [this]() {
         if (smtcManager_->initialize(reinterpret_cast<void*>(winId()))) {
             qInfo() << "[MainWindow] SMTC 초기화 성공";
@@ -1275,7 +1285,9 @@ void MainWindow::toggleProFeatures() {
             proFeatures_->addTab(networkBrowserWidget_, "네트워크");
             // SMB 파일 열기 요청 연결
             connect(networkBrowserWidget_, &NetworkBrowserWidget::openFileRequested,
-                    this, [this](const QString& path) { openFiles({path}); });
+                    this, [this](const QString& path) { openFiles({path});
+    connect(networkBrowserWidget_, &NetworkBrowserWidget::fileRequested,
+            this, [this](const QString& url){ openFiles({url}); }); });
         }
         // 스마트 미디어 라이브러리
         if (!mediaLibrary_) {
@@ -1448,6 +1460,31 @@ void MainWindow::toggleProFeatures() {
     if (!screenRecorder_) {
         screenRecorder_ = new ScreenRecorder(proFeatures_);
         proFeatures_->addTab(screenRecorder_, "🎥 화면 녹화");
+
+        // v6.17.0 신규 탭
+        if (!voiceControlWidget_) {
+            voiceControlWidget_ = new VoiceControlWidget(proFeatures_);
+            // 음성 명령 시그널 연결
+            connect(voiceControlWidget_, &VoiceControlWidget::commandPlay,
+                    this, [this](){ mpvCore_->command("cycle pause"); });
+            connect(voiceControlWidget_, &VoiceControlWidget::commandPause,
+                    this, [this](){ mpvCore_->command("cycle pause"); });
+            connect(voiceControlWidget_, &VoiceControlWidget::commandStop,
+                    this, [this](){ mpvCore_->command("stop"); });
+            connect(voiceControlWidget_, &VoiceControlWidget::commandNext,
+                    this, [this](){ mpvCore_->command("playlist-next"); });
+            connect(voiceControlWidget_, &VoiceControlWidget::commandPrev,
+                    this, [this](){ mpvCore_->command("playlist-prev"); });
+            connect(voiceControlWidget_, &VoiceControlWidget::commandVolume,
+                    this, [this](int v){ mpvCore_->setProperty("volume", v); });
+            connect(voiceControlWidget_, &VoiceControlWidget::commandMute,
+                    this, [this](){ mpvCore_->command("cycle mute"); });
+            connect(voiceControlWidget_, &VoiceControlWidget::commandSeek,
+                    this, [this](double s){ mpvCore_->seek(s, false); });
+            connect(voiceControlWidget_, &VoiceControlWidget::commandFullscreen,
+                    this, [this](){ toggleFullscreen(); });
+        }
+        proFeatures_->addTab(voiceControlWidget_, "🎙 음성 제어");
         // 녹화 완료 시 OSD 알림
         connect(screenRecorder_, &ScreenRecorder::recordingStarted,
                 this, [this](const QString&) {
