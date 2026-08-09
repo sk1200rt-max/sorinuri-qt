@@ -577,7 +577,8 @@ void NetworkBrowserWidget::buildWebDavTab(QWidget* parent)
 
         // WebDAV PROPFIND 요청으로 파일 목록 가져오기
         auto* mgr = new QNetworkAccessManager(this);
-        QNetworkRequest req(QUrl(url));
+        QUrl davUrl(url);
+        QNetworkRequest req(davUrl);
         req.setRawHeader("Depth", "1");
         req.setRawHeader("Content-Type", "application/xml");
 

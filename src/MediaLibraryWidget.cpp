@@ -204,7 +204,7 @@ void MediaLibraryWidget::setupDatabase() {
                "  mood TEXT DEFAULT '',"
                "  genre TEXT DEFAULT '',"
                "  ai_tagged INTEGER DEFAULT 0"
-               ")");"
+               ")");
         // 기존 DB에 컨럼 없으면 추가 (ALTER TABLE 실패 시 무시)
         q.exec("ALTER TABLE media ADD COLUMN bpm REAL DEFAULT 0");
         q.exec("ALTER TABLE media ADD COLUMN mood TEXT DEFAULT ''");

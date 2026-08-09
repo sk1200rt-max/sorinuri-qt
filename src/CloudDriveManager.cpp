@@ -7,6 +7,8 @@
 #include <QDesktopServices>
 #include <QUrl>
 #include <QTcpSocket>
+#include <QFileInfo>
+#include <QRegularExpression>
 #include <QSettings>
 
 // OneDrive (Microsoft Graph API) - 공개 클라이언트 앱 ID
@@ -138,8 +140,9 @@ void CloudDriveManager::exchangeCodeForToken(Provider p, const QString& code) {
         body.addQueryItem("redirect_uri", redirectUri);
         body.addQueryItem("grant_type",   "authorization_code");
 
-        QNetworkRequest req(QUrl("https://login.microsoftonline.com/common/oauth2/v2.0/token"));
-        req.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
+        QUrl msUrl("https://login.microsoftonline.com/common/oauth2/v2.0/token");
+        QNetworkRequest req(msUrl);
+        req.setHeader(QNetworkRequest::ContentTypeHeader, QByteArray("application/x-www-form-urlencoded"));
         auto* reply = nam_->post(req, body.toString(QUrl::FullyEncoded).toUtf8());
         connect(reply, &QNetworkReply::finished, this, [this, reply, p]() {
             reply->deleteLater();
@@ -159,8 +162,9 @@ void CloudDriveManager::exchangeCodeForToken(Provider p, const QString& code) {
         body.addQueryItem("redirect_uri", redirectUri);
         body.addQueryItem("grant_type",   "authorization_code");
 
-        QNetworkRequest req(QUrl("https://oauth2.googleapis.com/token"));
-        req.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
+        QUrl googleUrl("https://oauth2.googleapis.com/token");
+        QNetworkRequest req(googleUrl);
+        req.setHeader(QNetworkRequest::ContentTypeHeader, QByteArray("application/x-www-form-urlencoded"));
         auto* reply = nam_->post(req, body.toString(QUrl::FullyEncoded).toUtf8());
         connect(reply, &QNetworkReply::finished, this, [this, reply, p]() {
             reply->deleteLater();
@@ -197,7 +201,8 @@ void CloudDriveManager::listOneDriveFiles(const QString& folderId) {
         ? "https://graph.microsoft.com/v1.0/me/drive/root/children?" + filter
         : "https://graph.microsoft.com/v1.0/me/drive/items/" + folderId + "/children?" + filter;
 
-    QNetworkRequest req(QUrl(url));
+    QUrl reqUrl(url);
+    QNetworkRequest req(reqUrl);
     req.setRawHeader("Authorization", ("Bearer " + oneDriveToken_).toUtf8());
 
     auto* reply = nam_->get(req);
@@ -249,7 +254,8 @@ void CloudDriveManager::listGoogleDriveFiles(const QString& folderId) {
     query.addQueryItem("fields", "files(id,name,mimeType,size)");
     query.addQueryItem("pageSize", "200");
 
-    QNetworkRequest req(QUrl("https://www.googleapis.com/drive/v3/files?" + query.toString()));
+    QUrl gdriveUrl("https://www.googleapis.com/drive/v3/files?" + query.toString());
+    QNetworkRequest req(gdriveUrl);
     req.setRawHeader("Authorization", ("Bearer " + googleToken_).toUtf8());
 
     auto* reply = nam_->get(req);

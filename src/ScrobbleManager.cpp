@@ -130,10 +130,10 @@ void ScrobbleManager::sendRequest(const QMap<QString, QString>& params,
         query.addQueryItem(it.key(), it.value());
     }
 
-    QNetworkRequest req(QUrl(API_URL));
-    req.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
-    req.setHeader(QNetworkRequest::UserAgentHeader, "Sorinuri/6.17.0");
-
+        QUrl apiUrl(API_URL);
+    QNetworkRequest req(apiUrl);
+    req.setHeader(QNetworkRequest::ContentTypeHeader, QByteArray("application/x-www-form-urlencoded"));
+    req.setHeader(QNetworkRequest::UserAgentHeader, QByteArray("Sorinuri/6.17.0"));
     QByteArray postData = query.toString(QUrl::FullyEncoded).toUtf8();
     auto* reply = nam_->post(req, postData);
     connect(reply, &QNetworkReply::finished, this, [this, reply, callback]() {
