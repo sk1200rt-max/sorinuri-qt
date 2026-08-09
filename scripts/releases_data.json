@@ -1,5 +1,14 @@
 [
   {
+    "version": "6.18.0",
+    "date": "2026-08-09",
+    "title": "클라우드 연동 완성 및 AI 기능 강화",
+    "desc": "OneDrive/Google Drive UI 패널, Last.fm 설정 탭, AI 태깅 분위기·BPM 필터, Whisper 모델 번들, WebDAV 즐겨찾기, AI 장면 감지 민감도 조절 추가",
+    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.18.0.exe",
+    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.18.0-Portable.zip",
+    "tags": []
+  },
+  {
     "version": "6.17.0",
     "date": "2026-08-09",
     "title": "AI 기능 및 클라우드 연동",

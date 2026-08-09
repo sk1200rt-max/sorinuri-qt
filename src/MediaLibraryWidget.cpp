@@ -127,6 +127,64 @@ void MediaLibraryWidget::setupUI() {
     tbLayout->addWidget(btnAnalyze_);
     mainLayout->addWidget(toolbar);
 
+    // AI 태깅 결과 필터 행 (v6.18.0 신규)
+    QWidget* filterBar = new QWidget(this);
+    filterBar->setFixedHeight(38);
+    filterBar->setStyleSheet("background: #0a0a0a; border-bottom: 1px solid #1a1a1a;");
+    auto* fbLayout = new QHBoxLayout(filterBar);
+    fbLayout->setContentsMargins(8, 0, 8, 0);
+    fbLayout->setSpacing(6);
+
+    auto* lblFilter = new QLabel("필터:", filterBar);
+    lblFilter->setStyleSheet("color: #555; font-size: 11px;");
+
+    moodFilterCombo_ = new QComboBox(filterBar);
+    moodFilterCombo_->addItems({"분위기 전체", "😌 평온", "🎵 여유", "⚡ 활기", "🔥 신남", "💥 격렬"});
+    moodFilterCombo_->setFixedWidth(110);
+    moodFilterCombo_->setStyleSheet(
+        "QComboBox { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 3px;"
+        "  padding: 3px 6px; color: #ccc; font-size: 11px; }"
+        "QComboBox::drop-down { border: none; }"
+        "QComboBox QAbstractItemView { background: #1a1a1a; color: #ccc; }");
+
+    bpmFilterCombo_ = new QComboBox(filterBar);
+    bpmFilterCombo_->addItems({"BPM 전체", "~80 BPM", "80~120 BPM", "120~160 BPM", "160~ BPM"});
+    bpmFilterCombo_->setFixedWidth(110);
+    bpmFilterCombo_->setStyleSheet(moodFilterCombo_->styleSheet());
+
+    genreFilterCombo_ = new QComboBox(filterBar);
+    genreFilterCombo_->addItem("장르 전체");
+    genreFilterCombo_->setFixedWidth(110);
+    genreFilterCombo_->setStyleSheet(moodFilterCombo_->styleSheet());
+
+    auto* btnClearFilter = new QPushButton("✕ 초기화", filterBar);
+    btnClearFilter->setFixedHeight(26);
+    btnClearFilter->setStyleSheet(
+        "QPushButton { background: transparent; color: #444; border: none; font-size: 11px; }"
+        "QPushButton:hover { color: #00D4B4; }");
+
+    fbLayout->addWidget(lblFilter);
+    fbLayout->addWidget(moodFilterCombo_);
+    fbLayout->addWidget(bpmFilterCombo_);
+    fbLayout->addWidget(genreFilterCombo_);
+    fbLayout->addWidget(btnClearFilter);
+    fbLayout->addStretch();
+    mainLayout->addWidget(filterBar);
+
+    // 필터 변경 시 목록 갱신
+    auto onFilterChanged = [this]() { onSearch(searchEdit_->text()); };
+    connect(moodFilterCombo_,  QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, onFilterChanged);
+    connect(bpmFilterCombo_,   QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, onFilterChanged);
+    connect(genreFilterCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, onFilterChanged);
+    connect(btnClearFilter, &QPushButton::clicked, this, [this]() {
+        moodFilterCombo_->setCurrentIndex(0);
+        bpmFilterCombo_->setCurrentIndex(0);
+        genreFilterCombo_->setCurrentIndex(0);
+    });
+
     // 탭 (비디오 / 음악)
     tabs_ = new QTabWidget(this);
     tabs_->setDocumentMode(true);
@@ -320,11 +378,72 @@ void MediaLibraryWidget::populateList(QListWidget* list,
                                        const QStringList& files,
                                        const QString& filter) {
     list->clear();
+
+    // AI 태깅 필터 값 읽기
+    QString moodFilter;
+    int bpmFilterIdx = 0;
+    QString genreFilter;
+    bool hasAiFilter = false;
+    if (moodFilterCombo_ && bpmFilterCombo_ && genreFilterCombo_) {
+        int moodIdx = moodFilterCombo_->currentIndex();
+        bpmFilterIdx = bpmFilterCombo_->currentIndex();
+        int genreIdx = genreFilterCombo_->currentIndex();
+        if (moodIdx > 0) {
+            // "😌 평온" → "평온" 추출
+            QString raw = moodFilterCombo_->currentText();
+            moodFilter = raw.mid(raw.indexOf(' ')+1).trimmed();
+            hasAiFilter = true;
+        }
+        if (bpmFilterIdx > 0) hasAiFilter = true;
+        if (genreIdx > 0) {
+            QString raw = genreFilterCombo_->currentText();
+            genreFilter = raw.trimmed();
+            hasAiFilter = true;
+        }
+    }
+
+    // DB에서 AI 태깅 정보 조회 (필터 필요 시)
+    QHash<QString, QString> pathMood;
+    QHash<QString, double>  pathBpm;
+    QHash<QString, QString> pathGenre;
+    if (hasAiFilter) {
+        auto db = QSqlDatabase::database("library");
+        if (db.isOpen()) {
+            QSqlQuery q(db);
+            q.exec("SELECT path, mood, bpm, genre FROM media WHERE ai_tagged=1");
+            while (q.next()) {
+                pathMood[q.value(0).toString()]  = q.value(1).toString();
+                pathBpm[q.value(0).toString()]   = q.value(2).toDouble();
+                pathGenre[q.value(0).toString()] = q.value(3).toString();
+            }
+        }
+    }
+
     for (const QString& path : files) {
         QFileInfo fi(path);
         QString name = fi.completeBaseName();
         if (!filter.isEmpty() &&
             !name.contains(filter, Qt::CaseInsensitive)) continue;
+
+        // AI 태깅 필터 적용
+        if (hasAiFilter) {
+            if (!moodFilter.isEmpty()) {
+                QString m = pathMood.value(path);
+                if (!m.contains(moodFilter, Qt::CaseInsensitive)) continue;
+            }
+            if (bpmFilterIdx > 0) {
+                double bpm = pathBpm.value(path, -1.0);
+                if (bpm < 0) continue;  // 태깅 안 된 파일 제외
+                if (bpmFilterIdx == 1 && bpm >= 80)  continue;
+                if (bpmFilterIdx == 2 && (bpm < 80 || bpm >= 120)) continue;
+                if (bpmFilterIdx == 3 && (bpm < 120 || bpm >= 160)) continue;
+                if (bpmFilterIdx == 4 && bpm < 160) continue;
+            }
+            if (!genreFilter.isEmpty()) {
+                QString g = pathGenre.value(path);
+                if (!g.contains(genreFilter, Qt::CaseInsensitive)) continue;
+            }
+        }
 
         auto* item = new QListWidgetItem(name, list);
         item->setData(Qt::UserRole, path);

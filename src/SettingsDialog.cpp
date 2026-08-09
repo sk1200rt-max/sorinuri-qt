@@ -1,5 +1,9 @@
 #include "SettingsDialog.h"
+#include "ScrobbleManager.h"
 #include <QFileDialog>
+#include <QDesktopServices>
+#include <QDateTime>
+#include <QUrl>
 #include <QStandardPaths>
 #include <QDialogButtonBox>
 #include <QScrollArea>
@@ -115,6 +119,7 @@ SettingsDialog::SettingsDialog(MpvCore* mpv, QWidget* parent)
     setupVideoTab(tabs);
     setupSubtitleTab(tabs);
     setupGeneralTab(tabs);
+    setupLastfmTab(tabs);
 
     mainLayout->addWidget(tabs, 1);
 
@@ -846,4 +851,126 @@ void SettingsDialog::onApply() {
 void SettingsDialog::onOk() {
     onApply();
     accept();
+}
+
+// ─── Last.fm 설정 탭 (v6.18.0 신규) ─────────────────────────────────────────
+void SettingsDialog::setupLastfmTab(QTabWidget* tabs) {
+    auto* page   = new QWidget;
+    auto* layout = new QVBoxLayout(page);
+    layout->setContentsMargins(16, 16, 16, 16);
+    layout->setSpacing(12);
+
+    // 헤더
+    auto* lblHdr = new QLabel("📻  Last.fm 스크로블링");
+    lblHdr->setStyleSheet("font-size: 13px; font-weight: bold; color: #e0e0e0;");
+    layout->addWidget(lblHdr);
+
+    auto* lblDesc = new QLabel(
+        "재생한 음악을 Last.fm에 자동으로 기록합니다.\n"
+        "재생 시간이 50% 이상이거나 4분 이상이면 스크로블됩니다.");
+    lblDesc->setStyleSheet("color: #888; font-size: 11px;");
+    lblDesc->setWordWrap(true);
+    layout->addWidget(lblDesc);
+
+    // 활성화 토글
+    lastfmEnabledCheck_ = new QCheckBox("Last.fm 스크로블링 활성화");
+    lastfmEnabledCheck_->setChecked(settings_.value("lastfm/enabled", false).toBool());
+    layout->addWidget(lastfmEnabledCheck_);
+
+    // 연결 상태 그룹
+    auto* grpAuth = new QGroupBox("계정 연결");
+    auto* authLayout = new QVBoxLayout(grpAuth);
+
+    lastfmStatusLabel_ = new QLabel("연결되지 않음");
+    lastfmStatusLabel_->setStyleSheet("color: #888; font-size: 11px;");
+    authLayout->addWidget(lastfmStatusLabel_);
+
+    auto* rowBtns = new QHBoxLayout;
+    btnLastfmAuth_ = new QPushButton("🔗  Last.fm 계정 연결");
+    btnLastfmAuth_->setStyleSheet(
+        "QPushButton { background: #c3000d; color: #fff; border: none;"
+        "  border-radius: 4px; padding: 7px 16px; font-size: 12px; }"
+        "QPushButton:hover { background: #e0001a; }");
+    btnLastfmLogout_ = new QPushButton("로그아웃");
+    btnLastfmLogout_->setEnabled(false);
+    rowBtns->addWidget(btnLastfmAuth_);
+    rowBtns->addWidget(btnLastfmLogout_);
+    rowBtns->addStretch();
+    authLayout->addLayout(rowBtns);
+
+    auto* lblHelp = new QLabel(
+        "연결 버튼을 누르면 브라우저에서 Last.fm 인증 페이지가 열립니다.\n"
+        "로그인 후 소리누리로 돌아오면 자동으로 연결됩니다.");
+    lblHelp->setStyleSheet("color: #555; font-size: 10px;");
+    lblHelp->setWordWrap(true);
+    authLayout->addWidget(lblHelp);
+    layout->addWidget(grpAuth);
+
+    // API 키 설정 (고급)
+    auto* grpApi = new QGroupBox("고급 설정 (선택 사항)");
+    auto* apiLayout = new QFormLayout(grpApi);
+    lastfmApiKeyEdit_ = new QLineEdit;
+    lastfmApiKeyEdit_->setPlaceholderText("기본값 사용 (비워두면 소리누리 앱 키 사용)");
+    lastfmApiKeyEdit_->setText(settings_.value("lastfm/api_key").toString());
+    apiLayout->addRow("API 키:", lastfmApiKeyEdit_);
+    layout->addWidget(grpApi);
+
+    // 최근 스크로블 이력
+    layout->addWidget(new QLabel("최근 스크로블 이력:"));
+    lastfmHistoryList_ = new QListWidget;
+    lastfmHistoryList_->setMaximumHeight(150);
+    lastfmHistoryList_->setStyleSheet(
+        "QListWidget { background: #0d0d0d; border: 1px solid #1e1e1e; border-radius: 4px; }"
+        "QListWidget::item { padding: 4px 8px; border-bottom: 1px solid #1a1a1a; font-size: 11px; }");
+    layout->addWidget(lastfmHistoryList_);
+    layout->addStretch();
+
+    // 시그널 연결
+    connect(btnLastfmAuth_,   &QPushButton::clicked, this, &SettingsDialog::onLastfmAuth);
+    connect(btnLastfmLogout_, &QPushButton::clicked, this, &SettingsDialog::onLastfmLogout);
+
+    if (scrobbleMgr_) {
+        connect(scrobbleMgr_, &ScrobbleManager::scrobbled,
+                this, [this](const QString& title, const QString& artist) {
+            if (lastfmHistoryList_) {
+                QString timeStr = QDateTime::currentDateTime().toString("hh:mm");
+                lastfmHistoryList_->insertItem(0,
+                    QString("[%1] %2 — %3").arg(timeStr, title, artist));
+                if (lastfmHistoryList_->count() > 30)
+                    lastfmHistoryList_->takeItem(lastfmHistoryList_->count()-1);
+            }
+        });
+    }
+
+    updateLastfmStatus();
+    tabs->addTab(page, "📻 Last.fm");
+}
+
+void SettingsDialog::onLastfmAuth() {
+    if (!scrobbleMgr_) return;
+    QDesktopServices::openUrl(QUrl(scrobbleMgr_->authUrl()));
+    if (lastfmStatusLabel_) {
+        lastfmStatusLabel_->setText("브라우저에서 Last.fm 로그인 후 돌아오세요...");
+        lastfmStatusLabel_->setStyleSheet("color: #f0c040; font-size: 11px;");
+    }
+}
+
+void SettingsDialog::onLastfmLogout() {
+    if (!scrobbleMgr_) return;
+    scrobbleMgr_->setSessionKey({});
+    QSettings s("GaonCommunication", "Sorinuri");
+    s.remove("lastfm/session_key");
+    updateLastfmStatus();
+}
+
+void SettingsDialog::updateLastfmStatus() {
+    if (!scrobbleMgr_) return;
+    bool connected = !scrobbleMgr_->sessionKey().isEmpty();
+    if (lastfmStatusLabel_) {
+        lastfmStatusLabel_->setText(connected ? "✅ Last.fm 계정 연결됨" : "연결되지 않음");
+        lastfmStatusLabel_->setStyleSheet(
+            connected ? "color: #00D4B4; font-size: 11px;" : "color: #888; font-size: 11px;");
+    }
+    if (btnLastfmAuth_)   btnLastfmAuth_->setText(connected ? "재인증" : "🔗  Last.fm 계정 연결");
+    if (btnLastfmLogout_) btnLastfmLogout_->setEnabled(connected);
 }

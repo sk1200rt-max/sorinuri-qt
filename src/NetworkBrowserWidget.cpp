@@ -537,6 +537,84 @@ void NetworkBrowserWidget::buildWebDavTab(QWidget* parent)
 
     layout->addWidget(grpConn);
 
+    // 즐겨찾기 패널 (v6.18.0 신규)
+    auto* grpFav = new QGroupBox("즐겨찾기");
+    auto* favLayout = new QVBoxLayout(grpFav);
+
+    davFavoritesList_ = new QListWidget;
+    davFavoritesList_->setMaximumHeight(80);
+    davFavoritesList_->setStyleSheet(
+        "QListWidget { background: #0a0a0a; border: 1px solid #1a1a1a; border-radius: 3px; }"
+        "QListWidget::item { padding: 4px 8px; border-bottom: 1px solid #111; font-size: 11px; }"
+        "QListWidget::item:selected { background: #1a3a2a; color: #00D4B4; }");
+    favLayout->addWidget(davFavoritesList_);
+
+    auto* favBtnRow = new QHBoxLayout;
+    auto* btnFavAdd = new QPushButton("⭐ 현재 서버 추가");
+    btnFavAdd->setStyleSheet(
+        "QPushButton { background: #1a1a1a; color: #aaa; border: 1px solid #2a2a2a;"
+        "  border-radius: 3px; padding: 4px 10px; font-size: 11px; }"
+        "QPushButton:hover { color: #00D4B4; border-color: #00D4B4; }");
+    auto* btnFavDel = new QPushButton("🗑 삭제");
+    btnFavDel->setStyleSheet(btnFavAdd->styleSheet());
+    favBtnRow->addWidget(btnFavAdd);
+    favBtnRow->addWidget(btnFavDel);
+    favBtnRow->addStretch();
+    favLayout->addLayout(favBtnRow);
+    layout->addWidget(grpFav);
+
+    // 즐겨찾기 저장된 항목 불러오기
+    auto loadDavFavorites = [this]() {
+        davFavoritesList_->clear();
+        QStringList favs = settings_.value("webdav/favorites").toStringList();
+        for (const QString& fav : favs) {
+            QStringList parts = fav.split("|");
+            QString label = parts.value(0);
+            auto* item = new QListWidgetItem("☁  " + label);
+            item->setData(Qt::UserRole, fav);
+            davFavoritesList_->addItem(item);
+        }
+    };
+    loadDavFavorites();
+
+    // 즐겨찾기 클릭 → URL/계정 자동 입력
+    connect(davFavoritesList_, &QListWidget::itemDoubleClicked, this,
+            [this](QListWidgetItem* item) {
+        QString data = item->data(Qt::UserRole).toString();
+        QStringList parts = data.split("|");
+        if (parts.size() >= 3) {
+            davUrlEdit_->setText(parts[0]);
+            davUserEdit_->setText(parts[1]);
+            davPassEdit_->setText(parts[2]);
+        }
+    });
+
+    // 즐겨찾기 추가
+    connect(btnFavAdd, &QPushButton::clicked, this, [this, loadDavFavorites]() {
+        QString url  = davUrlEdit_->text().trimmed();
+        QString user = davUserEdit_->text().trimmed();
+        QString pass = davPassEdit_->text();
+        if (url.isEmpty()) return;
+        QStringList favs = settings_.value("webdav/favorites").toStringList();
+        QString entry = url + "|" + user + "|" + pass;
+        if (!favs.contains(entry)) {
+            favs.append(entry);
+            settings_.setValue("webdav/favorites", favs);
+            loadDavFavorites();
+        }
+    });
+
+    // 즐겨찾기 삭제
+    connect(btnFavDel, &QPushButton::clicked, this, [this, loadDavFavorites]() {
+        auto* item = davFavoritesList_->currentItem();
+        if (!item) return;
+        QString data = item->data(Qt::UserRole).toString();
+        QStringList favs = settings_.value("webdav/favorites").toStringList();
+        favs.removeAll(data);
+        settings_.setValue("webdav/favorites", favs);
+        loadDavFavorites();
+    });
+
     // 파일 목록
     auto* grpFiles = new QGroupBox("파일 목록");
     auto* filesLayout = new QVBoxLayout(grpFiles);

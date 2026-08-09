@@ -344,6 +344,50 @@ void ChapterWidget::buildUI() {
     btnDetect_->setToolTip("ffmpeg으로 영상의 장면 전환을 자동 감지하여 챕터를 생성합니다");
     panelRoot->addSpacing(4);
     panelRoot->addWidget(btnDetect_);
+
+    // 민감도 슬라이더 (v6.18.0 신규) - 0.1(매우 민감) ~ 0.9(둔감)
+    {
+        auto* sensRow = new QWidget;
+        auto* sensLayout = new QHBoxLayout(sensRow);
+        sensLayout->setContentsMargins(0, 0, 0, 0);
+        sensLayout->setSpacing(6);
+
+        auto* lblSens = new QLabel("감지 민감도:");
+        lblSens->setStyleSheet("color: #666; font-size: 11px;");
+        lblSens->setFixedWidth(70);
+
+        sceneThresholdSlider_ = new QSlider(Qt::Horizontal);
+        sceneThresholdSlider_->setRange(10, 90);  // 0.10 ~ 0.90 (×0.01)
+        sceneThresholdSlider_->setValue(35);        // 기본값 0.35
+        sceneThresholdSlider_->setFixedWidth(120);
+        sceneThresholdSlider_->setStyleSheet(
+            "QSlider::groove:horizontal { height: 4px; background: #2a2a2a; border-radius: 2px; }"
+            "QSlider::sub-page:horizontal { background: #00D4B4; border-radius: 2px; }"
+            "QSlider::handle:horizontal { width: 12px; height: 12px; margin: -4px 0;"
+            "  background: #fff; border-radius: 6px; }");
+
+        lblThresholdVal_ = new QLabel("0.35");
+        lblThresholdVal_->setStyleSheet("color: #00D4B4; font-size: 11px;");
+        lblThresholdVal_->setFixedWidth(30);
+
+        auto* lblHigh = new QLabel("높음");
+        lblHigh->setStyleSheet("color: #444; font-size: 10px;");
+        auto* lblLow = new QLabel("낮음");
+        lblLow->setStyleSheet("color: #444; font-size: 10px;");
+
+        sensLayout->addWidget(lblSens);
+        sensLayout->addWidget(lblLow);
+        sensLayout->addWidget(sceneThresholdSlider_);
+        sensLayout->addWidget(lblHigh);
+        sensLayout->addWidget(lblThresholdVal_);
+
+        connect(sceneThresholdSlider_, &QSlider::valueChanged, this, [this](int v) {
+            sceneThreshold_ = v / 100.0;
+            lblThresholdVal_->setText(QString::number(sceneThreshold_, 'f', 2));
+        });
+
+        panelRoot->addWidget(sensRow);
+    }
     panelRoot->addSpacing(8);
 
     // 단축키 힌트
@@ -491,7 +535,7 @@ void ChapterWidget::detectScenes(const QString& filePath) {
 
     QStringList args;
     args << "-i" << filePath
-         << "-vf" << "select='gt(scene,0.35)',showinfo"
+         << "-vf" << QString("select='gt(scene,%1)',showinfo").arg(sceneThreshold_, 0, 'f', 2)
          << "-vsync" << "vfr"
          << "-f" << "null"
          << "-";

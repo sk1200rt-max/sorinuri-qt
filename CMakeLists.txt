@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(Sorinuri VERSION 6.17.0 LANGUAGES CXX)
+project(Sorinuri VERSION 6.18.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -129,6 +129,8 @@ set(SOURCES
     src/ScrobbleManager.h
     src/CloudDriveManager.cpp
     src/CloudDriveManager.h
+    src/CloudDriveBrowserWidget.cpp
+    src/CloudDriveBrowserWidget.h
     resources/resources.qrc
 )
 

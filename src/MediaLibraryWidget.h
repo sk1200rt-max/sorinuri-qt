@@ -67,6 +67,11 @@ private:
     QLabel*       statusLabel_ = nullptr;
     QPushButton*  btnAnalyze_  = nullptr;  // AI 태깅 버튼
 
+    // AI 태깅 결과 필터 (v6.18.0 신규)
+    QComboBox*    moodFilterCombo_  = nullptr;
+    QComboBox*    bpmFilterCombo_   = nullptr;
+    QComboBox*    genreFilterCombo_ = nullptr;
+
     QStringList   videoFiles_;
     QStringList   audioFiles_;
     QStringList   folders_;

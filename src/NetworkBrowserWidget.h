@@ -77,6 +77,7 @@ private:
     QLineEdit*   davUserEdit_      = nullptr;
     QLineEdit*   davPassEdit_      = nullptr;
     QListWidget* davFileList_      = nullptr;
+    QListWidget* davFavoritesList_  = nullptr;  // WebDAV 즐겨찾기 (v6.18.0)
     QLabel*      davStatusLabel_   = nullptr;
     QString      davBaseUrl_;
     QString      davUser_;

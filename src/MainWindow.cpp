@@ -1485,6 +1485,16 @@ void MainWindow::toggleProFeatures() {
                     this, [this](){ toggleFullscreen(); });
         }
         proFeatures_->addTab(voiceControlWidget_, "🎙 음성 제어");
+
+        // 클라우드 드라이브 UI 탭
+        if (!cloudDriveBrowserWidget_) {
+            cloudDriveBrowserWidget_ = new CloudDriveBrowserWidget(cloudDriveManager_, proFeatures_);
+            connect(cloudDriveBrowserWidget_, &CloudDriveBrowserWidget::fileRequested,
+                    this, [this](const QString& url, const QString& /*name*/) {
+                openFiles({url});
+            });
+        }
+        proFeatures_->addTab(cloudDriveBrowserWidget_, "☁ 클라우드");
         // 녹화 완료 시 OSD 알림
         connect(screenRecorder_, &ScreenRecorder::recordingStarted,
                 this, [this](const QString&) {

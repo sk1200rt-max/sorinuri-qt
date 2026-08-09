@@ -3,6 +3,7 @@
 #include <QVector>
 #include <QPixmap>
 #include <QLabel>
+#include <QSlider>
 #include <QProcess>
 
 class QPushButton;
@@ -106,8 +107,11 @@ private:
     QString          mediaPath_;
 
     // AI 장면 감지
-    QProcess*        sceneProcess_  = nullptr;
-    QPushButton*     btnDetect_     = nullptr;
+    QProcess*        sceneProcess_         = nullptr;
+    QPushButton*     btnDetect_            = nullptr;
+    QSlider*         sceneThresholdSlider_ = nullptr;  // v6.18.0 민감도 조절
+    QLabel*          lblThresholdVal_      = nullptr;
+    double           sceneThreshold_       = 0.35;
 
     // UI 컴포넌트
     ChapterTimeline* timeline_      = nullptr;

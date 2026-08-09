@@ -292,6 +292,20 @@ jobs:
             Write-Host "ffmpeg 다운로드 실패 (선택적 기능): $_"
           }
 
+          # Whisper ggml-base.bin 모델 다운로드 (v6.18.0 신규)
+          try {
+            Write-Host "Whisper 모델 다운로드 중..."
+            New-Item -ItemType Directory -Path "dist/Sorinuri-Portable/models" -Force | Out-Null
+            New-Item -ItemType Directory -Path "dist/models" -Force | Out-Null
+            $whisperUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin"
+            Invoke-WebRequest -Uri $whisperUrl -OutFile "dist/Sorinuri-Portable/models/ggml-base.bin" -TimeoutSec 300
+            Copy-Item "dist/Sorinuri-Portable/models/ggml-base.bin" "dist/models/ggml-base.bin"
+            $modelSize = [math]::Round((Get-Item "dist/Sorinuri-Portable/models/ggml-base.bin").Length/1MB, 1)
+            Write-Host "Whisper 모델 다운로드 완료: $modelSize MB"
+          } catch {
+            Write-Host "Whisper 모델 다운로드 실패 (선택적 기능): $_"
+          }
+
           # 디버그 배치 파일
           if (Test-Path "소리누리-디버그.bat") {
             Copy-Item "소리누리-디버그.bat" dist/Sorinuri-Portable/
@@ -400,7 +414,7 @@ jobs:
 
       - name: Generate version-staging.json
         env:
-          APP_VERSION: "6.17.0"
+          APP_VERSION: "6.18.0"
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
         run: python3 scripts/make_version_json.py "$APP_VERSION" "$DEPLOY_HOST" staging
 
@@ -410,7 +424,7 @@ jobs:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
-          APP_VERSION: "6.17.0"
+          APP_VERSION: "6.18.0"
         run: |
           if [ -z "$SSH_KEY" ] || [ -z "$DEPLOY_HOST" ]; then
             echo "배포 Secrets 미설정 - 건너뜀"
