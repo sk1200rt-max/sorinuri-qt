@@ -1607,26 +1607,9 @@ bool MainWindow::nativeEvent(const QByteArray& type, void* msg, qintptr* result)
                     if (!mpvWidget_ || !mpvWidget_->core()) return;
                     auto* core = mpvWidget_->core();
 
-                    // ── HDMI/광출력 장치 연결 감지 → 독점 모드 자동 전환 ──
-                    // 노트북 기본값은 공유 모드이지만 HDMI 홈시어터 연결 시
-                    // 독점 모드가 없으면 Windows 리샘플링으로 음성 왜곡 발생
-                    if (core->isLaptop()) {
-                        QSettings s("Sorinuri", "SorinuriPlayer");
-                        if (!s.contains("audio/exclusive")) {
-                            // 장치 연결 시: HDMI 감지 → 독점 모드 활성화
-                            // 장치 해제 시: 내장 스피커로 복귀 → 공유 모드 복원
-                            const bool arrival = (wParam == 0x8000);
-                            const bool hdmiNow = core->deviceLikelySupportsPassthrough();
-                            if (arrival && hdmiNow) {
-                                core->setAudioExclusive(true);
-                                qInfo() << "[MainWindow] HDMI 연결 감지 → 독점 모드 자동 활성화";
-                            } else if (!arrival && !hdmiNow) {
-                                core->setAudioExclusive(false);
-                                qInfo() << "[MainWindow] HDMI 해제 감지 → 공유 모드 자동 복원";
-                            }
-                        }
-                    }
-
+                    // 오디오 장치 재초기화 (v6.18.0 방식 유지)
+                    // HDMI 자동 감지 + setAudioExclusive 호출 제거
+                    // → 재생 중 채널 매핑 초기화 방지
                     core->command({"ao-reload"});
                     qInfo() << "[MainWindow] 오디오 장치 재초기화 완료";
                 });
