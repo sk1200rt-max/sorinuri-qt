@@ -1113,8 +1113,28 @@ void MainWindow::keyPressEvent(QKeyEvent* e) {
     case Qt::Key_W:  // 자막 폰트 크기 증가
         core->command({"add", "sub-scale", "0.1"});
         break;
-    case Qt::Key_E:  // 자막 폰트 크기 감소
-        core->command({"add", "sub-scale", "-0.1"});
+    case Qt::Key_E:
+        // Ctrl+Shift+E: WASAPI 독점/공유 모드 즉시 전환
+        if ((e->modifiers() & Qt::ControlModifier) && (e->modifiers() & Qt::ShiftModifier)) {
+            if (core) {
+                const bool currentExclusive =
+                    core->getProperty("audio-exclusive").toString() == "yes";
+                const bool newExclusive = !currentExclusive;
+                core->setAudioExclusive(newExclusive);
+                QSettings s("Sorinuri", "SorinuriPlayer");
+                s.setValue("audio/exclusive", newExclusive);
+                if (osdWidget_)
+                    osdWidget_->showInfo(newExclusive
+                        ? "WASAPI 독점 모드 (원본 음질)"
+                        : "WASAPI 공유 모드 (다중 앱 동시 재생)");
+                qInfo() << "[MainWindow] Ctrl+Shift+E → WASAPI"
+                        << (newExclusive ? "독점" : "공유") << "모드 전환";
+            }
+            e->accept();
+            return;
+        }
+        // E만 누른 경우: 자막 폰트 크기 감소
+        if (core) core->command({"add", "sub-scale", "-0.1"});
         break;
     case Qt::Key_Plus:   // 재생 속도 증가
     case Qt::Key_Equal:
@@ -1226,31 +1246,6 @@ void MainWindow::keyPressEvent(QKeyEvent* e) {
         break;
     case Qt::Key_Question:
         shortcutOverlay_->toggle();
-        break;
-    case Qt::Key_E:
-        // Ctrl+Shift+E: WASAPI 독점/공유 모드 즉시 전환
-        if ((e->modifiers() & Qt::ControlModifier) && (e->modifiers() & Qt::ShiftModifier)) {
-            if (core) {
-                const bool currentExclusive =
-                    core->getProperty("audio-exclusive").toString() == "yes";
-                const bool newExclusive = !currentExclusive;
-                core->setAudioExclusive(newExclusive);
-                // QSettings에 저장 (다음 실행 시 유지)
-                QSettings s("Sorinuri", "SorinuriPlayer");
-                s.setValue("audio/exclusive", newExclusive);
-                // OSD로 현재 모드 표시
-                if (osdWidget_)
-                    osdWidget_->showInfo(newExclusive
-                        ? "WASAPI 독점 모드 (원본 음질)"
-                        : "WASAPI 공유 모드 (다중 앱 동시 재생)");
-                qInfo() << "[MainWindow] 단축키 Ctrl+Shift+E → WASAPI"
-                        << (newExclusive ? "독점" : "공유") << "모드 전환";
-            }
-            e->accept();
-            return;
-        }
-        // Ctrl+Shift 없이 E만 누른 경우: 자막 폰트 크기 감소 (기존 동작)
-        if (core) core->command({"add", "sub-scale", "-0.1"});
         break;
     default: QMainWindow::keyPressEvent(e); break;
     }
