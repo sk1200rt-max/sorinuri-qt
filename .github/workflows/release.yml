@@ -234,6 +234,61 @@ jobs:
             & $iscc installer/sorinuri-setup.iss
           }
 
+      # ── 자체 서명 인증서 생성 및 코드 서명 ──────────────────────────
+      # 인증서 없이 "가온 Communication" 게시자 이름 표시
+      # UAC 창에서 빨간 "알 수 없음" 대신 노란 "가온 Communication" 표시
+      - name: Code Sign (Self-Signed)
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          $installerPath = "dist\Sorinuri-Setup-$version.exe"
+
+          # 자체 서명 인증서 생성 (3년 유효)
+          $cert = New-SelfSignedCertificate `
+            -Subject "CN=Gaon Communication, O=Gaon Communication, L=Seoul, C=KR" `
+            -Type CodeSigningCert `
+            -CertStoreLocation Cert:\CurrentUser\My `
+            -KeyUsage DigitalSignature `
+            -KeyAlgorithm RSA `
+            -KeyLength 2048 `
+            -HashAlgorithm SHA256 `
+            -NotAfter (Get-Date).AddYears(3)
+          Write-Host "인증서 생성: $($cert.Subject) | 지문: $($cert.Thumbprint)"
+
+          # signtool.exe 경로 탐색
+          $signtoolPaths = @(
+            "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe",
+            "C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\x64\signtool.exe",
+            "C:\Program Files (x86)\Windows Kits\10\bin\x64\signtool.exe"
+          )
+          $signtool = $signtoolPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $signtool) {
+            $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits" -Recurse -Filter "signtool.exe" `
+              -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
+          }
+
+          if ($signtool -and (Test-Path $installerPath)) {
+            Write-Host "signtool 경로: $signtool"
+            # 타임스탬프 서버로 서명 (RFC 3161)
+            $result = & $signtool sign `
+              /fd SHA256 `
+              /td SHA256 `
+              /tr http://timestamp.digicert.com `
+              /sha1 $cert.Thumbprint `
+              $installerPath 2>&1
+            Write-Host $result
+            if ($LASTEXITCODE -eq 0) {
+              Write-Host "서명 완료: $installerPath"
+              # 서명 확인
+              $verify = & $signtool verify /pa $installerPath 2>&1
+              Write-Host "서명 검증: $verify"
+            } else {
+              Write-Host "서명 실패 (빌드는 계속 진행): $LASTEXITCODE"
+            }
+          } else {
+            Write-Host "signtool 또는 인스톨러 파일 없음 - 서명 건너뜀"
+          }
+
       # ── GitHub Release 생성 ───────────────────────────────────────
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
