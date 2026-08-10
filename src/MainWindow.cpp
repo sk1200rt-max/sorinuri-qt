@@ -1641,13 +1641,15 @@ bool MainWindow::nativeEvent(const QByteArray& type, void* msg, qintptr* result)
         // 외부 모니터 연결/해제 시 OpenGL 컨텍스트 손실 방지
         // 해상도·색심도 변경 시에도 렌더링 재초기화 수행
         if (m->message == WM_DISPLAYCHANGE) {
-            qInfo() << "[MainWindow] 디스플레이 구성 변경 감지 → 렌더링 재초기화 예약";
+            qInfo() << "[MainWindow] 디스플레이 구성 변경 감지 → 렌더링 갱신 예약";
             // 500ms 지연: 드라이버가 새 디스플레이 구성을 완전히 적용할 시간 확보
             QTimer::singleShot(500, this, [this]() {
                 if (mpvWidget_) {
+                    // 렌더링만 갱신 - redetectGpuAndApply() 호출 제거
+                    // redetectGpuAndApply()는 hwdec/video-sync를 재설정하여
+                    // 프로젝터 설정 변경 시 프레임 끊김 유발
                     mpvWidget_->update();
-                    mpvWidget_->core()->redetectGpuAndApply();
-                    qInfo() << "[MainWindow] 디스플레이 변경 후 렌더링 재초기화 완료";
+                    qInfo() << "[MainWindow] 디스플레이 변경 후 렌더링 갱신 완료";
                 }
             });
         }

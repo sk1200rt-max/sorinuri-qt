@@ -138,12 +138,11 @@ bool MpvCore::initialize(WId windowId) {
     {
         RenderEnvInfo tmpEnv = RenderEnvironment::detect();
         if (tmpEnv.isLaptop) {
-            // 노트북 (AC 연결 포함): display-resample 금지, audio 모드 강제
-            // 이유: NVIDIA Optimus + Windows 11 24H2에서 display-resample이 끔김 유발
-            qInfo() << "[MPV] 노트북 감지 → video-sync=audio 강제 (display-resample 금지)";
-            check_error(mpv_set_property_string(mpv_, "video-sync", "audio"));
-            check_error(mpv_set_property_string(mpv_, "framedrop", "vo"));
-            isLaptop_ = true;  // applyVideoSyncByFps()에서 display-resample 차단용
+            // 노트북 감지: isLaptop_ 플래그만 설정
+            // video-sync는 applyVideoSyncByFps()가 FPS/주사율 기반으로 자동 선택
+            // 노트북이라도 display-resample을 강제 차단하지 않음
+            qInfo() << "[MPV] 노트북 감지 → isLaptop_=true (영상 로드 후 video-sync 자동 선택)";
+            isLaptop_ = true;
         }
     }
 
@@ -1113,20 +1112,11 @@ void MpvCore::applyVideoSyncByFps(double fps) {
     //   - 120Hz 이상: 비정수여도 display-resample (충분한 주사율)
     double refreshRate = renderEnv_.refreshRate > 0 ? renderEnv_.refreshRate : 60.0;
     QString optimalSync = RenderEnvironment::selectVideoSync(fps, refreshRate);
-    // 통합 GPU(노트북 Intel UHD/Iris, AMD APU) 환경에서는
-    // display-resample이 프레임 타이밍 부하를 가중시켜 끊김을 유발함
-    // 통합 GPU는 audio 모드가 항상 안정적
-    if (renderEnv_.gpuTier == GpuTier::Integrated) {
-        qInfo() << "[MPV] 통합 GPU 감지 → video-sync=audio 강제 (끊김 방지)";
-        optimalSync = "audio";
-    }
-    // 노트북 환경 (AC 연결 포함): display-resample 강제 차단
-    // mpv GitHub 이슈 #15196: Windows 11 24H2 + NVIDIA Optimus에서 display-resample이 끊김 유발
-    // initialize()에서 isLaptop_=true로 설정됨
-    if (isLaptop_) {
-        qInfo() << "[MPV] 노트북 환경 → display-resample 차단, audio 강제";
-        optimalSync = "audio";
-    }
+    // RenderEnvironment::selectVideoSync()가 FPSxd7주사율 배수 관계를 분석하여 자동 선택
+    // 노트북/데스크탑 구분 없이 모든 환경에서 동일하게 적용
+    // (v6.11.9에서 추가한 노트북 강제 로직 제거 - 프레임 끊김 원인)
+    qInfo() << "[MPV] video-sync 자동 선택:" << optimalSync
+             << "(fps=" << fps << "Hz=" << refreshRate << ")";
 
     mpv_set_property_string(mpv_, "video-sync", optimalSync.toUtf8().constData());
 
