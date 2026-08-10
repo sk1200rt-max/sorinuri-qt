@@ -694,10 +694,8 @@ void MpvCore::loadFile(const QString& path, bool append) {
     // 패스스루 지원 장치(HDMI/리시버)는 spdif 유지 → 비트스트림 그대로.
     // 판단 실패 시에도 AO 실패 자동복구(ao-reload)가 백업으로 동작.
     if (!append) {
-        // audio-channels=auto: 파일마다 채널 수 자동 감지 (이전 파일 설정 초기화)
-        // WASAPI 독점 모드에서 5.1/7.1 PCM 멀티채널 자동 출력 보장
-        mpv_set_property_string(mpv_, "audio-channels", "auto");
-
+        // audio-channels=auto는 initialize()에서 한 번만 설정
+        // 파일마다 재설정하면 WASAPI 채널 협상이 초기화되어 채널 매핑 오류 발생
         if (deviceLikelySupportsPassthrough()) {
             if (passthroughEnabled_)
                 mpv_set_property_string(mpv_, "audio-spdif", spdifCodecs_.toUtf8().constData());
