@@ -1593,8 +1593,10 @@ bool MainWindow::nativeEvent(const QByteArray& type, void* msg, qintptr* result)
                 // 500ms 지연: 드라이버가 컨텍스트를 완전히 복원할 시간 확보
                 QTimer::singleShot(500, this, [this]() {
                     if (mpvWidget_) {
+                        // 렌더링만 갱신 - redetectGpuAndApply() 제거
+                        // redetectGpuAndApply()가 내부적으로 ao-reload를 호출하여
+                        // WASAPI 채널 협상이 초기화되면서 DD+/5.1ch 패스스루가 깨짐
                         mpvWidget_->update();
-                        mpvWidget_->core()->redetectGpuAndApply();
                         qInfo() << "[MainWindow] 절전 복귀 후 렌더링 재시작 완료";
                     }
                 });
