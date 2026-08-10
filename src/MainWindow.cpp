@@ -215,6 +215,25 @@ void MainWindow::setupConnections() {
     // window.show() 직후 openFiles() 호출 시 initialized_=false로 무시되던 문제 근본 해결
     // Qt::SingleShotConnection: 한 번만 실행 (initializeGL은 한 번만 호출됨)
     connect(mpvWidget_, &MpvWidget::mpvInitialized, this, [this]() {
+        // MPV 초기화 완료 후 오디오 설정 재적용
+        // loadSettings()는 생성자에서 호출되어 MPV 초기화 전에 실행됨
+        // initialized_=false로 setSpdifCodecs 등이 적용 안 됨 → 여기서 재적용
+        auto* core = mpvWidget_->core();
+        // WASAPI 독점 모드 재적용
+        if (settings_.value("audio/exclusive", true).toBool())
+            core->setAudioExclusive(true);
+        // 패스스루 코덱 재적용 (DD+/DTS/TrueHD)
+        if (settings_.value("audio/passthrough", true).toBool()) {
+            QStringList codecs;
+            if (settings_.value("audio/pt_ac3",    true).toBool()) codecs << "ac3";
+            if (settings_.value("audio/pt_eac3",   true).toBool()) codecs << "eac3";
+            if (settings_.value("audio/pt_dts",    true).toBool()) codecs << "dts";
+            if (settings_.value("audio/pt_dtshd",  true).toBool()) codecs << "dts-hd";
+            if (settings_.value("audio/pt_truehd", true).toBool()) codecs << "truehd";
+            core->setSpdifCodecs(codecs);
+            qInfo() << "[MainWindow] mpvInitialized: 패스스루 코덱 적용:" << codecs;
+        }
+        // 시작 파일 처리
         if (!pendingStartupFiles_.isEmpty()) {
             qInfo() << "[MainWindow] mpvInitialized: pendingStartupFiles_ 처리" << pendingStartupFiles_;
             QStringList files = pendingStartupFiles_;
