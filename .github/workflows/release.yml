@@ -202,6 +202,13 @@ jobs:
           & $windeployqt `
             --no-translations --no-system-d3d-compiler `
             "dist/Sorinuri-Portable/Sorinuri.exe"
+          # vc_redist.x64.exe 다운로드 (Visual C++ 런타임 - 인스톨러에 포함)
+          try {
+            Invoke-WebRequest -Uri "https://aka.ms/vs/17/release/vc_redist.x64.exe" `
+              -OutFile "dist/vc_redist.x64.exe" -TimeoutSec 120
+            Copy-Item "dist/vc_redist.x64.exe" "dist/Sorinuri-Portable/vc_redist.x64.exe"
+            Write-Host "vc_redist: $([math]::Round((Get-Item dist/vc_redist.x64.exe).Length/1MB,1)) MB"
+          } catch { Write-Host "vc_redist 다운로드 실패: $_" }
           # ZIP 압축
           Compress-Archive -Path "dist/Sorinuri-Portable/*" `
             -DestinationPath "dist/Sorinuri-Qt-$version-Portable.zip" -Force
