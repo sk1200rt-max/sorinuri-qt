@@ -693,16 +693,9 @@ void MpvCore::loadFile(const QString& path, bool append) {
     // 처음부터 올바른 모드로 시작 (첫 소리까지 시간 단축).
     // 패스스루 지원 장치(HDMI/리시버)는 spdif 유지 → 비트스트림 그대로.
     // 판단 실패 시에도 AO 실패 자동복구(ao-reload)가 백업으로 동작.
-    if (!append) {
-        // audio-channels=auto는 initialize()에서 한 번만 설정
-        // 파일마다 재설정하면 WASAPI 채널 협상이 초기화되어 채널 매핑 오류 발생
-        if (deviceLikelySupportsPassthrough()) {
-            if (passthroughEnabled_)
-                mpv_set_property_string(mpv_, "audio-spdif", spdifCodecs_.toUtf8().constData());
-        } else {
-            mpv_set_property_string(mpv_, "audio-spdif", "");
-        }
-    }
+    // audio-spdif는 initialize()에서 한 번만 설정
+    // loadFile()에서 재설정하면 장치 감지 실패 시 DD+/DTS 패스스루가 차단됨
+    // 패스스루 실패 시 워치독가 ao-reload로 자동복구
     // loadfile 전에 pause=no 먼저 설정 → keep-open=yes 환경에서
     // 새 파일 로드 시 이전 pause 상태를 유지하지 않고 즐시 재생
     int pauseFlag = 0;
