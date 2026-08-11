@@ -1,6 +1,7 @@
 #include "SettingsDialog.h"
 #include "ScrobbleManager.h"
 #include <QFileDialog>
+#include <QTimer>
 #include <QDesktopServices>
 #include <QDateTime>
 #include <QUrl>
@@ -474,6 +475,62 @@ void SettingsDialog::setupSubtitleTab(QTabWidget* tabs) {
     subShadowCheck_->setChecked(true);
     subForm->addRow("", subShadowCheck_);
 
+    // ── 자막 실시간 미리보기 ────────────────────────────────────────────
+    // 폰트/크기/볼드/색상/그림자 변경 시 즉시 반영되는 미리보기 라벨
+    subPreviewLabel_ = new QLabel("자막 미리보기 — 소리누리 Sorinuri", page);
+    subPreviewLabel_->setAlignment(Qt::AlignCenter);
+    subPreviewLabel_->setMinimumHeight(60);
+    subPreviewLabel_->setStyleSheet(
+        "background:#000; color:#fff; padding:10px 16px;"
+        "border:1px solid #2a2a2a; border-radius:4px;"
+        "font-family:'맑은 고딕'; font-size:24px;");
+    subPreviewLabel_->setWordWrap(true);
+    subForm->addRow("미리보기:", subPreviewLabel_);
+
+    // 미리보기 업데이트 람다
+    auto updatePreview = [this]() {
+        if (!subPreviewLabel_) return;
+        // 폰트
+        QString fontFamily = subFontCombo_ ? subFontCombo_->currentText() : "맑은 고딕";
+        // 크기 (MPV sub-font-size 36 ≈ UI 24px 기준으로 비례 환산)
+        int mpvSize = subSizeSlider_ ? subSizeSlider_->value() : 36;
+        int previewPx = qBound(12, mpvSize * 2 / 3, 48);
+        // 볼드
+        bool bold = subBoldCheck_ && subBoldCheck_->isChecked();
+        // 색상
+        QString colorStr = "#ffffff";
+        if (subColorCombo_) {
+            switch (subColorCombo_->currentIndex()) {
+            case 1: colorStr = "#ffff00"; break;  // 노란색
+            case 2: colorStr = "#87ceeb"; break;  // 하늘색
+            case 3: colorStr = "#90ee90"; break;  // 연두색
+            default: colorStr = "#ffffff"; break; // 흰색
+            }
+        }
+        // 그림자
+        QString shadow = (subShadowCheck_ && subShadowCheck_->isChecked())
+            ? "text-shadow: 1px 1px 3px #000000;"
+            : "";
+        subPreviewLabel_->setStyleSheet(QString(
+            "background:#000; color:%1; padding:10px 16px;"
+            "border:1px solid #2a2a2a; border-radius:4px;"
+            "font-family:'%2'; font-size:%3px; %4 %5")
+            .arg(colorStr)
+            .arg(fontFamily)
+            .arg(previewPx)
+            .arg(bold ? "font-weight:bold;" : "font-weight:normal;")
+            .arg(shadow));
+    };
+
+    // 각 컨트롤 변경 시 미리보기 즉시 업데이트
+    connect(subFontCombo_,  QOverload<int>::of(&QComboBox::currentIndexChanged), page, [updatePreview](int){ updatePreview(); });
+    connect(subSizeSlider_, &QSlider::valueChanged, page, [updatePreview](int){ updatePreview(); });
+    connect(subBoldCheck_,  &QCheckBox::toggled, page, [updatePreview](bool){ updatePreview(); });
+    connect(subColorCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged), page, [updatePreview](int){ updatePreview(); });
+    connect(subShadowCheck_,&QCheckBox::toggled, page, [updatePreview](bool){ updatePreview(); });
+    // 초기 미리보기 렌더링
+    QTimer::singleShot(0, page, [updatePreview]() { updatePreview(); });
+
     layout->addWidget(subGroup);
 
     QGroupBox* autoSubGroup = new QGroupBox("자막 자동 로드", page);
@@ -708,6 +765,15 @@ void SettingsDialog::loadSettings() {
         renderProfileCombo_->setCurrentIndex(settings_.value("video/render_profile", 2).toInt());
     rememberPosCheck_->setChecked(settings_.value("general/remember_pos", true).toBool());
     resumeCheck_->setChecked(settings_.value("general/resume", false).toBool());
+    // 자막 스타일 복원 (폰트/크기/볼드/색상/그림자)
+    if (subFontCombo_) {
+        int fi = subFontCombo_->findText(settings_.value("subtitle/font", "맑은 고딕").toString());
+        if (fi >= 0) subFontCombo_->setCurrentIndex(fi);
+    }
+    if (subSizeSlider_) subSizeSlider_->setValue(settings_.value("subtitle/size", 36).toInt());
+    if (subBoldCheck_)  subBoldCheck_->setChecked(settings_.value("subtitle/bold", false).toBool());
+    if (subColorCombo_) subColorCombo_->setCurrentIndex(settings_.value("subtitle/color", 0).toInt());
+    if (subShadowCheck_)subShadowCheck_->setChecked(settings_.value("subtitle/shadow", true).toBool());
     autoLoadSubCheck_->setChecked(settings_.value("subtitle/auto_load", true).toBool());
     if (subApiKeyEdit_)
         subApiKeyEdit_->setText(settings_.value("subtitle/opensubtitles_apikey").toString());
@@ -789,10 +855,22 @@ void SettingsDialog::applyToMpv() {
     // voCombo_ 선택값은 QSettings에 저장하고 다음 실행 시 initialize()에서 적용됨.
 
     // 자막
-    mpv_->setProperty("sub-font", subFontCombo_->currentText());
-    mpv_->setProperty("sub-font-size", subSizeSlider_->value());
-    mpv_->setProperty("sub-bold", subBoldCheck_->isChecked() ? 1 : 0);
-    mpv_->setProperty("sub-shadow-offset", subShadowCheck_->isChecked() ? 2 : 0);
+    if (subFontCombo_)  mpv_->setProperty("sub-font", subFontCombo_->currentText());
+    if (subSizeSlider_) mpv_->setProperty("sub-font-size", subSizeSlider_->value());
+    if (subBoldCheck_)  mpv_->setProperty("sub-bold", subBoldCheck_->isChecked() ? 1 : 0);
+    if (subShadowCheck_) mpv_->setProperty("sub-shadow-offset", subShadowCheck_->isChecked() ? 2 : 0);
+    // 자막 색상 적용 (MPV sub-color: AARRGGBB 포맷 0xAARRGGBB)
+    if (subColorCombo_) {
+        static const QStringList colors = {
+            "#FFFFFFFF",  // 흰색
+            "#FFFFFF00",  // 노란색
+            "#FF87CEEB",  // 하늘색
+            "#FF90EE90",  // 연두색
+        };
+        int ci = subColorCombo_->currentIndex();
+        if (ci >= 0 && ci < colors.size())
+            mpv_->setProperty("sub-color", colors[ci]);
+    }
     mpv_->setProperty("sub-auto", autoLoadSubCheck_->isChecked() ? "fuzzy" : "no");
 }
 
@@ -834,6 +912,12 @@ void SettingsDialog::onApply() {
         settings_.setValue("remote/enabled", remoteEnabledCheck_->isChecked());
     if (originalsApiUrlEdit_ && !originalsApiUrlEdit_->text().isEmpty())
         settings_.setValue("originals/api_url", originalsApiUrlEdit_->text().trimmed());
+    // 자막 스타일 저장 (폰트/크기/볼드/색상/그림자)
+    if (subFontCombo_)  settings_.setValue("subtitle/font",   subFontCombo_->currentText());
+    if (subSizeSlider_) settings_.setValue("subtitle/size",   subSizeSlider_->value());
+    if (subBoldCheck_)  settings_.setValue("subtitle/bold",   subBoldCheck_->isChecked());
+    if (subColorCombo_) settings_.setValue("subtitle/color",  subColorCombo_->currentIndex());
+    if (subShadowCheck_)settings_.setValue("subtitle/shadow", subShadowCheck_->isChecked());
     settings_.setValue("subtitle/auto_load",autoLoadSubCheck_->isChecked());
     if (subApiKeyEdit_)
         settings_.setValue("subtitle/opensubtitles_apikey", subApiKeyEdit_->text().trimmed());

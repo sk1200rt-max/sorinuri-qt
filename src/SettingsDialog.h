@@ -94,6 +94,7 @@ private:
     QCheckBox*  subBoldCheck_       = nullptr;
     QComboBox*  subColorCombo_      = nullptr;
     QCheckBox*  subShadowCheck_     = nullptr;
+    QLabel*     subPreviewLabel_    = nullptr;  // 자막 실시간 미리보기
 
     // 일반 탭
     QCheckBox*  rememberPosCheck_   = nullptr;
