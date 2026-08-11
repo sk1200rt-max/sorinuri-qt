@@ -1,4 +1,5 @@
 #include "TitleBar.h"
+#include "UiTheme.h"
 #include <QIcon>
 #include <QPixmap>
 
@@ -19,8 +20,9 @@ QPushButton* TitleBar::makeIconBtn(const QString& svgPath, const QString& toolti
 }
 
 TitleBar::TitleBar(QWidget* parent) : QWidget(parent) {
-    setFixedHeight(36);
-    setStyleSheet("background: #111111; border-bottom: 1px solid #1e1e1e;");
+    setFixedHeight(40);
+    setStyleSheet(QString("background: %1; border-bottom: 1px solid %2;")
+                  .arg(SorinuriUi::Surface, SorinuriUi::BorderSoft));
 
     auto* layout = new QHBoxLayout(this);
     layout->setContentsMargins(10, 0, 0, 0);
@@ -41,9 +43,7 @@ TitleBar::TitleBar(QWidget* parent) : QWidget(parent) {
     // 오디오 포맷 배지
     badgeLabel_ = new QLabel(this);
     badgeLabel_->setFixedHeight(18);
-    badgeLabel_->setStyleSheet(
-        "background: #1a3a5c; color: #4fc3f7; font-size: 9px; font-weight: 700;"
-        "font-family: 'Consolas', monospace; padding: 1px 6px; border-radius: 2px; border: none;");
+    badgeLabel_->setStyleSheet(SorinuriUi::statusBadgeStyle(SorinuriUi::Mint));
     badgeLabel_->hide();
     layout->addWidget(badgeLabel_);
     layout->addSpacing(8);
@@ -51,7 +51,7 @@ TitleBar::TitleBar(QWidget* parent) : QWidget(parent) {
     // 파일명
     titleLabel_ = new QLabel(this);
     titleLabel_->setStyleSheet(
-        "color: #555; font-size: 11px; font-family: 'Segoe UI', sans-serif;"
+        "color: #8C9A99; font-size: 12px; font-family: 'Segoe UI', sans-serif;"
         "background: transparent; border: none;");
     layout->addWidget(titleLabel_);
     layout->addStretch();
@@ -72,21 +72,21 @@ TitleBar::TitleBar(QWidget* parent) : QWidget(parent) {
         "  color: #555;"
         "}"
         "QPushButton:hover {"
-        "  background: #252525;"
+        "  background: #1A2526;"
         "}"
         "QPushButton:checked {"
-        "  background: #0d2a4a;"
-        "  border-bottom: 2px solid #4fc3f7;"
+        "  background: #063B35;"
+        "  border-bottom: 2px solid #00D4B4;"
         "}"
         "QPushButton:checked:hover {"
-        "  background: #1e3a5f;"
+        "  background: #0B564B;"
         "}");
 
     // ── 창 버튼 ───────────────────────────────────────────────────
-    btnMin_        = makeIconBtn(":/icons/minimize.svg",   "최소화",     "#252525");
-    btnMax_        = makeIconBtn(":/icons/maximize.svg",   "화면 채우기", "#252525");
-    btnFullscreen_ = makeIconBtn(":/icons/expand.svg",     "전체화면",   "#1e3a5f");
-    btnClose_      = makeIconBtn(":/icons/close.svg",      "닫기",       "#c42b1c", 48);
+    btnMin_        = makeIconBtn(":/icons/minimize.svg",   "최소화",     "#1A2526");
+    btnMax_        = makeIconBtn(":/icons/maximize.svg",   "화면 채우기", "#1A2526");
+    btnFullscreen_ = makeIconBtn(":/icons/expand.svg",     "전체화면",   "#063B35");
+    btnClose_      = makeIconBtn(":/icons/close.svg",      "닫기",       "#D94D45", 48);
 
     layout->addWidget(btnPin_);
     layout->addWidget(btnMin_);

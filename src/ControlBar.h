@@ -149,7 +149,8 @@ private:
     QSlider*     volSlider_  = nullptr;
     QLabel*      volLabel_   = nullptr;
     QPushButton* btnSettings_    = nullptr;
-    QHBoxLayout* btnRow_         = nullptr;  // 중앙 TrackSelector 삽입용
+    QHBoxLayout* btnRow_         = nullptr;  // 재생 제어·출력 상태 행
+    QHBoxLayout* trackRow_       = nullptr;  // 오디오·자막 트랙 및 모드 선택 행
 
     // 모드 버튼 (파일 플레이어 / OTT)
     QPushButton* btnPlayerMode_  = nullptr;

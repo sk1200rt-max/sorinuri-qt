@@ -85,7 +85,6 @@ ShortcutConfigWidget::ShortcutConfigWidget(QWidget* parent)
         {"vol_down",     "볼륨 -5",               QKeySequence(Qt::Key_Down),          {}},
         {"fullscreen",   "전체화면 토글",          QKeySequence(Qt::Key_F),             {}},
         {"mute",         "음소거",                QKeySequence(Qt::Key_M),             {}},
-        {"media_info",   "미디어 정보 오버레이",   QKeySequence(Qt::Key_Tab),           {}},
         {"pro_panel",    "전문 기능 패널",         QKeySequence(Qt::Key_P),             {}},
         {"screenshot",   "스크린샷",              QKeySequence(Qt::Key_S),             {}},
         {"open_file",    "파일 열기",             QKeySequence(Qt::CTRL | Qt::Key_O),  {}},

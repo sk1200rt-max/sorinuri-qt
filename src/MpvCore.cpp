@@ -33,6 +33,57 @@ static void check_error(int status) {
         qWarning() << "[MPV] Error:" << mpv_error_string(status);
 }
 
+static int channelCountFromLayout(const QString& layout) {
+    const QString value = layout.trimmed().toLower();
+    if (value == "mono") return 1;
+    if (value == "stereo") return 2;
+    if (value.contains("7.1")) return 8;
+    if (value.contains("6.1")) return 7;
+    if (value.contains("5.1")) return 6;
+    bool ok = false;
+    const int count = value.toInt(&ok);
+    return ok ? count : 0;
+}
+
+static QString channelLayoutLabel(int channels) {
+    switch (channels) {
+    case 1: return QStringLiteral("1.0");
+    case 2: return QStringLiteral("2.0");
+    case 6: return QStringLiteral("5.1");
+    case 7: return QStringLiteral("6.1");
+    case 8: return QStringLiteral("7.1");
+    default: return channels > 0 ? QString::number(channels) + QStringLiteral("ch") : QString();
+    }
+}
+
+// audio-out-params는 디코더 원본이 아니라 실제 오디오 API로 전달되는 값이다.
+// UI에는 이 값을 우선 표시해 원본 6ch/HDMI PCM 2.0 같은 혼동을 막는다.
+static QString actualAudioOutput(mpv_handle* mpv, int& channelCount, int& sampleRate) {
+    int64_t outputChannels = 0;
+    int64_t outputRate = 0;
+    mpv_get_property(mpv, "audio-out-params/channel-count", MPV_FORMAT_INT64, &outputChannels);
+    mpv_get_property(mpv, "audio-out-params/samplerate", MPV_FORMAT_INT64, &outputRate);
+
+    char* formatRaw = mpv_get_property_string(mpv, "audio-out-params/format");
+    char* layoutRaw = mpv_get_property_string(mpv, "audio-out-params/hr-channels");
+    const QString format = formatRaw ? QString::fromUtf8(formatRaw) : QString();
+    const QString layout = layoutRaw ? QString::fromUtf8(layoutRaw) : QString();
+    if (formatRaw) mpv_free(formatRaw);
+    if (layoutRaw) mpv_free(layoutRaw);
+
+    if (outputChannels > 0) channelCount = static_cast<int>(outputChannels);
+    else if (!layout.isEmpty()) channelCount = channelCountFromLayout(layout);
+    if (outputRate > 0) sampleRate = static_cast<int>(outputRate);
+
+    if (format.isEmpty()) return {};
+    const bool bitstream = format.contains("spdif", Qt::CaseInsensitive) ||
+                           format.contains("bitstream", Qt::CaseInsensitive);
+    if (bitstream) return QStringLiteral("BITSTREAM");
+    const QString displayLayout = channelLayoutLabel(channelCount);
+    return displayLayout.isEmpty() ? QStringLiteral("PCM")
+                                   : QStringLiteral("PCM ") + displayLayout;
+}
+
 MpvCore::MpvCore(QObject* parent) : QObject(parent) {
     setlocale(LC_NUMERIC, "C");
 
@@ -282,9 +333,10 @@ bool MpvCore::initialize(WId windowId) {
         "ac3,eac3,dts,dts-hd,truehd"));
     // 오디오 초기화 실패 시 영상은 계속 재생 (null 오디오 폴백)
     check_error(mpv_set_property_string(mpv_, "audio-fallback-to-null", "yes"));
-    // 멀티채널 자동 인식: audio-channels=auto (5.1/7.1 PCM 자동 출력)
-    // WASAPI 독점 모드에서 원본 채널 수 그대로 출력 (다운믹스 없음)
-    check_error(mpv_set_property_string(mpv_, "audio-channels", "auto"));
+    // HDMI 멀티채널 정책: 리시버가 지원하는 레이아웃만 명시적으로 허용한다.
+    // auto는 Windows가 보고한 레이아웃 중 잘못된 구성을 선택해 2.0 폴백을 만들 수 있다.
+    // 7.1 → 5.1 → stereo 순서로 원본과 가장 가까운 레이아웃을 오디오 API에 요청한다.
+    check_error(mpv_set_property_string(mpv_, "audio-channels", "7.1,5.1,stereo"));
 
     // 자막 우선순위: 언어 메타데이터가 있는 경우 한국어를 먼저 선택한다.
     // 메타데이터가 없는 외부 SMI/SRT는 sub-auto=fuzzy가 파일명 기준으로 탐색한다.
@@ -320,6 +372,7 @@ bool MpvCore::initialize(WId windowId) {
     mpv_observe_property(mpv_, 0, "audio-codec-name",MPV_FORMAT_STRING);
     mpv_observe_property(mpv_, 0, "audio-channels",  MPV_FORMAT_STRING);
     mpv_observe_property(mpv_, 0, "audio-samplerate",MPV_FORMAT_INT64);
+    mpv_observe_property(mpv_, 0, "audio-out-params", MPV_FORMAT_NODE);
     mpv_observe_property(mpv_, 0, "audio-out-detected-device", MPV_FORMAT_STRING);
     mpv_observe_property(mpv_, 0, "video-params/w",  MPV_FORMAT_INT64);
     mpv_observe_property(mpv_, 0, "video-params/h",  MPV_FORMAT_INT64);
@@ -384,17 +437,10 @@ void MpvCore::handleEvent(mpv_event* event) {
                 QString codecStr   = QString::fromUtf8(codec);
                 QString channelStr = channels ? QString::fromUtf8(channels) : "";
                 mpv_free(codec); mpv_free(channels);
-                int ch = 0;
-                if (channelStr == "mono") ch = 1;
-                else if (channelStr == "stereo") ch = 2;
-                else if (channelStr.contains("5.1")) ch = 6;
-                else if (channelStr.contains("7.1")) ch = 8;
-                else if (channelStr.contains("6.1")) ch = 7;
-                else { bool ok; int n = channelStr.toInt(&ok); if (ok) ch = n; }
-                char* aoFmt = mpv_get_property_string(mpv_, "audio-out-params/format");
-                QString outStr = aoFmt ? QString::fromUtf8(aoFmt) : "";
-                mpv_free(aoFmt);
-                emit audioFormatChanged(codecStr, ch, static_cast<int>(sr), outStr);
+                int ch = channelCountFromLayout(channelStr);
+                int outputRate = static_cast<int>(sr);
+                const QString outStr = actualAudioOutput(mpv_, ch, outputRate);
+                emit audioFormatChanged(codecStr, ch, outputRate, outStr);
             } else {
                 mpv_free(channels);
             }
@@ -564,7 +610,7 @@ void MpvCore::handlePropertyChange(mpv_event_property* prop) {
         emit tracksChanged();
     }
     else if (name == "audio-codec-name" || name == "audio-channels" ||
-             name == "audio-samplerate") {
+             name == "audio-samplerate" || name == "audio-out-params") {
         // 오디오 포맷 정보 업데이트
         char* codec = mpv_get_property_string(mpv_, "audio-codec-name");
         char* channels = mpv_get_property_string(mpv_, "audio-channels");
@@ -576,32 +622,19 @@ void MpvCore::handlePropertyChange(mpv_event_property* prop) {
         mpv_free(codec);
         mpv_free(channels);
 
-        // 채널 수 파싱 ("stereo"=2, "5.1"=6, "7.1"=8, 숫자 등)
-        int channelCount = 0;
-        if (channelStr == "mono")   channelCount = 1;
-        else if (channelStr == "stereo") channelCount = 2;
-        else if (channelStr.contains("5.1")) channelCount = 6;
-        else if (channelStr.contains("7.1")) channelCount = 8;
-        else if (channelStr.contains("6.1")) channelCount = 7;
-        else {
-            // 숫자 형태 처리
-            bool ok;
-            int n = channelStr.toInt(&ok);
-            if (ok) channelCount = n;
-        }
-
-        // 현재 오디오 출력 드라이버에서 패스스루 여부 감지
-        char* aoFormat = mpv_get_property_string(mpv_, "audio-out-params/format");
-        QString outputStr = aoFormat ? QString::fromUtf8(aoFormat) : "";
-        mpv_free(aoFormat);
-        // spdif 출력 시 패스스루
+        // 원본 채널 수는 폴백으로만 사용하고, UI에는 audio-out-params의 실제 출력 채널을 우선 표시한다.
+        int channelCount = channelCountFromLayout(channelStr);
+        int outputRate = static_cast<int>(samplerate);
+        QString outputStr = actualAudioOutput(mpv_, channelCount, outputRate);
         if (outputStr.isEmpty()) {
             char* ao = mpv_get_property_string(mpv_, "current-ao");
-            outputStr = ao ? QString::fromUtf8(ao) : "";
+            outputStr = ao ? QString::fromUtf8(ao) : QStringLiteral("출력 협상 중");
             mpv_free(ao);
         }
 
-        emit audioFormatChanged(codecStr, channelCount, static_cast<int>(samplerate), outputStr);
+        appLog(QString("AUDIO actual-output=%1 channels=%2 rate=%3 source-layout=%4")
+                   .arg(outputStr).arg(channelCount).arg(outputRate).arg(channelStr));
+        emit audioFormatChanged(codecStr, channelCount, outputRate, outputStr);
     }
     else if (name == "video-params/w" || name == "video-params/h" ||
              name == "container-fps" || name == "video-codec") {
@@ -964,20 +997,38 @@ void MpvCore::command(const QStringList& args) {
 }
 
 QVariantList MpvCore::audioTracks() const {
-    // track-list에서 오디오 트랙만 추출
     QVariantList result;
     if (!initialized_) return result;
-    // TODO: mpv_node 파싱
+    const QVariantList tracks = getProperty("track-list").toList();
+    for (const QVariant& item : tracks) {
+        const QVariantMap track = item.toMap();
+        if (track.value("type").toString() == "audio")
+            result.append(track);
+    }
     return result;
 }
 
 QVariantList MpvCore::videoTracks() const {
     QVariantList result;
+    if (!initialized_) return result;
+    const QVariantList tracks = getProperty("track-list").toList();
+    for (const QVariant& item : tracks) {
+        const QVariantMap track = item.toMap();
+        if (track.value("type").toString() == "video")
+            result.append(track);
+    }
     return result;
 }
 
 QVariantList MpvCore::subtitleTracks() const {
     QVariantList result;
+    if (!initialized_) return result;
+    const QVariantList tracks = getProperty("track-list").toList();
+    for (const QVariant& item : tracks) {
+        const QVariantMap track = item.toMap();
+        if (track.value("type").toString() == "sub")
+            result.append(track);
+    }
     return result;
 }
 

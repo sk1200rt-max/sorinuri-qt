@@ -26,7 +26,6 @@
 #include "ShortcutOverlay.h"
 #include "ShortcutConfigWidget.h"
 #include "ScreenRecorder.h"
-#include "MediaInfoOverlay.h"
 #include "MusicWidget.h"
 #include "HiFiEngine.h"
 #include "MiniPlayerWidget.h"
@@ -150,7 +149,6 @@ private:
     ControlBar*        controlBar_      = nullptr;
     ProFeaturesWidget* proFeatures_     = nullptr;
     ShortcutOverlay*   shortcutOverlay_  = nullptr;
-    MediaInfoOverlay*  mediaInfoOverlay_ = nullptr;
 
     // HiFi 엔진
     HiFiEngine*        hifiEngine_      = nullptr;
@@ -177,10 +175,6 @@ private:
     ScrobbleManager*      scrobbleManager_       = nullptr;  // Last.fm 스크로블링
     CloudDriveManager*         cloudDriveManager_         = nullptr;  // 클라우드 드라이브 연동
     CloudDriveBrowserWidget*   cloudDriveBrowserWidget_   = nullptr;  // 클라우드 드라이브 UI
-
-    // 멀티체널 안내 상태 (파일당 한 번만 표시)
-    bool   multichannelPromptShown_ = false;
-    void   showMultichannelPrompt(int channelCount);
 
     bool   isFullscreen_      = false;
     bool   isOttMode_         = false;

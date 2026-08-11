@@ -9,6 +9,7 @@
 #include "UpdateChecker.h"
 #include "UpdateDialog.h"
 #include "AlbumArtExtractor.h"
+#include "UiTheme.h"
 #include <QApplication>
 #include <QGuiApplication>
 #include <QScreen>
@@ -26,6 +27,7 @@
 #include <QMenu>
 #include <QStandardPaths>
 #include <QAction>
+#include <QActionGroup>
 #include <QCryptographicHash>
 #include <QDateTime>
 #include <QTableWidget>
@@ -49,7 +51,9 @@ MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent), settings_("Sorinuri", "SorinuriPlayer")
 {
     setWindowTitle("소리누리");
-    setMinimumSize(800, 540);
+    // 실제 최소 크기는 loadSettings()에서 현재 논리 화면 크기에 맞춰 계산한다.
+    // 여기서는 250% 배율의 작은 논리 해상도를 막지 않는 안전한 하한만 둔다.
+    setMinimumSize(640, 420);
     setAcceptDrops(true);
     setWindowFlags(Qt::FramelessWindowHint | Qt::Window);
 
@@ -97,7 +101,10 @@ void MainWindow::setupUI() {
     setFocusPolicy(Qt::StrongFocus);
 
     auto* central = new QWidget(this);
-    central->setStyleSheet("QWidget { background: #0e0e0e; color: #ccc; }");
+    central->setObjectName("mainSurface");
+    central->setStyleSheet(QString(
+        "QWidget#mainSurface { background: %1; color: %2; font-family: 'Segoe UI'; }")
+        .arg(SorinuriUi::Surface, SorinuriUi::Text));
     setCentralWidget(central);
 
     auto* mainLayout = new QVBoxLayout(central);
@@ -173,10 +180,6 @@ void MainWindow::setupUI() {
     // ── 단축키 오버레이 (영상 위에 표시) ─────────────────────────────
     shortcutOverlay_ = new ShortcutOverlay(mpvWidget_);
     shortcutOverlay_->hide();
-    // ── 미디어 정보 오버레이 (Tab키로 토글, 좌측 사이드바) ──────────────
-    mediaInfoOverlay_ = new MediaInfoOverlay(mpvWidget_);
-    mediaInfoOverlay_->hide();
-
     // OSD 위젯 (화면 중앙 반투명 표시) - mpvWidget_ 위에 오버레이
     osdWidget_ = new OsdWidget(mpvWidget_);
     osdWidget_->hide();
@@ -206,8 +209,7 @@ void MainWindow::setupConnections() {
     mpvWidget_->setMouseTracking(true);
     mpvWidget_->installEventFilter(this);
     setMouseTracking(true);
-    // Tab키 전역 감지: Qt는 Tab키를 포커스 이동으로 처리하여 keyPressEvent로 전달하지 않음
-    // qApp 이벤트 필터로 애플리케이션 전체에서 Tab키를 감지하여 처리
+    // 애플리케이션 전체 마우스 이동을 감지해 전체화면 UI 자동 숨김 상태를 안전하게 관리한다.
     qApp->installEventFilter(this);
 
     // HiDPI 근본 수정: mpvInitialized 시그널 연결
@@ -326,44 +328,9 @@ void MainWindow::setupConnections() {
 
     // 전문 기능 패널 연결
     proFeatures_->connectMpv(core);
-    mediaInfoOverlay_->connectMpv(core);
     // 패널 내부 닫기 버튼 → toggleProFeatures (앱 종료 아님)
     connect(proFeatures_, &ProFeaturesWidget::closeRequested,
             this, &MainWindow::toggleProFeatures);
-
-    // ── 사이드 탭 클릭 → 해당 패널 열기 ──────────────────────────────
-    // 0=재생목록, 1=오디오, 2=화질, 3=자막, 4=전문기능
-    connect(mediaInfoOverlay_, &MediaInfoOverlay::tabClicked, this, [this](int idx) {
-        // 사이드 패널 즉시 숨김 (toggle() 애니메이션 대신 hide() 직접 호출)
-        // toggle()의 슬라이드 애니메이션 중 toggleProFeatures()가 실행되면 레이아웃 충돌 발생
-        mediaInfoOverlay_->hide();
-        // 전문기능 패널이 이미 열려 있으면 닫고, 닫혀 있으면 열고 탭 이동
-        bool wasOpen = proFeatures_ && proFeatures_->isVisible();
-        if (!wasOpen) toggleProFeatures();
-        // 패널이 열린 상태에서 탭 이동 (50ms 지연: 레이아웃 재계산 완료 후)
-        QTimer::singleShot(50, this, [this, idx]() {
-            if (!proFeatures_ || !proFeatures_->isVisible()) return;
-            // 탭 이름으로 이동 (지연 초기화로 인덱스가 가변적이므로 고정 인덱스 사용 금지)
-            // MediaInfoOverlay 탭: 0=재생목록, 1=오디오, 2=화질, 3=자막, 4=전문기능
-            switch (idx) {
-            case 0:  // 재생목록 → 전문 기능 탭 (별도 재생목록 탭 없음)
-                proFeatures_->setCurrentTab(0);
-                break;
-            case 1:  // 오디오 → "하이엔드 오디오" 탭
-                proFeatures_->setCurrentTabByName("하이엔드 오디오");
-                break;
-            case 2:  // 화질 → "하이엔드 비디오" 탭
-                proFeatures_->setCurrentTabByName("하이엔드 비디오");
-                break;
-            case 3:  // 자막 → "자막 편집기" 탭
-                proFeatures_->setCurrentTabByName("자막 편집기");
-                break;
-            case 4:  // 전문기능 → "전문 기능" 탭
-                proFeatures_->setCurrentTabByName("전문 기능");
-                break;
-            }
-        });
-    });
 
     connect(titleBar_, &TitleBar::minimizeClicked,   this, &QMainWindow::showMinimized);
     connect(titleBar_, &TitleBar::maximizeClicked, this, [this]() {
@@ -567,8 +534,6 @@ void MainWindow::onFileLoaded(const QString& path) {
         saveResumePosition();
     currentFilePath_ = path;
     lastPosition_ = 0.0;
-    // 새 파일 로드 시 멀티체널 안내 상태 초기화 (파일마다 한 번씩 감지)
-    multichannelPromptShown_ = false;
     updateWindowTitle(QFileInfo(path).fileName());
     addToRecentFiles(path);
     tryResumePosition(path);
@@ -669,12 +634,7 @@ void MainWindow::showUI() {
 void MainWindow::hideUI() {
     // 음악 모드에서는 타이틀바/커서를 절대 숨기지 않음
     if (isMusicMode_) return;
-    // ── 사이드 메뉴/팝업/메뉴가 열려 있으면 절대 숨기지 않음 ──────────────
-    // MediaInfoOverlay(사이드 메뉴)가 열려 있으면 타이머 재시작 후 복귀
-    if (mediaInfoOverlay_ && mediaInfoOverlay_->isVisible()) {
-        if (uiHideTimer_) uiHideTimer_->start(3000);  // 메뉴 닫힌 후 3초 뒤 재시도
-        return;
-    }
+    // ── 팝업/메뉴가 열려 있으면 절대 숨기지 않음 ──────────────────────────
     // QApplication 레벨 팝업(QMenu, QComboBox 드롭다운 등)이 열려 있으면 숨기지 않음
     if (QApplication::activePopupWidget() != nullptr) {
         if (uiHideTimer_) uiHideTimer_->start(1000);
@@ -860,85 +820,10 @@ void MainWindow::onVolumeChanged(int v) {
     }
 }
 
-void MainWindow::onAudioFormatChanged(const QString& codec, int channelCount, int, const QString&) {
+void MainWindow::onAudioFormatChanged(const QString& codec, int, int, const QString&) {
+    // 헤더는 원본 코덱만 간결하게 표시하고, 실제 HDMI 출력은 하단 컨트롤바에 PCM/비트스트림
+    // 레이아웃으로 표시한다. 수동 설정을 요구하는 팝업은 열지 않는다.
     titleBar_->setAudioBadge(codec.toUpper());
-
-    // 멀티채널 파일 감지: 공유 모드에서 5.1 이상인 경우 안내
-    // QSettings 대신 MPV audio-exclusive 속성 직접 확인 (실제 상태 반영)
-    if (channelCount >= 6 && !multichannelPromptShown_) {
-        auto* core = mpvWidget_->core();
-        // MPV에서 현재 실제 독점 모드 여부 직접 확인
-        const bool isExclusive = core->getProperty("audio-exclusive").toString() == "yes";
-        if (!isExclusive) {
-            multichannelPromptShown_ = true;
-            QMetaObject::invokeMethod(this, [this, channelCount]() {
-                showMultichannelPrompt(channelCount);
-            }, Qt::QueuedConnection);
-        }
-    }
-}
-
-void MainWindow::showMultichannelPrompt(int channelCount) {
-    const QString chStr = (channelCount == 6) ? "5.1" :
-                          (channelCount == 8) ? "7.1" :
-                          QString("%1ch").arg(channelCount);
-
-    QDialog dlg(this);
-    dlg.setWindowTitle("멀티체널 오디오 감지");
-    dlg.setFixedSize(460, 230);
-    dlg.setStyleSheet(
-        "QDialog { background:#1a1a1a; color:#e0e0e0; "
-        "font-family:'Segoe UI','Malgun Gothic',sans-serif; font-size:13px; }"
-        "QLabel { color:#e0e0e0; }"
-        "QPushButton { background:#252525; border:1px solid #444; border-radius:5px; "
-        "  padding:8px 18px; color:#e0e0e0; font-size:13px; min-width:100px; }"
-        "QPushButton:hover { background:#2a2a2a; }"
-        "QPushButton#btnExclusive { background:#00443a; border-color:#00c8b4; "
-        "  color:#00c8b4; font-weight:bold; }"
-        "QPushButton#btnExclusive:hover { background:#005a4d; }");
-
-    QVBoxLayout* vl = new QVBoxLayout(&dlg);
-    vl->setContentsMargins(24, 20, 24, 20);
-    vl->setSpacing(12);
-
-    QLabel* title = new QLabel(
-        QString("🔊  %1 서라운드 파일이 감지되었습니다").arg(chStr), &dlg);
-    title->setStyleSheet("font-size:15px; font-weight:bold; color:#00c8b4;");
-    vl->addWidget(title);
-
-    QLabel* msg = new QLabel(
-        QString("현재 <b>공유 모드</b>로 재생 중입니다.<br>"
-                "%1 서라운드를 완벽하게 듣려면 <b>독점 모드</b>로 전환하세요.<br>"
-                "<span style='color:#888;font-size:11px;'>"
-                "⚠️ 독점 모드 전환 시 다른 앱의 소리가 일시적으로 차단될 수 있습니다."
-                "</span>").arg(chStr), &dlg);
-    msg->setWordWrap(true);
-    msg->setTextFormat(Qt::RichText);
-    vl->addWidget(msg);
-
-    vl->addStretch();
-
-    QHBoxLayout* hl = new QHBoxLayout();
-    hl->setSpacing(10);
-    QPushButton* btnKeep      = new QPushButton("공유 모드 유지", &dlg);
-    QPushButton* btnExclusive = new QPushButton("🔊  독점 모드로 전환", &dlg);
-    btnExclusive->setObjectName("btnExclusive");
-    hl->addStretch();
-    hl->addWidget(btnKeep);
-    hl->addWidget(btnExclusive);
-    vl->addLayout(hl);
-
-    // 독점 모드 전환: QSettings 저장 + MPV 즉시 적용 (재시작 불필요)
-    connect(btnExclusive, &QPushButton::clicked, &dlg, [this, &dlg]() {
-        QSettings s("Sorinuri", "SorinuriPlayer");
-        s.setValue("audio/exclusive", true);
-        s.sync();
-        mpvWidget_->core()->setAudioExclusive(true);
-        dlg.accept();
-    });
-    connect(btnKeep, &QPushButton::clicked, &dlg, &QDialog::reject);
-
-    dlg.exec();
 }
 
 void MainWindow::onVideoInfoChanged(int, int, double, const QString&) {}
@@ -1054,7 +939,6 @@ void MainWindow::keyPressEvent(QKeyEvent* e) {
                     else if (entry.id == "vol_down")     { core->setVolume(qMax(core->volume()-5, 0));   if (osdWidget_) osdWidget_->showVolume(core->volume(), false); }
                     else if (entry.id == "fullscreen")   toggleFullscreen();
                     else if (entry.id == "mute")         core->setMuted(!core->getProperty("mute").toBool());
-                    else if (entry.id == "media_info")   mediaInfoOverlay_->toggle();
                     else if (entry.id == "pro_panel")    toggleProFeatures();
                     else if (entry.id == "screenshot")   { core->command({"screenshot", "video"}); if (osdWidget_) osdWidget_->showInfo("화면 캡처 저장"); }
                     else if (entry.id == "open_file")    onOpenFile();
@@ -1257,9 +1141,6 @@ void MainWindow::keyPressEvent(QKeyEvent* e) {
             core->command({"screenshot", "video"});
         }
         if (osdWidget_) osdWidget_->showInfo("화면 캡처 저장");
-        break;
-    case Qt::Key_Tab:
-        mediaInfoOverlay_->toggle();
         break;
     case Qt::Key_P:
         toggleProFeatures();
@@ -1560,10 +1441,6 @@ void MainWindow::resizeEvent(QResizeEvent* e) {
     if (shortcutOverlay_ && mpvWidget_) {
         shortcutOverlay_->setGeometry(mpvWidget_->rect());
     }
-    // 미디어 정보 오버레이: 열려있을 때만 높이 동기화
-    if (mediaInfoOverlay_ && mpvWidget_ && mediaInfoOverlay_->isVisible()) {
-        mediaInfoOverlay_->setGeometry(0, 0, 180, mpvWidget_->height());
-    }
 }
 
 // ── 창 크기 조절 ──────────────────────────────────────────────────
@@ -1728,23 +1605,8 @@ void MainWindow::mousePressEvent(QMouseEvent* e) {
 }
 
 bool MainWindow::eventFilter(QObject* obj, QEvent* event) {
-    // Tab키 전역 처리: qApp 이벤트 필터로 모든 이벤트를 감지
-    // Qt가 Tab키를 포커스 이동으로 가로채기 전에 여기서 먹음
-    if (event->type() == QEvent::KeyPress) {
-        auto* ke = static_cast<QKeyEvent*>(event);
-        if (ke->key() == Qt::Key_Tab && ke->modifiers() == Qt::NoModifier) {
-            // 설정 창·파일 대화상자·콤보박스가 활성화된 상태에서는 Tab이 해당 UI의
-            // 정상 포커스 이동에 사용되어야 하므로 사이드 메뉴 단축키를 가로채지 않는다.
-            if (QApplication::activeModalWidget() || QApplication::activePopupWidget())
-                return QMainWindow::eventFilter(obj, event);
-            if (isActiveWindow() && mediaInfoOverlay_) mediaInfoOverlay_->toggle();
-            return isActiveWindow();  // 비활성 창의 Tab은 소비하지 않음
-        }
-    }
     // ── 마우스 이동 시 showUI() 전역 호출 ──────────────────────────────
-    // MediaInfoOverlay, proFeatures_ 등 자식 위젯 위에서 마우스 이동 시에도
-    // uiHideTimer_를 리셋하여 커서가 숨겨지지 않도록 함
-    // (이전: obj==mpvWidget_ 조건 안에만 있어 사이드 탭 위에서 커서 숨김 발생)
+    // 자식 위젯 위에서도 uiHideTimer_를 리셋하여 커서가 숨겨지지 않도록 한다.
     if (event->type() == QEvent::MouseMove) {
         showUI();
     }
@@ -1752,6 +1614,13 @@ bool MainWindow::eventFilter(QObject* obj, QEvent* event) {
         // 클릭 시 MainWindow로 포커스 재설정 - 키 이벤트가 keyPressEvent로 정상 전달됨
         if (event->type() == QEvent::MouseButtonPress) {
             setFocus();
+        } else if (event->type() == QEvent::MouseButtonRelease) {
+            auto* me = static_cast<QMouseEvent*>(event);
+            if (me->button() == Qt::RightButton) {
+                showUI();
+                showContextMenu(me->globalPosition().toPoint());
+                return true;
+            }
         }
         if (event->type() == QEvent::MouseMove) {
             auto* me = static_cast<QMouseEvent*>(event);
@@ -1845,14 +1714,7 @@ void MainWindow::showContextMenu(const QPoint& globalPos) {
     bool hasFile = !core->currentFile().isEmpty();
 
     QMenu menu(this);
-    menu.setStyleSheet(
-        "QMenu { background: #1a1a1a; color: #ddd; border: 1px solid #333; "
-        "font-size: 12px; padding: 4px 0; } "
-        "QMenu::item { padding: 6px 24px 6px 16px; } "
-        "QMenu::item:selected { background: #2a2a2a; color: #fff; } "
-        "QMenu::item:disabled { color: #555; } "
-        "QMenu::separator { height: 1px; background: #2a2a2a; margin: 3px 8px; }"
-    );
+    menu.setStyleSheet(SorinuriUi::menuStyle());
 
     // 파일 열기
     QAction* actOpen = menu.addAction("파일 열기...");
@@ -1896,26 +1758,44 @@ void MainWindow::showContextMenu(const QPoint& globalPos) {
     connect(actStop, &QAction::triggered, core, &MpvCore::stop);
 
     QAction* actPrev = menu.addAction("이전");
+    actPrev->setEnabled(hasFile);
     connect(actPrev, &QAction::triggered, [core]() { core->command({"playlist-prev"}); });
 
     QAction* actNext = menu.addAction("다음");
+    actNext->setEnabled(hasFile);
     connect(actNext, &QAction::triggered, [core]() { core->command({"playlist-next"}); });
+
+    QAction* actMute = menu.addAction("음소거");
+    actMute->setEnabled(hasFile);
+    actMute->setCheckable(true);
+    actMute->setChecked(core->getProperty("mute").toBool());
+    connect(actMute, &QAction::triggered, [core](bool muted) { core->setMuted(muted); });
 
     menu.addSeparator();
 
-    // 오디오 트랙 서브메뉴
+    // 오디오 트랙 서브메뉴: 실제 track-list를 읽어 현재 선택 상태와 원본 포맷을 함께 표시한다.
     QMenu* audioMenu = menu.addMenu("오디오 트랙");
-    QVariantList audioTracks = core->audioTracks();
+    auto* audioGroup = new QActionGroup(audioMenu);
+    audioGroup->setExclusive(true);
+    const int currentAid = core->getProperty("aid").toInt();
+    const QVariantList audioTracks = core->audioTracks();
     if (audioTracks.isEmpty()) {
-        audioMenu->addAction("트랙 없음")->setEnabled(false);
+        audioMenu->addAction("오디오 트랙 없음")->setEnabled(false);
     } else {
         for (const QVariant& t : audioTracks) {
-            QVariantMap m = t.toMap();
-            QString label = QString("[%1] %2").arg(m["id"].toInt()).arg(m["lang"].toString());
-            if (!m["title"].toString().isEmpty()) label += " - " + m["title"].toString();
-            if (!m["codec"].toString().isEmpty()) label += " (" + m["codec"].toString() + ")";
+            const QVariantMap m = t.toMap();
+            const int id = m.value("id").toInt();
+            const QString lang = m.value("lang").toString().isEmpty()
+                ? QStringLiteral("언어 미지정") : m.value("lang").toString();
+            const QString codec = m.value("codec").toString().toUpper();
+            const int channels = m.value("demux-channel-count").toInt();
+            QString label = QString("%1 · %2").arg(lang, codec.isEmpty() ? QStringLiteral("오디오") : codec);
+            if (channels > 0) label += QString(" · %1ch").arg(channels);
+            if (!m.value("title").toString().isEmpty()) label += " · " + m.value("title").toString();
             QAction* a = audioMenu->addAction(label);
-            int id = m["id"].toInt();
+            a->setCheckable(true);
+            a->setChecked(id == currentAid);
+            audioGroup->addAction(a);
             connect(a, &QAction::triggered, [core, id]() { core->setAudioTrack(id); });
         }
     }
@@ -1927,16 +1807,31 @@ void MainWindow::showContextMenu(const QPoint& globalPos) {
     actSubSearch->setEnabled(!currentFilePath_.isEmpty() && !currentFilePath_.startsWith("http"));
     connect(actSubSearch, &QAction::triggered, this, &MainWindow::onSubtitleSearch);
     subMenu->addSeparator();
+    auto* subGroup = new QActionGroup(subMenu);
+    subGroup->setExclusive(true);
+    const int currentSid = core->getProperty("sid").toInt();
     QAction* actSubOff = subMenu->addAction("자막 끄기");
+    actSubOff->setCheckable(true);
+    actSubOff->setChecked(currentSid == 0);
+    subGroup->addAction(actSubOff);
     connect(actSubOff, &QAction::triggered, [core]() { core->setSubtitleTrack(0); });
     subMenu->addSeparator();
-    QVariantList subTracks = core->subtitleTracks();
+    const QVariantList subTracks = core->subtitleTracks();
+    if (subTracks.isEmpty()) {
+        subMenu->addAction("자막 트랙 없음")->setEnabled(false);
+    }
     for (const QVariant& t : subTracks) {
-        QVariantMap m = t.toMap();
-        QString label = QString("[%1] %2").arg(m["id"].toInt()).arg(m["lang"].toString());
-        if (!m["title"].toString().isEmpty()) label += " - " + m["title"].toString();
+        const QVariantMap m = t.toMap();
+        const int id = m.value("id").toInt();
+        const QString lang = m.value("lang").toString().isEmpty()
+            ? QStringLiteral("언어 미지정") : m.value("lang").toString();
+        const QString codec = m.value("codec").toString().toUpper();
+        QString label = QString("%1 · %2").arg(lang, codec.isEmpty() ? QStringLiteral("자막") : codec);
+        if (!m.value("title").toString().isEmpty()) label += " · " + m.value("title").toString();
         QAction* a = subMenu->addAction(label);
-        int id = m["id"].toInt();
+        a->setCheckable(true);
+        a->setChecked(id == currentSid);
+        subGroup->addAction(a);
         connect(a, &QAction::triggered, [core, id]() { core->setSubtitleTrack(id); });
     }
 
@@ -2188,10 +2083,16 @@ void MainWindow::loadSettings() {
     QRect availGeom = scr ? scr->availableGeometry() : QRect(0, 0, 1920, 1080);
     QSize availSize = availGeom.size();
 
-    // 화면 크기의 60%를 기본 크기로 설정
-    QSize defaultSize(availSize.width() * 6 / 10, availSize.height() * 6 / 10);
+    // 72% 기본 크기: 재생 화면은 충분히 크게 열되, 250% HiDPI의 작은 논리 해상도도 넘지 않는다.
+    const int minWidth  = qMin(800, availSize.width());
+    const int minHeight = qMin(540, availSize.height());
+    const int maxWidth  = qMin(1440, availSize.width());
+    const int maxHeight = qMin(900,  availSize.height());
+    const QSize defaultSize(
+        qBound(minWidth,  availSize.width()  * 72 / 100, maxWidth),
+        qBound(minHeight, availSize.height() * 72 / 100, maxHeight));
 
-    // 저장된 창 크기 로드 - 단, 화면보다 크거나 화면 밖에 있으면 자동 재설정
+    // 저장된 창 크기 로드 - 화면보다 크거나, 너무 작거나, 화면 밖이면 자동 재설정
     QSize savedSize = settings_.value("window/size", QSize()).toSize();
     QPoint savedPos  = settings_.value("window/pos",  QPoint(-1,-1)).toPoint();
 
@@ -2201,6 +2102,8 @@ void MainWindow::loadSettings() {
     } else if (savedSize.width()  > availSize.width() ||
                savedSize.height() > availSize.height()) {
         needReset = true;  // 화면보다 큼서 하단바 접근 불가
+    } else if (savedSize.width() < minWidth || savedSize.height() < minHeight) {
+        needReset = true;  // 이전의 작은 저장값으로 컨트롤·정보 표시가 잘리는 문제 방지
     } else if (savedPos.x() >= 0) {
         // 저장된 위치가 화면 밖에 있으면 재설정
         QRect windowRect(savedPos, savedSize);

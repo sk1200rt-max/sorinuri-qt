@@ -336,7 +336,7 @@ jobs:
         run: |
           # 6.7.3의 고DPI 네이티브 컨트롤 지원을 보장하기 위해 기존 버전이 있어도 갱신한다.
           Write-Host "Inno Setup 6.7.3 설치 중..."
-          $url = "https://files.jrsoftware.org/is/6/innosetup-6.7.3.exe"
+          $url = "https://github.com/jrsoftware/issrc/releases/download/is-6_7_3/innosetup-6.7.3.exe"
           Invoke-WebRequest -Uri $url -OutFile "innosetup.exe" -TimeoutSec 120
           Start-Process -FilePath "innosetup.exe" -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART" -Wait
           $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
@@ -422,7 +422,7 @@ jobs:
 
       - name: Generate version-staging.json
         env:
-          APP_VERSION: "6.18.4"
+          APP_VERSION: "6.18.5"
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
         run: python3 scripts/make_version_json.py "$APP_VERSION" "$DEPLOY_HOST" staging
 
@@ -432,7 +432,7 @@ jobs:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
-          APP_VERSION: "6.18.4"
+          APP_VERSION: "6.18.5"
         run: |
           if [ -z "$SSH_KEY" ] || [ -z "$DEPLOY_HOST" ]; then
             echo "배포 Secrets 미설정 - 건너뜀"

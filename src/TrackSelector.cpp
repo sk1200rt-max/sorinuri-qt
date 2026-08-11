@@ -1,4 +1,5 @@
 #include "TrackSelector.h"
+#include "UiTheme.h"
 #include <QDebug>
 #include <QAbstractItemView>
 #include <QFileInfo>
@@ -51,34 +52,18 @@ TrackSelector::TrackSelector(QWidget* parent) : QWidget(parent) {
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(6);
 
-    QLabel* audioLabel = new QLabel("오디오:", this);
-    audioLabel->setStyleSheet("color: #888; font-size: 11px;");
+    QLabel* audioLabel = new QLabel("오디오", this);
+    audioLabel->setStyleSheet("color: #8C9A99; font-size: 11px; font-weight: 600;");
     layout->addWidget(audioLabel);
 
     audioCombo_ = new QComboBox(this);
     audioCombo_->setMinimumWidth(180);
     audioCombo_->setMaximumWidth(280);
-    audioCombo_->setStyleSheet(R"(
-        QComboBox {
-            background: #1e1e1e;
-            border: 1px solid #333;
-            border-radius: 3px;
-            padding: 3px 6px;
-            color: #e0e0e0;
-            font-size: 11px;
-        }
-        QComboBox::drop-down { border: none; width: 16px; }
-        QComboBox QAbstractItemView {
-            background: #1e1e1e;
-            color: #e0e0e0;
-            selection-background-color: #1a3a5c;
-            font-size: 11px;
-        }
-    )");
+    audioCombo_->setStyleSheet(SorinuriUi::comboBoxStyle());
     layout->addWidget(audioCombo_);
 
-    QLabel* subLabel = new QLabel("자막:", this);
-    subLabel->setStyleSheet("color: #888; font-size: 11px;");
+    QLabel* subLabel = new QLabel("자막", this);
+    subLabel->setStyleSheet("color: #8C9A99; font-size: 11px; font-weight: 600;");
     layout->addWidget(subLabel);
 
     subCombo_ = new QComboBox(this);
@@ -89,7 +74,7 @@ TrackSelector::TrackSelector(QWidget* parent) : QWidget(parent) {
     subCombo_->setMinimumContentsLength(16);
     subCombo_->view()->setMinimumWidth(380);
     subCombo_->setToolTip("선택된 자막의 언어, 파일명 및 형식을 표시합니다.");
-    subCombo_->setStyleSheet(audioCombo_->styleSheet());
+    subCombo_->setStyleSheet(SorinuriUi::comboBoxStyle());
     layout->addWidget(subCombo_);
 
     connect(audioCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged),

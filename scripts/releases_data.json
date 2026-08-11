@@ -1,5 +1,14 @@
 [
   {
+    "version": "6.18.5",
+    "date": "2026-08-11",
+    "title": "UI 통합 재설계 및 핵심 동작 안정화",
+    "desc": "사이드 탭 제거, 우클릭 트랙 메뉴 고도화, 자막 목록 개선, 실제 HDMI 오디오 출력 상태 표시, HiDPI 하단 컨트롤 레이아웃 안정화",
+    "installer": "https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v6.18.5/Sorinuri-Setup-6.18.5.exe",
+    "portable": "https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v6.18.5/Sorinuri-Qt-6.18.5-Portable.zip",
+    "tags": []
+  },
+  {
     "version": "6.18.4",
     "date": "2026-08-11",
     "title": "사이드 탭 렌더러 분리 수정 + 자막 목록 개선 + HiDPI 설치 수정",

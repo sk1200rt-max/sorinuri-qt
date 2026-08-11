@@ -1,13 +1,14 @@
 #include "ControlBar.h"
+#include "UiTheme.h"
 
 static const char* SEEK_STYLE =
     "QSlider::groove:horizontal { height: 4px; background: #2a2a2a; border-radius: 2px; }"
     "QSlider::handle:horizontal { width: 12px; height: 12px; margin: -4px 0;"
-    "  background: #4fc3f7; border-radius: 6px; }"
+    "  background: #00D4B4; border-radius: 6px; }"
     "QSlider::handle:horizontal:hover { width: 16px; height: 16px; margin: -6px 0;"
-    "  background: #81d4fa; border-radius: 8px; }"
-    "QSlider::sub-page:horizontal { background: #1976d2; border-radius: 2px; }"
-    "QSlider::sub-page:horizontal:hover { background: #42a5f5; }";
+    "  background: #20E0C3; border-radius: 8px; }"
+    "QSlider::sub-page:horizontal { background: #063B35; border-radius: 2px; }"
+    "QSlider::sub-page:horizontal:hover { background: #00D4B4; }";
 static const char* VOL_STYLE =
     "QSlider::groove:horizontal { height: 3px; background: #2a2a2a; border-radius: 1px; }"
     "QSlider::handle:horizontal { width: 10px; height: 10px; margin: -4px 0;"
@@ -24,10 +25,7 @@ QPushButton* ControlBar::makeBtn(const QString& svg, const QString& tip, int siz
     btn->setFocusPolicy(Qt::NoFocus);  // HiDPI: 버튼 클릭 후 포커스가 MainWindow에 유지되도록
     btn->setIcon(QIcon(svg));
     btn->setIconSize(QSize(size == 36 ? 20 : 16, size == 36 ? 20 : 16));
-    btn->setStyleSheet(
-        "QPushButton { background: transparent; border: none; border-radius: 3px; }"
-        "QPushButton:hover { background: #252525; }"
-        "QPushButton:pressed { background: #1565c0; }");
+    btn->setStyleSheet(SorinuriUi::iconButtonStyle());
     return btn;
 }
 
@@ -37,18 +35,15 @@ QPushButton* ControlBar::makeModeBtn(const QString& text, const QString& tip) {
     btn->setFixedHeight(22);
     btn->setCursor(Qt::ArrowCursor);
     btn->setFocusPolicy(Qt::NoFocus);  // HiDPI: 버튼 클릭 후 포커스가 MainWindow에 유지되도록
-    btn->setStyleSheet(
-        "QPushButton { background: #1a1a1a; color: #666; border: 1px solid #2a2a2a;"
-        "  border-radius: 3px; padding: 0 10px; font-size: 11px; }"
-        "QPushButton:hover { color: #ccc; border-color: #333; }"
-        "QPushButton[active=true] { background: #1565c0; color: #fff; border-color: #1976d2; }");
+    btn->setStyleSheet(SorinuriUi::modeButtonStyle());
     return btn;
 }
 
 ControlBar::ControlBar(QWidget* parent) : QWidget(parent) {
-    setFixedHeight(62);
-    // border-top 제거: 영상과 컨트롤바 사이에 불필요한 업스라인이 보이는 문제 해결
-    setStyleSheet("background: #0d0d0d;");
+    // 재생 제어와 트랙 선택을 분리해 250% 배율에서도 라벨·버튼이 겹치지 않게 한다.
+    setFixedHeight(94);
+    setStyleSheet(QString("background: %1; border-top: 1px solid %2;")
+                  .arg(SorinuriUi::Surface, SorinuriUi::BorderSoft));
 
     auto* mainLayout = new QVBoxLayout(this);
     // 상단 여백 5px: 타임라인 슬라이더 핸들이 영상 영역에 겹치지 않도록
@@ -78,7 +73,7 @@ ControlBar::ControlBar(QWidget* parent) : QWidget(parent) {
     });
     timeLabel_ = new QLabel("00:00 / 00:00", this);
     timeLabel_->setStyleSheet(
-        "color: #888; font-size: 11px; font-family: 'Consolas', monospace;"
+        "color: #8C9A99; font-size: 11px; font-family: 'Consolas', monospace;"
         "min-width: 110px; background: transparent;");
     timeLabel_->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
 
@@ -124,7 +119,7 @@ ControlBar::ControlBar(QWidget* parent) : QWidget(parent) {
     // 인라인 오디오 정보 (AudioInfoBar 대체)
     audioInfoLabel_ = new QLabel(this);
     audioInfoLabel_->setStyleSheet(
-        "color: #555; font-size: 10px; font-family: 'Consolas', monospace;"
+        "color: #8C9A99; font-size: 10px; font-family: 'Consolas', monospace;"
         "background: transparent; padding: 0 8px;");
     audioInfoLabel_->setTextFormat(Qt::RichText);
 
@@ -152,28 +147,28 @@ ControlBar::ControlBar(QWidget* parent) : QWidget(parent) {
     btnRow_->addWidget(volSlider_);
     btnRow_->addWidget(volLabel_);
     btnRow_->addSpacing(4);
-    btnRow_->addWidget(audioInfoLabel_);
+    btnRow_->addWidget(audioInfoLabel_, 1);
     btnRow_->addStretch(1);
-    // TrackSelector는 embedTrackSelector()에서 삽입됨
-    btnRow_->addStretch(1);
-    btnRow_->addWidget(btnPlayerMode_);
-    btnRow_->addSpacing(2);
-    btnRow_->addWidget(btnOttMode_);
-    btnRow_->addSpacing(6);
     btnRow_->addWidget(btnSettings_);
-
     mainLayout->addLayout(btnRow_);
+
+    // 트랙 선택은 재생 제어와 독립 행으로 배치한다. 짧은 노트북 폭과 250% DPI에서도
+    // 출력 상태·오디오·자막·모드 버튼이 서로 밀거나 잘리지 않는다.
+    trackRow_ = new QHBoxLayout();
+    trackRow_->setSpacing(4);
+    trackRow_->setContentsMargins(0, 0, 0, 0);
+    trackRow_->addStretch(1);  // TrackSelector는 embedTrackSelector()에서 앞에 삽입
+    trackRow_->addWidget(btnPlayerMode_);
+    trackRow_->addSpacing(2);
+    trackRow_->addWidget(btnOttMode_);
+    mainLayout->addLayout(trackRow_);
 }
 
 void ControlBar::embedTrackSelector(TrackSelector* selector) {
-    if (!selector || !btnRow_) return;
-    // 두 stretch 사이에 TrackSelector 삽입
-    // 레이아웃 끝: [stretch] [PlayerMode] [2] [OTT] [6] [Settings]
-    // 우측 stretch 위치 = count - 6
-    int insertPos = btnRow_->count() - 6;
-    if (insertPos < 0) insertPos = 0;
+    if (!selector || !trackRow_) return;
     selector->setParent(this);
-    btnRow_->insertWidget(insertPos, selector, 2);
+    // 두 번째 행의 좌측 공간을 트랙 선택기에 우선 배정한다.
+    trackRow_->insertWidget(0, selector, 2);
 }
 
 void ControlBar::connectMpv(MpvCore* core) {
@@ -184,23 +179,20 @@ void ControlBar::connectMpv(MpvCore* core) {
 
 void ControlBar::onAudioFormatChanged(const QString& codec, int channels,
                                        int sampleRate, const QString& output) {
-    bool isPassthrough = !output.isEmpty() &&
-        !output.toLower().contains("pcm") &&
-        !output.toLower().contains("float") &&
-        !output.toLower().contains("s16") &&
-        !output.toLower().contains("s32");
-
-    QString mode = isPassthrough ? "THRU" : "DECODE";
-    QString modeColor = isPassthrough ? "#4caf50" : "#ff9800";
-    QString ch = formatChannels(channels);
-    QString sr = sampleRate > 0 ? QString("  %1Hz").arg(sampleRate) : "";
-    QString codecStr = getDisplayCodec(codec);
+    const bool isPassthrough = output == QStringLiteral("BITSTREAM");
+    const QString mode = isPassthrough ? QStringLiteral("THRU") : QStringLiteral("PCM");
+    const QString modeColor = isPassthrough ? SorinuriUi::Mint : QStringLiteral("#F5B942");
+    const QString ch = formatChannels(channels);
+    const QString sr = sampleRate > 0 ? QString("  %1Hz").arg(sampleRate) : QString();
+    const QString codecStr = getDisplayCodec(codec);
+    const QString actualOutput = output.isEmpty() ? QStringLiteral("출력 협상 중") : output;
 
     audioInfoLabel_->setText(
         QString("<span style='color:%1;font-weight:700;'>%2</span>"
-                "<span style='color:#555;'>  %3%4%5</span>")
+                "<span style='color:#8C9A99;'>  %3%4%5</span>"
+                "<span style='color:#00D4B4;'>  → %6</span>")
         .arg(modeColor, mode, codecStr,
-             ch.isEmpty() ? "" : "  " + ch, sr));
+             ch.isEmpty() ? QString() : "  " + ch, sr, actualOutput));
 }
 
 void ControlBar::onVideoInfoChanged(int, int, double, const QString&) {}

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(Sorinuri VERSION 6.18.4 LANGUAGES CXX)
+project(Sorinuri VERSION 6.18.5 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -59,6 +59,7 @@ set(SOURCES
     src/SettingsDialog.h
     src/TrackSelector.cpp
     src/TrackSelector.h
+    src/UiTheme.h
     src/UrlDialog.cpp
     src/UrlDialog.h
     src/YtdlpManager.cpp
@@ -70,7 +71,6 @@ set(SOURCES
     src/ShortcutConfigWidget.cpp
     src/ScreenRecorder.cpp
     src/ShortcutOverlay.cpp
-    src/MediaInfoOverlay.cpp
     src/ShortcutConfigWidget.h
     src/ScreenRecorder.h
     src/ShortcutOverlay.h
