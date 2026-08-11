@@ -199,8 +199,14 @@ void VideoAdvancedWidget::loadSettings()
     }
 
     int csIdx = settings_.value("video_advanced/colorspace_idx", 0).toInt();
-    if (colorspaceCombo_ && csIdx >= 0 && csIdx < colorspaceCombo_->count())
+    if (colorspaceCombo_ && csIdx >= 0 && csIdx < colorspaceCombo_->count()) {
+        // blockSignals: 생성자에서 setCurrentIndex 시 currentIndexChanged 시그널 차단
+        // onColorspaceChanged가 호출되면 target-colorspace-hint 등 MPV 속성이 변경되어
+        // vo=libmpv 렌더러가 재초기화되면서 영상 창 분리 발생
+        colorspaceCombo_->blockSignals(true);
         colorspaceCombo_->setCurrentIndex(csIdx);
+        colorspaceCombo_->blockSignals(false);
+    }
 
     bool wasEnabled = settings_.value("video_advanced/lut_enabled", false).toBool();
     if (wasEnabled && !activeLutPath_.isEmpty() && QFileInfo::exists(activeLutPath_)) {

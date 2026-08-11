@@ -1730,6 +1730,13 @@ bool MainWindow::eventFilter(QObject* obj, QEvent* event) {
             return true;  // 이벤트 소비 - 포커스 이동 방지
         }
     }
+    // ── 마우스 이동 시 showUI() 전역 호출 ──────────────────────────────
+    // MediaInfoOverlay, proFeatures_ 등 자식 위젯 위에서 마우스 이동 시에도
+    // uiHideTimer_를 리셋하여 커서가 숨겨지지 않도록 함
+    // (이전: obj==mpvWidget_ 조건 안에만 있어 사이드 탭 위에서 커서 숨김 발생)
+    if (event->type() == QEvent::MouseMove) {
+        showUI();
+    }
     if (obj == mpvWidget_) {
         // 클릭 시 MainWindow로 포커스 재설정 - 키 이벤트가 keyPressEvent로 정상 전달됨
         if (event->type() == QEvent::MouseButtonPress) {
