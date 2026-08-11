@@ -2,6 +2,7 @@
 #include "RenderEnvironment.h"
 #include <QDebug>
 #include <QSettings>
+#include <QSet>
 #include <QThread>
 #include <QMetaObject>
 #include <QFile>
@@ -284,6 +285,12 @@ bool MpvCore::initialize(WId windowId) {
     // 멀티채널 자동 인식: audio-channels=auto (5.1/7.1 PCM 자동 출력)
     // WASAPI 독점 모드에서 원본 채널 수 그대로 출력 (다운믹스 없음)
     check_error(mpv_set_property_string(mpv_, "audio-channels", "auto"));
+
+    // 자막 우선순위: 언어 메타데이터가 있는 경우 한국어를 먼저 선택한다.
+    // 메타데이터가 없는 외부 SMI/SRT는 sub-auto=fuzzy가 파일명 기준으로 탐색한다.
+    check_error(mpv_set_property_string(mpv_, "slang", "ko,kor,korean"));
+    check_error(mpv_set_property_string(mpv_, "sub-auto", "fuzzy"));
+
     // 오디오 필터 초기화
     check_error(mpv_set_property_string(mpv_, "af", ""));
 
@@ -800,8 +807,10 @@ void MpvCore::setHwdec(const QString& method) {
 }
 
 void MpvCore::setVideoOutput(const QString& vo) {
-    if (!initialized_) return;
-    mpv_set_property_string(mpv_, "vo", vo.toUtf8().constData());
+    Q_UNUSED(vo)
+    // libmpv 렌더 컨텍스트는 initialize()에서 vo=libmpv로 한 번만 구성한다.
+    // 재생 중 vo를 gpu/gpu-next 등으로 바꾸면 MPV가 자체 비디오 창을 생성한다.
+    qWarning() << "[MPV] 런타임 vo 변경 차단: libmpv 렌더 컨텍스트는 고정";
 }
 
 void MpvCore::setSubtitleTrack(int id) {
@@ -863,6 +872,20 @@ QString MpvCore::currentFile() const {
 
 void MpvCore::setProperty(const QString& name, const QVariant& value) {
     if (!initialized_) return;
+
+    // libmpv 렌더 컨텍스트가 생성된 뒤 출력 백엔드/그래픽 API를 바꾸면
+    // MPV가 외부 렌더 타깃을 잃고 독립 비디오 창을 만들 수 있다.
+    // 이 속성들은 initialize()에서만 옵션으로 설정하며 UI·사이드 탭에서는 절대 변경하지 않는다.
+    static const QSet<QString> rendererLockedProperties = {
+        QStringLiteral("vo"), QStringLiteral("gpu-api"),
+        QStringLiteral("gpu-context"), QStringLiteral("wid"),
+        QStringLiteral("force-window")
+    };
+    if (rendererLockedProperties.contains(name)) {
+        qWarning() << "[MPV] 런타임 렌더러 속성 변경 차단:" << name;
+        return;
+    }
+
     if (value.typeId() == QMetaType::QString) {
         mpv_set_property_string(mpv_, name.toUtf8().constData(),
             value.toString().toUtf8().constData());

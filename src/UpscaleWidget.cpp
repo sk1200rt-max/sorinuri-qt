@@ -313,9 +313,9 @@ void UpscaleWidget::buildUI() {
 
     root->addStretch();
 
-    // 초기 상태 적용
-    mode_ = UpscaleMode::NvidiaRTX;
-    applyToMpv();
+    // 패널을 열기만 해도 MPV 렌더러나 디코더 설정이 바뀌면 안 된다.
+    // 실제 보정은 사용자가 모드 버튼을 명시적으로 눌렀을 때만 적용한다.
+    mode_ = UpscaleMode::Off;
 }
 
 QString UpscaleWidget::detectGpu() const {
@@ -356,25 +356,19 @@ void UpscaleWidget::applyToMpv() {
     if (!core_) return;
     switch (mode_) {
     case UpscaleMode::Off:
-        core_->setProperty("vo",    QString("gpu"));
-        core_->setProperty("scale", QString("bilinear"));
-        core_->setProperty("hwdec", QString("auto-safe"));
+        // Off는 사용자 렌더러·디코더 설정을 덮어쓰지 않는다.
         break;
     case UpscaleMode::NvidiaRTX:
-        core_->setProperty("vo",           QString("gpu-next"));
         core_->setProperty("hwdec",        QString("d3d11va"));
-        core_->setProperty("gpu-api",      QString("d3d11"));
         core_->setProperty("scale",        QString("ewa_lanczossharp"));
         core_->setProperty("scale-param1", QVariant(strength_*0.5));
         break;
     case UpscaleMode::AmdFSR:
-        core_->setProperty("vo",           QString("gpu-next"));
         core_->setProperty("hwdec",        QString("auto"));
         core_->setProperty("scale",        QString("ewa_lanczos"));
         core_->setProperty("scale-param1", QVariant(strength_*0.4));
         break;
         case UpscaleMode::Lanczos:
-        core_->setProperty("vo",           QString("gpu"));
         core_->setProperty("hwdec",        QString("auto-safe"));
         core_->setProperty("scale",        QString("lanczos"));
         core_->setProperty("scale-param1", QVariant(strength_*0.5));
@@ -383,7 +377,6 @@ void UpscaleWidget::applyToMpv() {
         break;
     case UpscaleMode::RealESRGAN: {
         // Real-ESRGAN x4 GLSL 셋어 적용 (MPV 내장 알고리즘 사용)
-        core_->setProperty("vo",    QString("gpu-next"));
         core_->setProperty("hwdec", QString("auto"));
         core_->setProperty("scale", QString("ewa_lanczossharp"));
         // 알려진 위치에 셋어 파일이 있으면 로드, 없으면 알고리즘만 적용
@@ -398,7 +391,6 @@ void UpscaleWidget::applyToMpv() {
     }
     case UpscaleMode::RIFE: {
         // RIFE 프레임 보간 GLSL 셔이더 적용
-        core_->setProperty("vo",    QString("gpu-next"));
         core_->setProperty("hwdec", QString("auto"));
         // 프레임 보간: video-sync=display-resample + interpolation
         core_->setProperty("video-sync",    QString("display-resample"));
@@ -419,7 +411,6 @@ void UpscaleWidget::applyToMpv() {
         // 애니메이션 특유의 라인 아트 선명도를 유지하면서 해상도 향상
         // 사용 셔이더: Anime4K/Anime4K-Lossless-Upscale-CNN-x2-M.glsl
         // 셔이더 파일이 없으면 MPV 내장 ewa_lanczossharp으로 폴백
-        core_->setProperty("vo",    QString("gpu-next"));
         core_->setProperty("hwdec", QString("auto-safe"));
         // 애니메이션 최적화: deband 끄기 (라인 아트 밴딩 방지)
         core_->setProperty("deband", false);
@@ -451,9 +442,10 @@ void UpscaleWidget::applyToMpv() {
         break;
     }
     }
-    // Off 시 RIFE 설정 원복
+    // OFF 버튼을 사용자가 명시적으로 선택했을 때만 RIFE 보정 상태를 해제한다.
+    // 생성 시에는 applyToMpv()를 호출하지 않으므로 사이드 패널 열기에는 영향을 주지 않는다.
     if (mode_ == UpscaleMode::Off) {
-        core_->setProperty("video-sync",    QString("audio"));
+        core_->setProperty("video-sync", QString("audio"));
         core_->setProperty("interpolation", false);
         core_->command({"change-list", "glsl-shaders", "clr", ""});
     }

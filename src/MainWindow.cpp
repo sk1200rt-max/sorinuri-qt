@@ -680,8 +680,9 @@ void MainWindow::hideUI() {
         if (uiHideTimer_) uiHideTimer_->start(1000);
         return;
     }
-    // proFeatures_ 패널이 열려 있으면 숨기지 않음
-    if (isProFeaturesOpen_) {
+    // 전문 기능 패널이 실제로 열려 있으면 UI/커서를 숨기지 않음.
+    // 플래그가 지연된 경우에도 패널 위에서 마우스가 사라지지 않도록 실제 가시성으로 판단한다.
+    if (proFeatures_ && proFeatures_->isVisible()) {
         if (uiHideTimer_) uiHideTimer_->start(3000);
         return;
     }
@@ -1271,7 +1272,13 @@ void MainWindow::keyPressEvent(QKeyEvent* e) {
 }
 
 void MainWindow::toggleProFeatures() {
-    isProFeaturesOpen_ = !isProFeaturesOpen_;
+    // 상태 플래그를 추정으로 토글하지 않는다. 사이드 탭·닫기 버튼·단축키가
+    // 섞여도 실제 위젯의 표시 상태를 단일 기준으로 사용한다.
+    isProFeaturesOpen_ = proFeatures_ && !proFeatures_->isVisible();
+    if (isProFeaturesOpen_) {
+        showUI();
+        if (uiHideTimer_) uiHideTimer_->stop();
+    }
 
     // 처음 열 때 지연 초기화 위젯 생성 및 탭 추가
     if (isProFeaturesOpen_) {
@@ -1726,8 +1733,12 @@ bool MainWindow::eventFilter(QObject* obj, QEvent* event) {
     if (event->type() == QEvent::KeyPress) {
         auto* ke = static_cast<QKeyEvent*>(event);
         if (ke->key() == Qt::Key_Tab && ke->modifiers() == Qt::NoModifier) {
-            if (mediaInfoOverlay_) mediaInfoOverlay_->toggle();
-            return true;  // 이벤트 소비 - 포커스 이동 방지
+            // 설정 창·파일 대화상자·콤보박스가 활성화된 상태에서는 Tab이 해당 UI의
+            // 정상 포커스 이동에 사용되어야 하므로 사이드 메뉴 단축키를 가로채지 않는다.
+            if (QApplication::activeModalWidget() || QApplication::activePopupWidget())
+                return QMainWindow::eventFilter(obj, event);
+            if (isActiveWindow() && mediaInfoOverlay_) mediaInfoOverlay_->toggle();
+            return isActiveWindow();  // 비활성 창의 Tab은 소비하지 않음
         }
     }
     // ── 마우스 이동 시 showUI() 전역 호출 ──────────────────────────────

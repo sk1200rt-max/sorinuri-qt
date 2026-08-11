@@ -334,16 +334,13 @@ jobs:
       - name: Build Installer
         shell: pwsh
         run: |
-          # Inno Setup 설치 확인 (windows-2022 runner에 기본 포함)
+          # 6.7.3의 고DPI 네이티브 컨트롤 지원을 보장하기 위해 기존 버전이 있어도 갱신한다.
+          Write-Host "Inno Setup 6.7.3 설치 중..."
+          $url = "https://files.jrsoftware.org/is/6/innosetup-6.7.3.exe"
+          Invoke-WebRequest -Uri $url -OutFile "innosetup.exe" -TimeoutSec 120
+          Start-Process -FilePath "innosetup.exe" -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART" -Wait
           $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
-          if (-not (Test-Path $iscc)) {
-            # Inno Setup 다운로드 및 설치
-            Write-Host "Inno Setup 설치 중..."
-            $url = "https://files.jrsoftware.org/is/6/innosetup-6.3.3.exe"
-            Invoke-WebRequest -Uri $url -OutFile "innosetup.exe" -TimeoutSec 120
-            Start-Process -FilePath "innosetup.exe" -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART" -Wait
-            Write-Host "Inno Setup 설치 완료"
-          }
+          if (-not (Test-Path $iscc)) { throw "Inno Setup 6.7.3 ISCC.exe를 찾을 수 없습니다." }
 
           # Korean.isl 언어 파일 확인
           $koreanIsl = "C:\Program Files (x86)\Inno Setup 6\Languages\Korean.isl"
@@ -425,7 +422,7 @@ jobs:
 
       - name: Generate version-staging.json
         env:
-          APP_VERSION: "6.18.3"
+          APP_VERSION: "6.18.4"
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
         run: python3 scripts/make_version_json.py "$APP_VERSION" "$DEPLOY_HOST" staging
 
@@ -435,7 +432,7 @@ jobs:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
-          APP_VERSION: "6.18.3"
+          APP_VERSION: "6.18.4"
         run: |
           if [ -z "$SSH_KEY" ] || [ -z "$DEPLOY_HOST" ]; then
             echo "배포 Secrets 미설정 - 건너뜀"

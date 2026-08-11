@@ -20,6 +20,7 @@ static QLabel* makeSectionTitle(const QString& text, QWidget* parent) {
 static QPushButton* makeSmallBtn(const QString& text, const QString& tip, QWidget* parent = nullptr) {
     auto* btn = new QPushButton(text, parent);
     btn->setToolTip(tip);
+    btn->setFocusPolicy(Qt::NoFocus);
     btn->setFixedHeight(22);
     btn->setStyleSheet(
         "QPushButton { background: #1e1e1e; color: #ccc; border: 1px solid #2a2a2a;"
@@ -61,6 +62,7 @@ ProFeaturesWidget::ProFeaturesWidget(QWidget* parent) : QWidget(parent) {
     // 앱 종료가 아니라 패널만 닫힘 → MainWindow::toggleProFeatures() 호출
     auto* closeBtn = new QPushButton("✕", this);
     closeBtn->setFixedSize(22, 22);
+    closeBtn->setFocusPolicy(Qt::NoFocus);
     closeBtn->setToolTip("전문 기능 패널 닫기 (P 키)");
     closeBtn->setStyleSheet(
         "QPushButton { background: transparent; color: #555; border: none;"

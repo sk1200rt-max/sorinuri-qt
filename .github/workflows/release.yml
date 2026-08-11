@@ -218,12 +218,12 @@ jobs:
       - name: Build Installer
         shell: pwsh
         run: |
+          # 6.7.3의 고DPI 네이티브 컨트롤 지원을 보장하기 위해 기존 버전이 있어도 갱신한다.
+          Invoke-WebRequest -Uri "https://files.jrsoftware.org/is/6/innosetup-6.7.3.exe" `
+            -OutFile "innosetup.exe" -TimeoutSec 120
+          Start-Process -FilePath "innosetup.exe" -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART" -Wait
           $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
-          if (-not (Test-Path $iscc)) {
-            Invoke-WebRequest -Uri "https://files.jrsoftware.org/is/6/innosetup-6.3.3.exe" `
-              -OutFile "innosetup.exe" -TimeoutSec 120
-            Start-Process -FilePath "innosetup.exe" -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART" -Wait
-          }
+          if (-not (Test-Path $iscc)) { throw "Inno Setup 6.7.3 ISCC.exe를 찾을 수 없습니다." }
           $koreanIsl = "C:\Program Files (x86)\Inno Setup 6\Languages\Korean.isl"
           if (-not (Test-Path $koreanIsl)) {
             $issContent = Get-Content installer/sorinuri-setup.iss -Raw
