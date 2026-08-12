@@ -338,7 +338,7 @@ jobs:
           Write-Host "Inno Setup 6.7.3 설치 중..."
           $url = "https://github.com/jrsoftware/issrc/releases/download/is-6_7_3/innosetup-6.7.3.exe"
           Invoke-WebRequest -Uri $url -OutFile "innosetup.exe" -TimeoutSec 120
-          Start-Process -FilePath "innosetup.exe" -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART" -Wait
+          Start-Process -FilePath "innosetup.exe" -ArgumentList "/SP- /VERYSILENT /SUPPRESSMSGBOXES /NORESTART" -Wait
           $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
           if (-not (Test-Path $iscc)) { throw "Inno Setup 6.7.3 ISCC.exe를 찾을 수 없습니다." }
 
