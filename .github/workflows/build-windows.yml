@@ -331,46 +331,24 @@ jobs:
           Write-Host "포터블 ZIP: $([math]::Round((Get-Item dist/Sorinuri-Qt-Portable.zip).Length/1MB,1)) MB"
 
       # ── Inno Setup 설치파일 생성 ──────────────────────────────────
+      # 액션이 공식 고정 릴리즈를 무인 설치·호출하므로 숨은 설치 창 대기를 피한다.
       - name: Build Installer
+        uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
+        with:
+          path: installer/sorinuri-setup.iss
+          install_latest: true
+          installer_url: https://github.com/jrsoftware/issrc/releases/download/is-6_7_3/innosetup-6.7.3.exe
+
+      - name: Verify Installer Package
         shell: pwsh
         run: |
-          # 6.7.3의 고DPI 네이티브 컨트롤 지원을 보장하기 위해 기존 버전이 있어도 갱신한다.
-          Write-Host "Inno Setup 6.7.3 설치 중..."
-          $url = "https://github.com/jrsoftware/issrc/releases/download/is-6_7_3/innosetup-6.7.3.exe"
-          Invoke-WebRequest -Uri $url -OutFile "innosetup.exe" -TimeoutSec 120
-          Start-Process -FilePath "innosetup.exe" -ArgumentList "/SP- /VERYSILENT /SUPPRESSMSGBOXES /NORESTART" -Wait
-          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
-          if (-not (Test-Path $iscc)) { throw "Inno Setup 6.7.3 ISCC.exe를 찾을 수 없습니다." }
-
-          # Korean.isl 언어 파일 확인
-          $koreanIsl = "C:\Program Files (x86)\Inno Setup 6\Languages\Korean.isl"
-          if (-not (Test-Path $koreanIsl)) {
-            Write-Host "Korean.isl 없음 - 영어로 대체"
-            # ISS 파일에서 Korean 언어 라인 제거
-            $issContent = Get-Content installer/sorinuri-setup.iss -Raw
-            $issContent = $issContent -replace 'Name: "korean";.*\n', ''
-            $issContent | Set-Content installer/sorinuri-setup-en.iss -Encoding UTF8
-            $issFile = "installer/sorinuri-setup-en.iss"
-          } else {
-            $issFile = "installer/sorinuri-setup.iss"
-          }
-
-          # 설치파일 빌드
-          & $iscc $issFile
-          if ($LASTEXITCODE -ne 0) {
-            Write-Error "Inno Setup 빌드 실패"
-            exit 1
-          }
-
-          # 결과 확인
           $installer = Get-ChildItem dist -Filter "Sorinuri-Setup-*.exe" | Select-Object -First 1
-          if ($installer) {
-            Write-Host "설치파일 생성: $($installer.Name) ($([math]::Round($installer.Length/1MB,1)) MB)"
-          } else {
+          if (-not $installer) {
             Write-Error "설치파일을 찾을 수 없습니다"
             Get-ChildItem dist/
             exit 1
           }
+          Write-Host "설치파일 생성: $($installer.Name) ($([math]::Round($installer.Length/1MB,1)) MB)"
 
       # ── Artifact 업로드 (포터블 + 설치파일) ─────────────────────
       - name: Upload Portable
