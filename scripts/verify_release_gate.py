@@ -137,7 +137,8 @@ def main() -> int:
     try:
         scope = json.loads(SCOPE_FILE.read_text(encoding="utf-8"))
         version = str(scope["version"])
-        domain = str(scope["domain"])
+        # 연관된 여러 영역은 쉼표 구분 선언을 허용하되, 선언 밖 제품 변경은 계속 차단한다.
+        domains = tuple(part.strip() for part in str(scope["domain"]).split(",") if part.strip())
         purpose = str(scope["purpose"]).strip()
     except (json.JSONDecodeError, KeyError, TypeError) as exc:
         print(f"릴리즈 게이트 실패: scope.json 형식 오류: {exc}", file=sys.stderr)
@@ -146,7 +147,7 @@ def main() -> int:
     if not VERSION_RE.fullmatch(version) or version != current_version():
         print("릴리즈 게이트 실패: scope.json 버전과 앱 버전이 일치하지 않습니다.", file=sys.stderr)
         return 1
-    if domain not in DOMAINS or not purpose:
+    if not domains or any(domain not in DOMAINS for domain in domains) or not purpose:
         print("릴리즈 게이트 실패: 허용되지 않은 변경 영역 또는 빈 변경 목적입니다.", file=sys.stderr)
         return 1
 
@@ -159,16 +160,16 @@ def main() -> int:
         if found is None:
             if not always_allowed(path):
                 unexpected.append((path, "분류되지 않은 제품 파일"))
-        elif found != domain:
-            unexpected.append((path, f"선언 영역={domain}, 실제 영역={found}"))
+        elif found not in domains:
+            unexpected.append((path, f"선언 영역={','.join(domains)}, 실제 영역={found}"))
 
     if unexpected:
-        print(f"릴리즈 게이트 실패: {base} 이후 선언 범위({domain}) 밖 변경이 있습니다.", file=sys.stderr)
+        print(f"릴리즈 게이트 실패: {base} 이후 선언 범위({','.join(domains)}) 밖 변경이 있습니다.", file=sys.stderr)
         for path, reason in unexpected:
             print(f" - {path}: {reason}", file=sys.stderr)
         return 1
 
-    print(f"릴리즈 게이트 통과: v{version} | 영역={domain} | 기준={base} | 목적={purpose}")
+    print(f"릴리즈 게이트 통과: v{version} | 영역={','.join(domains)} | 기준={base} | 목적={purpose}")
     return 0
 
 

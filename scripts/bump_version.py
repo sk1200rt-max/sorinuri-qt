@@ -116,8 +116,8 @@ if __name__ == '__main__':
     parser.add_argument('--installer-mb',   type=int, default=None, help='인스톨러 파일 크기(MB)')
     parser.add_argument('--portable-mb',    type=int, default=None, help='포터블 파일 크기(MB)')
     parser.add_argument('--no-landing',     action='store_true', help='랜딩페이지 업데이트 건너뜀')
-    parser.add_argument('--scope', choices=['audio', 'renderer', 'ui', 'installer'], required=True,
-                        help='이번 릴리즈에서 변경할 제품 영역 (한 영역만 허용)')
+    parser.add_argument('--scope', required=True,
+                        help='이번 릴리즈에서 변경할 제품 영역. 관련 영역을 함께 수정할 때는 쉼표로 구분 (예: audio,installer)')
     parser.add_argument('--purpose', required=True,
                         help='사용자 지시와 연결되는 이번 릴리즈의 단일 변경 목적')
     args = parser.parse_args()

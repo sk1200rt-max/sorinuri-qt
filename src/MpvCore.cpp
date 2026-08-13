@@ -331,12 +331,20 @@ bool MpvCore::initialize(WId windowId) {
         "ac3,eac3,dts,dts-hd,truehd"));
     // 오디오 초기화 실패 시 영상은 계속 재생 (null 오디오 폴백)
     check_error(mpv_set_property_string(mpv_, "audio-fallback-to-null", "yes"));
-    // HDMI 멀티채널 정책: Windows/WASAPI가 현재 선택된 HDMI 장치와
-    // 리시버가 실제로 협상한 레이아웃을 그대로 사용한다. mpv 공식 권고도
-    // 멀티채널 PCM 출력에는 audio-channels=auto를 사용하도록 안내한다.
-    // 명시적 7.1→5.1→stereo 강제는 일부 HDMI 드라이버에서 협상 실패 후
-    // PCM 2.0으로 폴백할 수 있으므로 사용하지 않는다.
-    check_error(mpv_set_property_string(mpv_, "audio-channels", "auto"));
+    // HDMI 멀티채널 정책: 리시버가 지원하는 7.1 → 5.1 → stereo만
+    // 명시적으로 허용한다. mpv 공식 매뉴얼은 HDMI에서 auto가 OS가 보고한
+    // 미지원 레이아웃을 선택할 수 있어, 지원 레이아웃 화이트리스트 사용을 권고한다.
+    // 7.1 리시버에서는 7.1 원본은 7.1, 5.1 원본은 5.1, 스테레오 원본은
+    // stereo로 유지되어 원본 채널을 임의 확장하지 않는다.
+    check_error(mpv_set_property_string(mpv_, "audio-channels", "7.1,5.1,stereo"));
+    // AAC/AC-3/DTS 디코더의 선행 다운믹스를 차단하고 항상 원본 레이아웃을
+    // mpv/WASAPI 협상 단계로 전달한다. PCM 2.0 폴백 시에도 LFE 혼합 차이를
+    // 만드는 코덱별 다운믹스 경로를 사용하지 않는다.
+    check_error(mpv_set_property_string(mpv_, "ad-lavc-downmix", "no"));
+    // 실제로 서라운드 → stereo 변환이 필요한 장치에서만 레벨을 정규화해
+    // 다운믹스 클리핑과 과도한 저역 체감을 방지한다. 정상 5.1/7.1 및
+    // 비트스트림 경로에는 적용되지 않는다.
+    check_error(mpv_set_property_string(mpv_, "audio-normalize-downmix", "yes"));
 
     // 자막 우선순위: 언어 메타데이터가 있는 경우 한국어를 먼저 선택한다.
     // 메타데이터가 없는 외부 SMI/SRT는 sub-auto=fuzzy가 파일명 기준으로 탐색한다.

@@ -1,5 +1,5 @@
 {
-  "version": "6.18.8",
-  "domain": "audio",
-  "purpose": "HDMI PCM 다채널 자동 협상 복구"
+  "version": "6.18.9",
+  "domain": "audio,installer",
+  "purpose": "MP4 기본 앱 연결 복구와 2채널 다운믹스 저음 보정"
 }

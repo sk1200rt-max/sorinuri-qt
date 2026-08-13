@@ -56,6 +56,16 @@ extern "C" {
 
 static const QString IPC_SERVER_NAME = "SorinuriIPC_v1";
 
+#ifdef _WIN32
+// Windows 10/11은 UserChoice 해시로 보호되므로 설치 프로그램이 레지스트리만
+// 써서 기본 앱을 강제할 수 없다. 최신 Windows에서 호환되는 기본 앱 설정 화면을
+// 열어 사용자가 소리누리를 명시적으로 기본 재생 프로그램으로 선택하게 한다.
+static void launchFileAssociationUI()
+{
+    ShellExecuteW(nullptr, L"open", L"ms-settings:defaultapps", nullptr, nullptr, SW_SHOWNORMAL);
+}
+#endif
+
 int main(int argc, char* argv[])
 {
 #ifdef _WIN32
@@ -98,7 +108,7 @@ int main(int argc, char* argv[])
     QApplication app(argc, argv);
     app.setApplicationName("Sorinuri");
     app.setApplicationDisplayName("소리누리");
-    app.setApplicationVersion("6.18.8");
+    app.setApplicationVersion("6.18.9");
     app.setOrganizationName("Sorinuri");
     app.setWindowIcon(QIcon(":/icons/sorinuri.ico"));
 
@@ -106,9 +116,24 @@ int main(int argc, char* argv[])
     QCommandLineParser parser;
     parser.addHelpOption();
     QCommandLineOption newWindowOption(QStringList() << "n" << "new-window", "새 창에서 실행합니다.");
+    QCommandLineOption registerAssociationsOption(
+        "register-file-associations",
+        "Windows 기본 앱 선택 화면을 열어 소리누리 파일 연결을 설정합니다.");
     parser.addOption(newWindowOption);
+    parser.addOption(registerAssociationsOption);
     parser.addPositionalArgument("file", "재생할 파일 경로");
     parser.process(app);
+
+    // 설치 프로그램의 파일 연결 작업 전용 경로: 메인 창·단일 인스턴스·MPV는 생성하지 않는다.
+    if (parser.isSet(registerAssociationsOption)) {
+#ifdef _WIN32
+        launchFileAssociationUI();
+#endif
+#ifdef _WIN32
+        timeEndPeriod(1);
+#endif
+        return 0;
+    }
 
     QSharedMemory sharedMem("Sorinuri_Instance");
     bool isNewWindow = parser.isSet(newWindowOption);

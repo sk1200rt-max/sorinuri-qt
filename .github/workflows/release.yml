@@ -70,6 +70,11 @@ jobs:
         shell: bash
         run: PYTHONUTF8=1 python3 scripts/verify_audio_policy.py
 
+      # ── 파일 연결·Windows 기본 앱 등록 검증 ──────────────────────────
+      - name: Verify file association policy
+        shell: bash
+        run: PYTHONUTF8=1 python3 scripts/verify_file_associations.py
+
       # ── Visual Studio 환경 설정 ────────────────────────────────────
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1

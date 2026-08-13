@@ -3,7 +3,7 @@
 
 #define MyAppName "소리누리"
 #define MyAppNameEn "Sorinuri"
-#define MyAppVersion "6.18.8"
+#define MyAppVersion "6.18.9"
 #define MyAppPublisher "Gaon Communication"
 #define MyAppURL "https://sorinuri.com"
 #define MyAppExeName "Sorinuri.exe"
@@ -77,8 +77,12 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Comment: 
 Name: "{userappdata}\Microsoft\Internet Explorer\Quick Launch\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: quicklaunchicon
 
 [Run]
-; Visual C++ 런타임 자동 설치 (이미 설치되어 있으면 건너땀)
+; Visual C++ 런타임 자동 설치 (이미 설치되어 있으면 건너뜀)
 Filename: "{tmp}\vc_redist.x64.exe"; Parameters: "/install /quiet /norestart"; StatusMsg: "Visual C++ 런타임 설치 중..."; Flags: skipifdoesntexist waituntilterminated
+; Windows 10/11은 기본 앱을 설치 프로그램이 강제할 수 없다(UserChoice 보호).
+; 파일 연결 작업을 선택했을 때 Microsoft 기본 앱 UI를 직접 열어 사용자가
+; 소리누리를 MP4 등 등록 형식의 기본 앱으로 확정할 수 있게 한다.
+Filename: "{app}\{#MyAppExeName}"; Parameters: "--register-file-associations"; Flags: nowait skipifsilent; Tasks: fileassoc
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 
 [Registry]
@@ -217,36 +221,36 @@ Root: HKCU; Subkey: "Software\Classes\Sorinuri.mka\shell\open\command"; ValueTyp
 
 ; ── Windows Capabilities 등록 (탐색기 우클릭 "연결 프로그램" 목록 표시 필수) ──────────
 ; RegisteredApplications 없이는 Windows가 소리누리를 연결 프로그램 목록에 표시하지 않음
-Root: HKCU; Subkey: "Software\Sorinuri\Capabilities"; ValueType: string; ValueName: "ApplicationName"; ValueData: "소리누리"; Flags: uninsdeletekey
-Root: HKCU; Subkey: "Software\Sorinuri\Capabilities"; ValueType: string; ValueName: "ApplicationDescription"; ValueData: "소리누리 - Windows 하이엔드 미디어 플레이어"
-Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".mkv"; ValueData: "Sorinuri.mkv"
-Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".mp4"; ValueData: "Sorinuri.mp4"
-Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".avi"; ValueData: "Sorinuri.avi"
-Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".mov"; ValueData: "Sorinuri.mov"
-Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".wmv"; ValueData: "Sorinuri.wmv"
-Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".m2ts"; ValueData: "Sorinuri.m2ts"
-Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".ts"; ValueData: "Sorinuri.ts"
-Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".m4v"; ValueData: "Sorinuri.m4v"
-Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".webm"; ValueData: "Sorinuri.webm"
-Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".flv"; ValueData: "Sorinuri.flv"
-Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".3gp"; ValueData: "Sorinuri.3gp"
-Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".ogv"; ValueData: "Sorinuri.ogv"
-Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".rmvb"; ValueData: "Sorinuri.rmvb"
-Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".rm"; ValueData: "Sorinuri.rm"
-Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".flac"; ValueData: "Sorinuri.flac"
-Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".mp3"; ValueData: "Sorinuri.mp3"
-Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".aac"; ValueData: "Sorinuri.aac"
-Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".ogg"; ValueData: "Sorinuri.ogg"
-Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".opus"; ValueData: "Sorinuri.opus"
-Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".wav"; ValueData: "Sorinuri.wav"
-Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".m4a"; ValueData: "Sorinuri.m4a"
-Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".wma"; ValueData: "Sorinuri.wma"
-Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".ape"; ValueData: "Sorinuri.ape"
-Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".dsf"; ValueData: "Sorinuri.dsf"
-Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".dff"; ValueData: "Sorinuri.dff"
-Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".mka"; ValueData: "Sorinuri.mka"
+Root: HKCU; Subkey: "Software\Sorinuri\Capabilities"; ValueType: string; ValueName: "ApplicationName"; ValueData: "소리누리"; Flags: uninsdeletekey; Tasks: fileassoc
+Root: HKCU; Subkey: "Software\Sorinuri\Capabilities"; ValueType: string; ValueName: "ApplicationDescription"; ValueData: "소리누리 - Windows 하이엔드 미디어 플레이어"; Tasks: fileassoc
+Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".mkv"; ValueData: "Sorinuri.mkv"; Tasks: fileassoc
+Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".mp4"; ValueData: "Sorinuri.mp4"; Tasks: fileassoc
+Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".avi"; ValueData: "Sorinuri.avi"; Tasks: fileassoc
+Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".mov"; ValueData: "Sorinuri.mov"; Tasks: fileassoc
+Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".wmv"; ValueData: "Sorinuri.wmv"; Tasks: fileassoc
+Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".m2ts"; ValueData: "Sorinuri.m2ts"; Tasks: fileassoc
+Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".ts"; ValueData: "Sorinuri.ts"; Tasks: fileassoc
+Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".m4v"; ValueData: "Sorinuri.m4v"; Tasks: fileassoc
+Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".webm"; ValueData: "Sorinuri.webm"; Tasks: fileassoc
+Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".flv"; ValueData: "Sorinuri.flv"; Tasks: fileassoc
+Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".3gp"; ValueData: "Sorinuri.3gp"; Tasks: fileassoc
+Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".ogv"; ValueData: "Sorinuri.ogv"; Tasks: fileassoc
+Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".rmvb"; ValueData: "Sorinuri.rmvb"; Tasks: fileassoc
+Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".rm"; ValueData: "Sorinuri.rm"; Tasks: fileassoc
+Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".flac"; ValueData: "Sorinuri.flac"; Tasks: fileassoc
+Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".mp3"; ValueData: "Sorinuri.mp3"; Tasks: fileassoc
+Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".aac"; ValueData: "Sorinuri.aac"; Tasks: fileassoc
+Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".ogg"; ValueData: "Sorinuri.ogg"; Tasks: fileassoc
+Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".opus"; ValueData: "Sorinuri.opus"; Tasks: fileassoc
+Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".wav"; ValueData: "Sorinuri.wav"; Tasks: fileassoc
+Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".m4a"; ValueData: "Sorinuri.m4a"; Tasks: fileassoc
+Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".wma"; ValueData: "Sorinuri.wma"; Tasks: fileassoc
+Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".ape"; ValueData: "Sorinuri.ape"; Tasks: fileassoc
+Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".dsf"; ValueData: "Sorinuri.dsf"; Tasks: fileassoc
+Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".dff"; ValueData: "Sorinuri.dff"; Tasks: fileassoc
+Root: HKCU; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".mka"; ValueData: "Sorinuri.mka"; Tasks: fileassoc
 ; RegisteredApplications: Windows에 소리누리를 공식 등록 (연결 프로그램 목록 표시 핵심 키)
-Root: HKCU; Subkey: "Software\RegisteredApplications"; ValueType: string; ValueName: "소리누리"; ValueData: "Software\Sorinuri\Capabilities"; Flags: uninsdeletevalue
+Root: HKCU; Subkey: "Software\RegisteredApplications"; ValueType: string; ValueName: "소리누리"; ValueData: "Software\Sorinuri\Capabilities"; Flags: uninsdeletevalue; Tasks: fileassoc
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}"
 
