@@ -3,7 +3,7 @@
 
 #define MyAppName "소리누리"
 #define MyAppNameEn "Sorinuri"
-#define MyAppVersion "6.18.5"
+#define MyAppVersion "6.18.6"
 #define MyAppPublisher "Gaon Communication"
 #define MyAppURL "https://sorinuri.com"
 #define MyAppExeName "Sorinuri.exe"
@@ -32,9 +32,9 @@ PrivilegesRequired=admin
 MinVersion=10.0.17763
 UninstallDisplayIcon={app}\{#MyAppExeName}
 UninstallDisplayName={#MyAppName}
-; 체크박스·버튼은 Windows의 DPI 인식 네이티브 컨트롤로 렌더링한다.
-; 250% 배율에서 modern 스타일 체크박스가 잘리던 문제를 방지한다.
-WizardStyle=modern excludelightcontrols
+; modern dynamic은 모든 체크박스·버튼·라디오 컨트롤을 같은 DPI 스케일 규칙으로 렌더링한다.
+; excludelightcontrols는 고배율에서 기본 체크박스만 작게 남아 잘리는 원인이므로 사용하지 않는다.
+WizardStyle=modern dynamic
 WizardResizable=no
 RestartIfNeededByRun=no
 ; 설치 마법사 이미지 (소리누리 브랜드)

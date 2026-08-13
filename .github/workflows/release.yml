@@ -217,7 +217,7 @@ jobs:
       # ── 설치파일 생성 ─────────────────────────────────────────────
       # 액션이 공식 고정 릴리즈를 무인 설치·호출하므로 숨은 설치 창 대기를 피한다.
       - name: Build Installer
-        uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
+        uses: Minionguyjpro/Inno-Setup-Action@v1.2.9
         with:
           path: installer/sorinuri-setup.iss
           install_latest: true

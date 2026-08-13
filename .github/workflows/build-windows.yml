@@ -333,7 +333,7 @@ jobs:
       # ── Inno Setup 설치파일 생성 ──────────────────────────────────
       # 액션이 공식 고정 릴리즈를 무인 설치·호출하므로 숨은 설치 창 대기를 피한다.
       - name: Build Installer
-        uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
+        uses: Minionguyjpro/Inno-Setup-Action@v1.2.9
         with:
           path: installer/sorinuri-setup.iss
           install_latest: true
@@ -400,7 +400,7 @@ jobs:
 
       - name: Generate version-staging.json
         env:
-          APP_VERSION: "6.18.5"
+          APP_VERSION: "6.18.6"
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
         run: python3 scripts/make_version_json.py "$APP_VERSION" "$DEPLOY_HOST" staging
 
@@ -410,7 +410,7 @@ jobs:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
-          APP_VERSION: "6.18.5"
+          APP_VERSION: "6.18.6"
         run: |
           if [ -z "$SSH_KEY" ] || [ -z "$DEPLOY_HOST" ]; then
             echo "배포 Secrets 미설정 - 건너뜀"
