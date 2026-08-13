@@ -23,6 +23,7 @@ import sys, re, os, datetime, argparse, json, shutil, subprocess
 MAX_CHANGELOG_ITEMS = 5  # 랜딩페이지에 표시할 최대 릴리즈 노트 수
 SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
 RELEASES_JSON = os.path.join(SCRIPTS_DIR, "releases_data.json")
+DOWNLOAD_BASE_URL = "https://sorinuri.com/downloads"
 
 
 def get_delay_class(idx):
@@ -50,8 +51,8 @@ def save_releases(releases):
 def add_release(releases, new_ver, title, desc, installer_mb, portable_mb):
     """릴리즈 목록 맨 앞에 새 항목 추가 (중복 버전은 업데이트)"""
     today = datetime.date.today().strftime("%Y-%m-%d")
-    installer_url = f"https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v{new_ver}/Sorinuri-Setup-{new_ver}.exe"
-    portable_url  = f"https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v{new_ver}/Sorinuri-Qt-{new_ver}-Portable.zip"
+    installer_url = f"{DOWNLOAD_BASE_URL}/Sorinuri-Setup-{new_ver}.exe"
+    portable_url  = f"{DOWNLOAD_BASE_URL}/Sorinuri-Qt-{new_ver}-Portable.zip"
 
     new_entry = {
         "version":   new_ver,
@@ -340,8 +341,8 @@ def build_changelog_html(releases, current_ver):
 def update_index_html(html, new_ver, releases, installer_mb, portable_mb):
     """index.html 내 버전·링크·릴리즈 노트 갱신"""
     today = datetime.date.today().strftime("%Y-%m-%d")
-    installer_url = f"https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v{new_ver}/Sorinuri-Setup-{new_ver}.exe"
-    portable_url  = f"https://github.com/sk1200rt-max/sorinuri-qt/releases/download/v{new_ver}/Sorinuri-Qt-{new_ver}-Portable.zip"
+    installer_url = f"{DOWNLOAD_BASE_URL}/Sorinuri-Setup-{new_ver}.exe"
+    portable_url  = f"{DOWNLOAD_BASE_URL}/Sorinuri-Qt-{new_ver}-Portable.zip"
 
     # 1. 타이틀·메타
     html = re.sub(
