@@ -331,10 +331,12 @@ bool MpvCore::initialize(WId windowId) {
         "ac3,eac3,dts,dts-hd,truehd"));
     // 오디오 초기화 실패 시 영상은 계속 재생 (null 오디오 폴백)
     check_error(mpv_set_property_string(mpv_, "audio-fallback-to-null", "yes"));
-    // HDMI 멀티채널 정책: 리시버가 지원하는 레이아웃만 명시적으로 허용한다.
-    // auto는 Windows가 보고한 레이아웃 중 잘못된 구성을 선택해 2.0 폴백을 만들 수 있다.
-    // 7.1 → 5.1 → stereo 순서로 원본과 가장 가까운 레이아웃을 오디오 API에 요청한다.
-    check_error(mpv_set_property_string(mpv_, "audio-channels", "7.1,5.1,stereo"));
+    // HDMI 멀티채널 정책: Windows/WASAPI가 현재 선택된 HDMI 장치와
+    // 리시버가 실제로 협상한 레이아웃을 그대로 사용한다. mpv 공식 권고도
+    // 멀티채널 PCM 출력에는 audio-channels=auto를 사용하도록 안내한다.
+    // 명시적 7.1→5.1→stereo 강제는 일부 HDMI 드라이버에서 협상 실패 후
+    // PCM 2.0으로 폴백할 수 있으므로 사용하지 않는다.
+    check_error(mpv_set_property_string(mpv_, "audio-channels", "auto"));
 
     // 자막 우선순위: 언어 메타데이터가 있는 경우 한국어를 먼저 선택한다.
     // 메타데이터가 없는 외부 SMI/SRT는 sub-auto=fuzzy가 파일명 기준으로 탐색한다.

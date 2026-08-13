@@ -57,6 +57,16 @@ jobs:
             echo "EOF"
           } >> $GITHUB_OUTPUT
 
+      # ── 릴리즈 변경 범위 게이트 ────────────────────────────────────
+      - name: Verify declared release scope
+        shell: bash
+        run: python3 scripts/verify_release_gate.py
+
+      # ── 멀티채널 출력 정책 회귀 검증 ──────────────────────────────
+      - name: Verify multichannel audio policy
+        shell: bash
+        run: python3 scripts/verify_audio_policy.py
+
       # ── Visual Studio 환경 설정 ────────────────────────────────────
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
@@ -323,6 +333,9 @@ jobs:
   publish-to-sorinuri:
     needs: release
     runs-on: ubuntu-24.04
+    # 승인 전에는 설치파일·자동 업데이트 메타데이터를 운영 서버에 게시하지 않는다.
+    environment:
+      name: sorinuri-production
     timeout-minutes: 20
     permissions:
       contents: read
@@ -382,6 +395,30 @@ jobs:
           VERSION="${{ steps.self_host_version.outputs.version }}"
           chmod +x scripts/publish_self_hosted_release.sh
           scripts/publish_self_hosted_release.sh "$VERSION" release-assets release-assets/release-notes.txt
+
+      - name: Publish approved landing page and release notes
+        shell: bash
+        env:
+          SORINURI_DEPLOY_HOST: ${{ secrets.SORINURI_DEPLOY_HOST }}
+          SORINURI_DEPLOY_USER: ${{ secrets.SORINURI_DEPLOY_USER }}
+          SORINURI_DEPLOY_PASSWORD: ${{ secrets.SORINURI_DEPLOY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.self_host_version.outputs.version }}"
+          TITLE=$(python3 -c 'import json; print(next(x for x in json.load(open("scripts/releases_data.json", encoding="utf-8")) if x["version"] == "'"$VERSION"'")["title"])')
+          DESC=$(python3 -c 'import json; print(next(x for x in json.load(open("scripts/releases_data.json", encoding="utf-8")) if x["version"] == "'"$VERSION"'")["desc"])')
+          python3 scripts/update_landing.py "$VERSION" "$TITLE" "$DESC"
+          TARGET="${SORINURI_DEPLOY_USER}@${SORINURI_DEPLOY_HOST}"
+          sshpass -p "$SORINURI_DEPLOY_PASSWORD" scp -o StrictHostKeyChecking=yes \
+            "/tmp/landing_${VERSION}.html" "$TARGET:/var/www/sorinuri/.index.html.new"
+          sshpass -p "$SORINURI_DEPLOY_PASSWORD" scp -o StrictHostKeyChecking=yes \
+            "/tmp/changelog_${VERSION}.html" "$TARGET:/var/www/sorinuri/.changelog.html.new"
+          sshpass -p "$SORINURI_DEPLOY_PASSWORD" scp -o StrictHostKeyChecking=yes \
+            scripts/releases_data.json "$TARGET:/var/www/sorinuri/.releases.json.new"
+          sshpass -p "$SORINURI_DEPLOY_PASSWORD" ssh -o StrictHostKeyChecking=yes "$TARGET" \
+            'mv -f /var/www/sorinuri/.index.html.new /var/www/sorinuri/index.html && \
+             mv -f /var/www/sorinuri/.changelog.html.new /var/www/sorinuri/changelog.html && \
+             mv -f /var/www/sorinuri/.releases.json.new /var/www/sorinuri/releases.json'
 
       - name: Verify public self-hosted release
         shell: bash

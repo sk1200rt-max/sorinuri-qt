@@ -470,7 +470,8 @@ def update_landing(new_ver, release_title, release_desc,
                    server_host="sorinuri.com",
                    server_user="amoross",
                    server_pass="mallgoer2023",
-                   web_root="/var/www/sorinuri"):
+                   web_root="/var/www/sorinuri",
+                   publish=False):
 
     sshpass_ok = shutil.which("sshpass") is not None
 
@@ -518,7 +519,9 @@ def update_landing(new_ver, release_title, release_desc,
     print(f"   ✅ changelog.html 생성 완료 ({len(releases)}개 릴리즈)")
 
     # ── 서버 업로드 ───────────────────────────────────────────────────
-    if sshpass_ok:
+    # 버전 범프 단계에서는 운영 페이지를 바꾸지 않는다. 실제 업로드는
+    # 태그 릴리즈의 sorinuri-production 승인 뒤 publish=True로만 허용된다.
+    if publish and sshpass_ok:
         files_to_upload = [
             (local_index,     f"{web_root}/index.html"),
             (local_changelog, f"{web_root}/changelog.html"),
@@ -540,11 +543,10 @@ def update_landing(new_ver, release_title, release_desc,
             print(f"\n   수동 업로드:")
             for src, dst in files_to_upload:
                 print(f"   scp {src} {server_user}@{server_host}:{dst}")
+    elif publish:
+        print("\n   ❌ 승인된 서버 게시에 필요한 sshpass가 없습니다.")
     else:
-        print(f"\n   ⚠️  sshpass 없음 → 수동 업로드 필요:")
-        print(f"   scp {local_index} {server_user}@{server_host}:{web_root}/index.html")
-        print(f"   scp {local_changelog} {server_user}@{server_host}:{web_root}/changelog.html")
-        print(f"   scp {RELEASES_JSON} {server_user}@{server_host}:{web_root}/releases.json")
+        print("   ⏸️  랜딩페이지 게시 보류: production 승인 뒤에만 업로드합니다.")
 
     return local_index, local_changelog
 
@@ -556,6 +558,8 @@ if __name__ == "__main__":
     parser.add_argument("description",   help="릴리즈 상세 설명")
     parser.add_argument("--installer-mb", type=int, default=None)
     parser.add_argument("--portable-mb",  type=int, default=None)
+    parser.add_argument("--publish", action="store_true",
+                        help="production 승인 뒤에만 서버 업로드 수행")
     args = parser.parse_args()
 
     print(f"\n🚀 소리누리 랜딩페이지 + 아카이브 업데이트: v{args.version}")
@@ -565,6 +569,7 @@ if __name__ == "__main__":
         release_desc=args.description,
         installer_mb=args.installer_mb,
         portable_mb=args.portable_mb,
+        publish=args.publish,
     )
     print("\n✅ 모든 업데이트 완료!")
     print(f"   🌐 https://sorinuri.com/changelog.html")

@@ -1,0 +1,5 @@
+{
+  "version": "6.18.8",
+  "domain": "audio",
+  "purpose": "HDMI PCM 다채널 자동 협상 복구"
+}

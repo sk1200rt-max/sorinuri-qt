@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 소리누리 버전 일괄 업데이트 스크립트
-사용법: python3 scripts/bump_version.py <버전> [--title "제목"] [--desc "설명"] [--installer-mb N] [--portable-mb N]
+사용법: python3 scripts/bump_version.py <버전> --scope <audio|renderer|ui|installer> --purpose "변경 목적" [--title "제목"] [--desc "설명"] [--installer-mb N] [--portable-mb N]
 
 예시:
   python3 scripts/bump_version.py 6.12.0 \
@@ -18,9 +18,10 @@
   6. src/main.cpp - app.setApplicationVersion()
   7. sorinuri.com/index.html - 버전, 다운로드 링크, 릴리즈 노트 (--title/--desc 제공 시)
 """
-import sys, re, os, argparse
+import sys, re, os, argparse, json
 
-def bump(new_ver):
+
+def bump(new_ver, scope, purpose):
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     changed = []
 
@@ -74,6 +75,20 @@ def bump(new_ver):
             open(path, 'w').write(c2)
             changed.append('resources/sorinuri.rc')
 
+    # 변경 범위 선언: CI 릴리즈 게이트가 이전 태그 이후의 제품 코드 변경을
+    # 이 영역으로 한정해, 지시 밖 기능이 섞인 배포를 차단한다.
+    scope_dir = os.path.join(root, '.release')
+    os.makedirs(scope_dir, exist_ok=True)
+    scope_path = os.path.join(scope_dir, 'scope.json')
+    with open(scope_path, 'w', encoding='utf-8') as f:
+        json.dump({
+            'version': new_ver,
+            'domain': scope,
+            'purpose': purpose,
+        }, f, ensure_ascii=False, indent=2)
+        f.write('\n')
+    changed.append('.release/scope.json')
+
     # 6. src/main.cpp
     path = os.path.join(root, 'src', 'main.cpp')
     if os.path.exists(path):
@@ -101,10 +116,14 @@ if __name__ == '__main__':
     parser.add_argument('--installer-mb',   type=int, default=None, help='인스톨러 파일 크기(MB)')
     parser.add_argument('--portable-mb',    type=int, default=None, help='포터블 파일 크기(MB)')
     parser.add_argument('--no-landing',     action='store_true', help='랜딩페이지 업데이트 건너뜀')
+    parser.add_argument('--scope', choices=['audio', 'renderer', 'ui', 'installer'], required=True,
+                        help='이번 릴리즈에서 변경할 제품 영역 (한 영역만 허용)')
+    parser.add_argument('--purpose', required=True,
+                        help='사용자 지시와 연결되는 이번 릴리즈의 단일 변경 목적')
     args = parser.parse_args()
 
-    # 소스 코드 버전 범프
-    bump(args.version)
+    # 소스 코드 버전 범프 및 CI용 변경 범위 선언
+    bump(args.version, args.scope, args.purpose)
 
     # 랜딩페이지 자동 업데이트
     if not args.no_landing:
