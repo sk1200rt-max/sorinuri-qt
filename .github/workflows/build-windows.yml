@@ -384,10 +384,13 @@ jobs:
             dist/Sorinuri-Setup-*.exe
           retention-days: 1
 
+  # 레거시 스테이징 배포 경로: 파일명·메타데이터·SSH 시크릿 체계가 현재
+  # 원자적 자체 서버 릴리즈 게시 방식과 다르므로 사용하지 않는다.
+  # 실제 서버 배포는 release.yml의 publish-to-sorinuri 작업만 담당한다.
   deploy:
     needs: build
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    if: ${{ false }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
