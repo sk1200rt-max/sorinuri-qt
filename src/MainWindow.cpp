@@ -262,7 +262,8 @@ void MainWindow::setupConnections() {
     // ISystemMediaTransportControlsInterop::GetForWindow()로 Win32 HWND 기반 초기화
     // 재생/일시정지/이전/다음 버튼 → MPV 명령 연결
     smtcManager_ = new SMTCManager(this);
-    // HWND는 show() 후에 유효하므로 singleShot(0)으로 이벤트 루프 후 초기화
+    // SMTC WinRT/COM 초기화는 첫 프레임 렌더링 뒤에 실행한다. 창이 보이기
+    // 전에 시스템 미디어 세션을 만들면 저사양·노트북에서 실행이 무겁게 느껴진다.
 
     // ScrobbleManager 초기화 (Last.fm 스크로블링)
     scrobbleManager_ = new ScrobbleManager(this);
@@ -273,7 +274,7 @@ void MainWindow::setupConnections() {
             this, [this](const QString& url, const QString& /*name*/) {
         openFiles({url});
     });
-    QTimer::singleShot(0, this, [this]() {
+    QTimer::singleShot(1200, this, [this]() {
         if (smtcManager_->initialize(reinterpret_cast<void*>(winId()))) {
             qInfo() << "[MainWindow] SMTC 초기화 성공";
         } else {

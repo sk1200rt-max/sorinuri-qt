@@ -115,20 +115,15 @@ void MpvWidget::initializeGL() {
     // (renderCtx_ 설정 완료 보장)
     QTimer::singleShot(0, this, [this]() { emit mpvInitialized(); });
 
-    // ── OpenGL 컨텍스트 준비 완료 후 GPU 정보 재감지 ─────────────
-    // initialize() 시점에는 OpenGL 컨텍스트가 없어 GPU 벤더 감지 불가.
-    // initializeGL() 이후에는 GL_RENDERER/GL_VENDOR 읽기 가능.
-    // → GPU 벤더 기반 렌더링 설정 재적용 (화면 해상도만 기반이던 초기 설정 개선)
-    core_->redetectGpuAndApply();
+    // MpvCore::initialize()는 이 initializeGL() 안에서 호출되므로 이미 유효한
+    // OpenGL 컨텍스트를 사용해 렌더링 환경을 결정한다. 여기서 다시 GPU를
+    // 재감지하면 첫 화면 표시가 지연되고 AO/렌더러 재협상이 발생할 수 있다.
+    // Qt가 FBO·DPI·화면 크기를 처리하므로 추가 재초기화는 하지 않는다.
 
     // ── 멀티모니터 이동 감지 ─────────────────────────────────────
-    // 소리누리 창을 다른 모니터로 이동 시 해상도/주사율/DPI가 바뀜
-    // QWindow::screenChanged 시그널 → redetectGpuAndApply() 재호출
-    // 예: FHD 모니터(ewa_lanczossharp) → 4K 모니터(spline36) 자동 전환
-    //
-    // 폴백: initializeGL() 시점에 windowHandle()이 nullptr일 수 있음
-    // (위젯이 최상위 윈도우에 완전히 연결되기 전)
-    // → showEvent()에서 screenChangedConnected_ 확인 후 재시도
+    // Qt가 FBO·DPI·위젯 크기를 다시 만들고 paintGL()은 매 프레임 물리 크기를
+    // 계산한다. 화면 이동으로 MPV 출력/오디오를 재초기화하지 않는다.
+    // 폴백 연결은 로고 위치와 렌더 갱신만 처리한다.
     if (QWindow* win = window()->windowHandle()) {
         connectScreenChanged(win);
     } else {
@@ -271,10 +266,11 @@ void MpvWidget::connectScreenChanged(QWindow* win) {
     if (!win || screenChangedConnected_) return;
     connect(win, &QWindow::screenChanged, this, [this](QScreen* newScreen) {
         Q_UNUSED(newScreen)
-        qInfo() << "[MpvWidget] 모니터 변경 감지 → 렌더링 설정 재적용";
-        // 500ms 지연 후 재감지 (모니터 전환 완료 대기)
-        QTimer::singleShot(500, this, [this]() {
-            core_->redetectGpuAndApply();
+        // 화면 이동 시 Qt가 FBO/DPI를 재구성한다. MPV의 출력·오디오 장치를
+        // 건드리면 HDMI 협상과 렌더 컨텍스트가 불필요하게 재시작될 수 있다.
+        QTimer::singleShot(0, this, [this]() {
+            updateLogoPos();
+            update();
         });
     });
     screenChangedConnected_ = true;

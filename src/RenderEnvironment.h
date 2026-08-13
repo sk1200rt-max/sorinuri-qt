@@ -94,6 +94,17 @@ struct RenderEnvInfo {
 
 class RenderEnvironment {
 public:
+    // 전체 GPU/화면 탐지 없이 노트북 여부만 확인하는 경량 시작 경로.
+    // 첫 프레임 전에는 GetSystemPowerStatus 한 번만 호출해 중복 환경 탐지를 피한다.
+    static bool hasBattery() {
+#if defined(Q_OS_WIN)
+        SYSTEM_POWER_STATUS ps{};
+        return GetSystemPowerStatus(&ps) && ps.BatteryFlag != 128 && ps.BatteryFlag != 255;
+#else
+        return false;
+#endif
+    }
+
     /**
      * 현재 실행 환경을 감지하고 최적 렌더링 설정을 반환한다.
      * QApplication 생성 후, OpenGL 컨텍스트 초기화 후 호출해야 한다.

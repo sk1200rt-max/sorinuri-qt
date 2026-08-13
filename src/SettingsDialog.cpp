@@ -8,6 +8,8 @@
 #include <QStandardPaths>
 #include <QDialogButtonBox>
 #include <QScrollArea>
+#include <QGuiApplication>
+#include <QScreen>
 #include <QDebug>
 
 static const QString DIALOG_STYLE = R"(
@@ -105,9 +107,23 @@ SettingsDialog::SettingsDialog(MpvCore* mpv, QWidget* parent)
     : QDialog(parent), mpv_(mpv), settings_("Sorinuri", "SorinuriPlayer")
 {
     setWindowTitle("소리누리 설정");
-    setMinimumSize(640, 540);
-    resize(700, 580);
+    setSizeGripEnabled(true);
     setStyleSheet(DIALOG_STYLE);
+
+    // Per-Monitor DPI 환경에서는 현재 화면의 논리 해상도를 기준으로 계산한다.
+    // 창 전체가 화면을 점유해 하단 확인·취소 버튼이 가려지는 것을 방지한다.
+    const QScreen* screen = parent ? parent->screen() : QGuiApplication::primaryScreen();
+    const QRect available = screen ? screen->availableGeometry() : QRect(0, 0, 1280, 720);
+    const int margin = 20;
+    const QSize availableSize(qMax(1, available.width() - margin * 2),
+                              qMax(1, available.height() - margin * 2));
+    const QSize preferred(760, 640);
+    const QSize minimum(qMin(640, availableSize.width()),
+                        qMin(420, availableSize.height()));
+    setMinimumSize(minimum);
+    setMaximumSize(availableSize);
+    resize(qMin(preferred.width(), availableSize.width()),
+           qMin(preferred.height(), availableSize.height()));
 
     QVBoxLayout* mainLayout = new QVBoxLayout(this);
     mainLayout->setContentsMargins(0, 0, 0, 0);
@@ -122,12 +138,32 @@ SettingsDialog::SettingsDialog(MpvCore* mpv, QWidget* parent)
     setupGeneralTab(tabs);
     setupLastfmTab(tabs);
 
+    // 각 탭의 본문은 독립 스크롤 영역으로 감싼다. 하단 버튼 영역은
+    // 스크롤되지 않는 mainLayout의 마지막 항목이라 어떤 DPI에서도 보인다.
+    for (int i = 0; i < tabs->count(); ++i) {
+        QWidget* page = tabs->widget(i);
+        const QString title = tabs->tabText(i);
+        const QIcon icon = tabs->tabIcon(i);
+        tabs->removeTab(i);
+        auto* scroll = new QScrollArea(tabs);
+        scroll->setObjectName("settingsTabScroll");
+        scroll->setWidgetResizable(true);
+        scroll->setFrameShape(QFrame::NoFrame);
+        scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+        scroll->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+        scroll->setWidget(page);
+        tabs->insertTab(i, scroll, icon, title);
+    }
+
     mainLayout->addWidget(tabs, 1);
 
     // 버튼 영역
     QWidget* btnWidget = new QWidget(this);
-    // 버튼 영역 최소 높이 보장: 위아래 여백 10px + 버튼 32px = 52px
-    btnWidget->setMinimumHeight(52);
+    // 버튼 영역은 콘텐츠 스크롤과 분리한다. 고배율에서 눌림 영역이
+    // 줄어들지 않도록 높이와 레이아웃 크기를 고정한다.
+    btnWidget->setMinimumHeight(60);
+    btnWidget->setMaximumHeight(60);
+    btnWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     btnWidget->setStyleSheet(
         "QWidget { background: #141414; border-top: 1px solid #2a2a2a; }"
         // 버튼은 btnWidget 자식으로 설정하여 스타일시트 상속이 정상 적용됨
@@ -154,6 +190,9 @@ SettingsDialog::SettingsDialog(MpvCore* mpv, QWidget* parent)
     btnLayout->addWidget(btnOk);
     btnLayout->addWidget(btnCancel);
 
+    // Esc/창 닫기와 동일하게 취소 동작을 제공하고, 확인 버튼을 기본 동작으로 둔다.
+    btnOk->setDefault(true);
+    btnCancel->setAutoDefault(false);
     mainLayout->addWidget(btnWidget);
 
     connect(btnApply,  &QPushButton::clicked, this, &SettingsDialog::onApply);

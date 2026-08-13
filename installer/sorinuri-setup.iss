@@ -3,7 +3,7 @@
 
 #define MyAppName "소리누리"
 #define MyAppNameEn "Sorinuri"
-#define MyAppVersion "6.18.6"
+#define MyAppVersion "6.18.7"
 #define MyAppPublisher "Gaon Communication"
 #define MyAppURL "https://sorinuri.com"
 #define MyAppExeName "Sorinuri.exe"
@@ -24,8 +24,11 @@ AllowNoIcons=yes
 OutputDir=..\dist
 OutputBaseFilename=Sorinuri-Setup-{#MyAppVersion}
 SetupIconFile=..\resources\sorinuri.ico
-Compression=lzma2/ultra64
-SolidCompression=yes
+; ultra64 + solid archive는 배포 파일은 작지만 설치 프로그램 첫 화면과
+; 설치 시작 시 긴 압축 해제를 유발한다. 빠른 시작과 안정적인 설치 진행을
+; 우선해 일반 LZMA2 압축과 비솔리드 파일 블록을 사용한다.
+Compression=lzma2/normal
+SolidCompression=no
 ArchitecturesInstallIn64BitMode=x64compatible
 ArchitecturesAllowed=x64compatible
 PrivilegesRequired=admin

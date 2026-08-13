@@ -188,13 +188,11 @@ bool MpvCore::initialize(WId windowId) {
     // 노트북 감지 시 (AC 연결 포함) video-sync=audio 강제
     // 데스크톱은 applyVideoSyncByFps()에서 자동 선택
     {
-        RenderEnvInfo tmpEnv = RenderEnvironment::detect();
-        if (tmpEnv.isLaptop) {
-            // 노트북 감지: isLaptop_ 플래그만 설정
-            // video-sync는 applyVideoSyncByFps()가 FPS/주사율 기반으로 자동 선택
-            // 노트북이라도 display-resample을 강제 차단하지 않음
+        // 전체 GPU/화면 탐지는 바로 아래에서 한 번만 수행한다. 여기서는
+        // 시작 지연을 줄이기 위해 전원 API만 사용해 노트북 여부를 표시한다.
+        isLaptop_ = RenderEnvironment::hasBattery();
+        if (isLaptop_) {
             qInfo() << "[MPV] 노트북 감지 → isLaptop_=true (영상 로드 후 video-sync 자동 선택)";
-            isLaptop_ = true;
         }
     }
 
