@@ -125,14 +125,22 @@ if __name__ == '__main__':
     # 소스 코드 버전 범프 및 CI용 변경 범위 선언
     bump(args.version, args.scope, args.purpose)
 
-    # 랜딩페이지 자동 업데이트
-    if not args.no_landing:
-        if args.title and args.desc:
-            print(f'\n🌐 랜딩페이지 자동 업데이트 시작...')
-            try:
-                # update_landing.py를 같은 scripts/ 디렉토리에서 import
-                scripts_dir = os.path.dirname(os.path.abspath(__file__))
-                sys.path.insert(0, scripts_dir)
+    # 릴리즈 이력은 승인 전에도 반드시 로컬 저장소에 생성한다. 실제 웹 게시만
+    # 승인된 릴리즈 작업에서 수행하므로, --no-landing은 공개 페이지 렌더링만 건너뛴다.
+    if args.title and args.desc:
+        try:
+            scripts_dir = os.path.dirname(os.path.abspath(__file__))
+            sys.path.insert(0, scripts_dir)
+            if args.no_landing:
+                from update_landing import load_releases, add_release, save_releases
+                releases = add_release(
+                    load_releases(), args.version, args.title, args.desc,
+                    args.installer_mb, args.portable_mb,
+                )
+                save_releases(releases)
+                print('✅ 릴리즈 이력 데이터 생성 완료 (공개 랜딩페이지 게시 보류)')
+            else:
+                print(f'\n🌐 랜딩페이지 로컬 렌더링 시작...')
                 from update_landing import update_landing
                 update_landing(
                     new_ver=args.version,
@@ -141,14 +149,11 @@ if __name__ == '__main__':
                     installer_mb=args.installer_mb,
                     portable_mb=args.portable_mb,
                 )
-                print('✅ 랜딩페이지 업데이트 완료!')
-            except Exception as e:
-                print(f'⚠️  랜딩페이지 업데이트 실패: {e}')
-                print('   수동으로 python3 scripts/update_landing.py 를 실행하세요.')
-        else:
-            print('\n💡 랜딩페이지 업데이트를 건너뜁니다.')
-            print('   --title 과 --desc 옵션을 추가하면 자동으로 업데이트됩니다.')
-            print(f'   예시: python3 scripts/bump_version.py {args.version} \\')
-            print(f'           --title "릴리즈 제목" \\')
-            print(f'           --desc "릴리즈 상세 설명" \\')
-            print(f'           --installer-mb 92 --portable-mb 116')
+                print('✅ 랜딩페이지 로컬 렌더링 완료 (공개 게시 보류)')
+        except Exception as e:
+            print(f'⚠️ 릴리즈 이력 생성 실패: {e}')
+            print('   릴리즈를 진행하기 전에 releases_data.json을 복구해야 합니다.')
+            raise
+    else:
+        print('\n오류: --title 및 --desc는 승인 배포용 릴리즈 이력 생성에 필수입니다.', file=sys.stderr)
+        sys.exit(2)

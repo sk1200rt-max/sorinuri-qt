@@ -1,5 +1,14 @@
 [
   {
+    "version": "6.18.9",
+    "date": "2026-08-14",
+    "title": "MP4 파일 연결 및 스테레오 저음 보정",
+    "desc": "Windows 기본 앱 설정 화면을 설치 후 직접 열어 MP4를 포함한 지원 형식 연결을 복구하고, HDMI 7.1/5.1/stereo 출력 화이트리스트와 스테레오 다운믹스 레벨 정규화를 적용했습니다.",
+    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.18.9.exe",
+    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.18.9-Portable.zip",
+    "tags": []
+  },
+  {
     "version": "6.18.8",
     "date": "2026-08-13",
     "title": "HDMI PCM 다채널 자동 협상 복구",
