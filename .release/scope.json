@@ -1,5 +1,5 @@
 {
-  "version": "6.19.0",
-  "domain": "ui,playback",
-  "purpose": "오리지널·YouTube 연속 재생과 저장 재생목록·반복 모드"
+  "version": "6.19.1",
+  "domain": "ui,installer",
+  "purpose": "Windows 기본 앱 등록 복구와 설치 시작 반응성 개선"
 }

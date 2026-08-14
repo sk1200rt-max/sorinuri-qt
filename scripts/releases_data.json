@@ -1,5 +1,14 @@
 [
   {
+    "version": "6.19.1",
+    "date": "2026-08-14",
+    "title": "Windows 파일 연결과 빠른 설치 시작",
+    "desc": "소리누리를 Windows 기본 앱 목록에 정식 등록하고 MP4·음성 파일 연결 화면을 직접 열며, 설치 마법사 시작 압축 해제 부담을 줄였습니다.",
+    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.19.1.exe",
+    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.19.1-Portable.zip",
+    "tags": []
+  },
+  {
     "version": "6.19.0",
     "date": "2026-08-14",
     "title": "통합 연속 재생과 내 재생목록",

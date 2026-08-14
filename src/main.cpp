@@ -46,6 +46,7 @@ extern "C" {
 #include <QColor>
 #include <QSurfaceFormat>
 #include <QStringList>
+#include <QUrl>
 #include "MainWindow.h"
 #include <QSharedMemory>
 #include <QCommandLineParser>
@@ -62,7 +63,17 @@ static const QString IPC_SERVER_NAME = "SorinuriIPC_v1";
 // 열어 사용자가 소리누리를 명시적으로 기본 재생 프로그램으로 선택하게 한다.
 static void launchFileAssociationUI()
 {
-    ShellExecuteW(nullptr, L"open", L"ms-settings:defaultapps", nullptr, nullptr, SW_SHOWNORMAL);
+    // 관리자 설치는 HKLM\Software\RegisteredApplications에 소리누리를 등록한다.
+    // Windows 11 21H2(2023-04 업데이트) 이상에서는 registeredAppMachine 딥링크로
+    // ‘소리누리’의 개별 확장자 기본값 화면을 바로 열 수 있다.
+    const QString uri = QStringLiteral("ms-settings:defaultapps?registeredAppMachine=")
+        + QString::fromLatin1(QUrl::toPercentEncoding(QStringLiteral("소리누리")));
+    const auto result = ShellExecuteW(
+        nullptr, L"open", reinterpret_cast<LPCWSTR>(uri.utf16()), nullptr, nullptr, SW_SHOWNORMAL);
+    // 이전 Windows 10 빌드는 세부 앱 URI를 인식하지 않을 수 있으므로 기본 페이지로 폴백한다.
+    if (reinterpret_cast<INT_PTR>(result) <= 32) {
+        ShellExecuteW(nullptr, L"open", L"ms-settings:defaultapps", nullptr, nullptr, SW_SHOWNORMAL);
+    }
 }
 #endif
 
@@ -108,7 +119,7 @@ int main(int argc, char* argv[])
     QApplication app(argc, argv);
     app.setApplicationName("Sorinuri");
     app.setApplicationDisplayName("소리누리");
-    app.setApplicationVersion("6.19.0");
+    app.setApplicationVersion("6.19.1");
     app.setOrganizationName("Sorinuri");
     app.setWindowIcon(QIcon(":/icons/sorinuri.ico"));
 

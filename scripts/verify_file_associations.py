@@ -18,25 +18,33 @@ extensions = [
 errors: list[str] = []
 for ext in extensions:
     prog_id = f"Sorinuri.{ext}"
-    class_pattern = rf'Subkey: "Software\\Classes\\{re.escape(prog_id)}(?:\\|";)'
-    capability_pattern = rf'ValueName: "\.{re.escape(ext)}"; ValueData: "{re.escape(prog_id)}"; Tasks: fileassoc'
+    class_pattern = rf'Root: HKLM64; Subkey: "Software\\Classes\\{re.escape(prog_id)}(?:\\|";)'
+    capability_pattern = rf'Root: HKLM64; Subkey: "Software\\Sorinuri\\Capabilities\\FileAssociations"; ValueType: string; ValueName: "\.{re.escape(ext)}"; ValueData: "{re.escape(prog_id)}"; Tasks: fileassoc'
+    supported_type_pattern = rf'Root: HKLM64; Subkey: "Software\\Classes\\Applications\\Sorinuri\.exe\\SupportedTypes"; ValueType: string; ValueName: "\.{re.escape(ext)}"; ValueData: ""; Tasks: fileassoc'
     if not re.search(class_pattern, installer):
-        errors.append(f".{ext}: ProgID 등록 누락 ({prog_id})")
+        errors.append(f".{ext}: HKLM64 ProgID 등록 누락 ({prog_id})")
     if not re.search(capability_pattern, installer):
-        errors.append(f".{ext}: Windows Capabilities 등록 또는 fileassoc 작업 조건 누락")
+        errors.append(f".{ext}: HKLM64 Capabilities 등록 또는 fileassoc 작업 조건 누락")
+    if not re.search(supported_type_pattern, installer):
+        errors.append(f".{ext}: Applications\\Sorinuri.exe SupportedTypes 등록 누락")
 
 required_installer = [
     'Parameters: "--register-file-associations"',
-    'Tasks: fileassoc',
-    'Subkey: "Software\\RegisteredApplications"',
+    'Root: HKLM64; Subkey: "Software\\RegisteredApplications"',
+    'Root: HKLM64; Subkey: "Software\\Classes\\Applications\\Sorinuri.exe"',
+    'Root: HKLM64; Subkey: "Software\\Microsoft\\Windows\\CurrentVersion\\App Paths\\Sorinuri.exe"',
+    'SHChangeNotifyDirect($08000000, $1003, 0, 0);',
+    'Compression=zip/9',
+    'SolidCompression=no',
 ]
 for needle in required_installer:
     if needle not in installer:
-        errors.append(f"인스톨러 필수 파일 연결 경로 누락: {needle}")
+        errors.append(f"인스톨러 필수 파일 연결 또는 빠른 시작 경로 누락: {needle}")
 
 required_app = [
     '"register-file-associations"',
-    'L"ms-settings:defaultapps"',
+    'ms-settings:defaultapps?registeredAppMachine=',
+    'QUrl::toPercentEncoding',
 ]
 for needle in required_app:
     if needle not in main_cpp:
@@ -48,4 +56,4 @@ if errors:
         print(f"- {error}", file=sys.stderr)
     sys.exit(1)
 
-print(f"파일 연결 정책 검증 통과: {len(extensions)}개 형식, Capabilities, Windows 기본 앱 UI 확인")
+print(f"파일 연결 정책 검증 통과: {len(extensions)}개 형식, HKLM64 Capabilities, 실행 파일 등록, Windows 기본 앱 상세 화면 확인")
