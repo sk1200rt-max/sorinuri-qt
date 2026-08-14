@@ -32,6 +32,11 @@ DOMAINS: dict[str, tuple[str, ...]] = {
         "src/SettingsDialog.cpp", "src/SettingsDialog.h", "src/TrackSelector.cpp",
         "src/TrackSelector.h", "src/TitleBar.cpp", "src/TitleBar.h", "src/UiTheme.h",
     ),
+    "playback": (
+        "src/PlaybackQueue.cpp", "src/PlaybackQueue.h", "src/PlaylistWidget.cpp",
+        "src/PlaylistWidget.h", "src/OriginalsWidget.cpp", "src/OriginalsWidget.h",
+        "src/YtdlpManager.cpp", "src/YtdlpManager.h",
+    ),
     "installer": (
         "installer/", "resources/sorinuri.rc",
     ),

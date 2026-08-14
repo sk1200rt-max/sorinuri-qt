@@ -44,6 +44,7 @@
 #include "AdManager.h"
 #include "SplashAdWidget.h"
 #include "OriginalsWidget.h"
+#include "PlaybackQueue.h"
 #include "SMTCManager.h"
 #include "ScrobbleManager.h"
 #include "CloudDriveManager.h"
@@ -120,6 +121,8 @@ private:
     void saveSettings();
     void updateWindowTitle(const QString& filename = {});
     void openUrl(const QString& url);
+    void playQueue(const QList<PlaybackQueue::Entry>& entries, int startIndex = 0);
+    void applyQueueRepeatMode();
     void loadMusicMeta(const QString& path);
     void showUI();
     void hideUI();
@@ -166,6 +169,7 @@ private:
     SubtitleEditorWidget* subtitleEditor_      = nullptr;  // 자막 편집기
     QWidget*              statsWidget_          = nullptr;  // 재생 통계/최근 감상 화면
     OriginalsWidget*      originalsWidget_      = nullptr;  // SORINURI ORIGINALS 탭
+    PlaybackQueue*        playbackQueue_        = nullptr;  // 오리지널·YouTube·로컬 통합 대기열
     AdManager*            adManager_            = nullptr;  // 광고 관리자
     SplashAdWidget*       splashAdWidget_       = nullptr;  // 시작 화면 광고
     SMTCManager*          smtcManager_          = nullptr;  // Windows 잠금 화면 미디어 컨트롤
@@ -187,6 +191,7 @@ private:
     double lastPosition_      = 0;   // 이어보기용 현재 재생 위치
     QString currentFilePath_;
     QSettings settings_;
+    bool pendingQueueEndUiUpdate_ = false;
 
     // Windows 작업표시줄 진행률 표시 (ITaskbarList3)
     void* taskbarList_  = nullptr;  // ITaskbarList3* (void*로 선언하여 헤더 의존성 제거)
@@ -203,6 +208,8 @@ private:
     void          stopRemoteServer();
     void          handleRemoteRequest(QTcpSocket* socket);
     QString pendingUrl_;
+    QList<PlaybackQueue::Entry> pendingYouTubeQueue_;
+    int pendingYouTubeQueueStartIndex_ = 0;
     QProgressDialog* ytdlpProgress_ = nullptr;
 
     // HiDPI 근본 수정: 시작 파일 대기 큐

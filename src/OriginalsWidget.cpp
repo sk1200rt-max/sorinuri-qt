@@ -1,4 +1,6 @@
 #include "OriginalsWidget.h"
+#include <QSignalBlocker>
+#include <QSet>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QDesktopServices>
@@ -310,6 +312,7 @@ void OriginalsWidget::setupUI() {
         "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }"
     ).arg(BG).arg(BG));
     listWidget_->setMouseTracking(true);
+    listWidget_->setSelectionMode(QAbstractItemView::ExtendedSelection);
     listWidget_->setSpacing(0);
     listWidget_->setUniformItemSizes(true);
 
@@ -321,40 +324,93 @@ void OriginalsWidget::setupUI() {
             this, &OriginalsWidget::onItemDoubleClicked);
     root->addWidget(listWidget_, 1);
 
-    // ── 하단 액션 바 ─────────────────────────────────────────────────────
+    // ── 하단 재생·재생목록 바 ─────────────────────────────────────────────
     auto* actionBar = new QWidget(this);
-    actionBar->setFixedHeight(48);
+    actionBar->setFixedHeight(82);
     actionBar->setStyleSheet(QString("background: %1; border-top: 1px solid %2;")
                               .arg(BG2).arg(BORDER));
-    auto* aRow = new QHBoxLayout(actionBar);
-    aRow->setContentsMargins(12, 8, 12, 8);
-    aRow->setSpacing(8);
+    auto* actionLayout = new QVBoxLayout(actionBar);
+    actionLayout->setContentsMargins(10, 6, 10, 6);
+    actionLayout->setSpacing(5);
+    auto* playRow = new QHBoxLayout();
+    auto* listRow = new QHBoxLayout();
+    playRow->setSpacing(8);
+    listRow->setSpacing(6);
 
-    auto* playAllBtn = new QPushButton("▶  전체 재생", actionBar);
-    playAllBtn->setFixedHeight(32);
+    auto* playAllBtn = new QPushButton("▶  현재 목록 전체 재생", actionBar);
+    playAllBtn->setFixedHeight(30);
     playAllBtn->setCursor(Qt::PointingHandCursor);
     playAllBtn->setFocusPolicy(Qt::NoFocus);
     playAllBtn->setStyleSheet(QString(
         "QPushButton { background: %1; color: #000; border: none;"
-        "border-radius: 6px; padding: 0 18px; font-size: 12px; font-weight: 700; }"
+        "border-radius: 6px; padding: 0 14px; font-size: 11px; font-weight: 700; }"
         "QPushButton:hover { background: #00f0cc; }"
         "QPushButton:pressed { background: #00b89a; }").arg(MINT));
     connect(playAllBtn, &QPushButton::clicked, this, &OriginalsWidget::onPlayAllClicked);
 
-    auto* ytBtn = new QPushButton("▶  YouTube", actionBar);
-    ytBtn->setFixedHeight(32);
+    auto* ytBtn = new QPushButton("▶  YouTube 전체", actionBar);
+    ytBtn->setFixedHeight(30);
     ytBtn->setCursor(Qt::PointingHandCursor);
     ytBtn->setFocusPolicy(Qt::NoFocus);
     ytBtn->setStyleSheet(
         "QPushButton { background: #cc0000; color: #fff; border: none;"
-        "border-radius: 6px; padding: 0 14px; font-size: 11px; font-weight: 600; }"
+        "border-radius: 6px; padding: 0 12px; font-size: 11px; font-weight: 600; }"
         "QPushButton:hover { background: #e00000; }"
         "QPushButton:pressed { background: #aa0000; }");
     connect(ytBtn, &QPushButton::clicked, this, &OriginalsWidget::onYouTubeClicked);
 
-    aRow->addWidget(playAllBtn);
-    aRow->addWidget(ytBtn);
-    aRow->addStretch();
+    repeatBtn_ = new QPushButton(actionBar);
+    repeatBtn_->setFixedHeight(30);
+    repeatBtn_->setCursor(Qt::PointingHandCursor);
+    repeatBtn_->setFocusPolicy(Qt::NoFocus);
+    repeatBtn_->setStyleSheet(QString(
+        "QPushButton { background: %1; color: %2; border: 1px solid %3; border-radius: 6px;"
+        "padding: 0 10px; font-size: 11px; } QPushButton:hover { border-color: %4; color: %4; }")
+        .arg(BG3).arg(TEXT).arg(BORDER).arg(MINT));
+    connect(repeatBtn_, &QPushButton::clicked, this, &OriginalsWidget::onRepeatModeClicked);
+    setRepeatMode(repeatMode_);
+
+    auto* saveBtn = new QPushButton("＋ 현재 목록 저장", actionBar);
+    saveBtn->setFixedHeight(28);
+    saveBtn->setCursor(Qt::PointingHandCursor);
+    saveBtn->setFocusPolicy(Qt::NoFocus);
+    saveBtn->setStyleSheet(QString("QPushButton { background: transparent; color: %1; border: 1px solid %2;"
+        "border-radius: 5px; padding: 0 9px; font-size: 10px; } QPushButton:hover { border-color: %1; }")
+        .arg(MINT).arg(BORDER));
+    connect(saveBtn, &QPushButton::clicked, this, &OriginalsWidget::onSavePlaylistClicked);
+
+    savedPlaylistCombo_ = new QComboBox(actionBar);
+    savedPlaylistCombo_->setMinimumWidth(150);
+    savedPlaylistCombo_->setFixedHeight(28);
+    savedPlaylistCombo_->addItem("내 재생목록 선택");
+    savedPlaylistCombo_->setStyleSheet(QString("QComboBox { background: %1; color: %2; border: 1px solid %3;"
+        "border-radius: 5px; padding: 2px 8px; font-size: 10px; } QComboBox QAbstractItemView {"
+        "background: %1; color: %2; selection-background-color: %4; }")
+        .arg(BG3).arg(TEXT).arg(BORDER).arg(MINT));
+
+    auto* loadBtn = new QPushButton("재생", actionBar);
+    auto* deleteBtn = new QPushButton("삭제", actionBar);
+    for (QPushButton* btn : {loadBtn, deleteBtn}) {
+        btn->setFixedHeight(28);
+        btn->setCursor(Qt::PointingHandCursor);
+        btn->setFocusPolicy(Qt::NoFocus);
+        btn->setStyleSheet(QString("QPushButton { background: %1; color: %2; border: 1px solid %3;"
+            "border-radius: 5px; padding: 0 9px; font-size: 10px; } QPushButton:hover { border-color: %4; color: %4; }")
+            .arg(BG3).arg(TEXT2).arg(BORDER).arg(MINT));
+    }
+    connect(loadBtn, &QPushButton::clicked, this, &OriginalsWidget::onLoadSavedPlaylistClicked);
+    connect(deleteBtn, &QPushButton::clicked, this, &OriginalsWidget::onDeleteSavedPlaylistClicked);
+
+    playRow->addWidget(playAllBtn);
+    playRow->addWidget(ytBtn);
+    playRow->addStretch();
+    playRow->addWidget(repeatBtn_);
+    listRow->addWidget(saveBtn);
+    listRow->addWidget(savedPlaylistCombo_, 1);
+    listRow->addWidget(loadBtn);
+    listRow->addWidget(deleteBtn);
+    actionLayout->addLayout(playRow);
+    actionLayout->addLayout(listRow);
     root->addWidget(actionBar);
 
     // ── 토스트 알림 (플로팅) ─────────────────────────────────────────────
@@ -566,23 +622,96 @@ void OriginalsWidget::onSortChanged(int index) {
     applyFilter();
 }
 
+QList<PlaybackQueue::Entry> OriginalsWidget::queueEntries(bool useYouTube) const {
+    QList<PlaybackQueue::Entry> entries;
+    for (const SongInfo& song : filtered_) {
+        const QString mediaUrl = useYouTube ? song.youtubeUrl : (baseUrl_ + song.mp3);
+        if (mediaUrl.trimmed().isEmpty()) continue;
+        PlaybackQueue::Entry entry;
+        entry.url = mediaUrl;
+        entry.title = song.title;
+        entry.artist = song.artist.isEmpty() ? QStringLiteral("소리누리") : song.artist;
+        entry.artworkUrl = baseUrl_ + song.cover;
+        entry.source = useYouTube ? QStringLiteral("youtube") : QStringLiteral("originals");
+        entries.append(entry);
+    }
+    return entries;
+}
+
 void OriginalsWidget::onItemDoubleClicked(QListWidgetItem* item) {
     if (!item) return;
-    QString url = item->data(ROLE_URL).toString();
-    if (!url.isEmpty() && url.startsWith("http"))
-        emit playRequested(url);
+    const QList<PlaybackQueue::Entry> entries = queueEntries(false);
+    const int row = listWidget_->row(item);
+    if (!entries.isEmpty() && row >= 0 && row < entries.size())
+        emit queueRequested(entries, row);
 }
 
 void OriginalsWidget::onPlayAllClicked() {
-    emit playlistRequested(m3uUrl_);
+    const QList<PlaybackQueue::Entry> entries = queueEntries(false);
+    if (!entries.isEmpty())
+        emit queueRequested(entries, 0);
 }
 
 void OriginalsWidget::onYouTubeClicked() {
-    auto* cur = listWidget_->currentItem();
-    if (!cur) return;
-    QString ytUrl = cur->data(ROLE_YTURL).toString();
-    if (!ytUrl.isEmpty())
-        QDesktopServices::openUrl(QUrl(ytUrl));
+    const QList<PlaybackQueue::Entry> entries = queueEntries(true);
+    if (entries.isEmpty()) {
+        showToast("YouTube 연결 곡이 없습니다.");
+        return;
+    }
+
+    int startIndex = 0;
+    if (auto* current = listWidget_->currentItem()) {
+        const QString selectedUrl = current->data(ROLE_YTURL).toString();
+        for (int i = 0; i < entries.size(); ++i) {
+            if (entries.at(i).url == selectedUrl) {
+                startIndex = i;
+                break;
+            }
+        }
+    }
+    emit queueRequested(entries, startIndex);
+}
+
+void OriginalsWidget::onSavePlaylistClicked() {
+    QList<PlaybackQueue::Entry> entries;
+    const QList<QListWidgetItem*> selectedItems = listWidget_->selectedItems();
+    if (selectedItems.isEmpty()) {
+        entries = queueEntries(false);
+    } else {
+        QSet<QString> selectedUrls;
+        for (QListWidgetItem* item : selectedItems)
+            selectedUrls.insert(item->data(ROLE_URL).toString());
+        for (const PlaybackQueue::Entry& entry : queueEntries(false)) {
+            if (selectedUrls.contains(entry.url))
+                entries.append(entry);
+        }
+    }
+    if (entries.isEmpty()) {
+        showToast("저장할 곡이 없습니다.");
+        return;
+    }
+    emit savePlaylistRequested(entries);
+}
+
+void OriginalsWidget::onLoadSavedPlaylistClicked() {
+    if (!savedPlaylistCombo_ || savedPlaylistCombo_->currentIndex() <= 0) {
+        showToast("재생목록을 선택해 주세요.");
+        return;
+    }
+    emit loadSavedPlaylistRequested(savedPlaylistCombo_->currentText());
+}
+
+void OriginalsWidget::onDeleteSavedPlaylistClicked() {
+    if (!savedPlaylistCombo_ || savedPlaylistCombo_->currentIndex() <= 0) {
+        showToast("삭제할 재생목록을 선택해 주세요.");
+        return;
+    }
+    emit deleteSavedPlaylistRequested(savedPlaylistCombo_->currentText());
+}
+
+void OriginalsWidget::onRepeatModeClicked() {
+    const int next = (static_cast<int>(repeatMode_) + 1) % 3;
+    emit repeatModeRequested(static_cast<PlaybackQueue::RepeatMode>(next));
 }
 
 // ── 공개 메서드 ──────────────────────────────────────────────────────────────
@@ -597,6 +726,26 @@ void OriginalsWidget::setApiUrl(const QString& url) {
     apiUrl_ = url;
     settings_.setValue("originals/api_url", url);
     fetchSongs();
+}
+
+void OriginalsWidget::setSavedPlaylistNames(const QStringList& names) {
+    if (!savedPlaylistCombo_) return;
+    const QString selected = savedPlaylistCombo_->currentText();
+    QSignalBlocker blocker(savedPlaylistCombo_);
+    savedPlaylistCombo_->clear();
+    savedPlaylistCombo_->addItem("내 재생목록 선택");
+    savedPlaylistCombo_->addItems(names);
+    const int selectedIndex = savedPlaylistCombo_->findText(selected);
+    if (selectedIndex > 0) savedPlaylistCombo_->setCurrentIndex(selectedIndex);
+}
+
+void OriginalsWidget::setRepeatMode(PlaybackQueue::RepeatMode mode) {
+    repeatMode_ = mode;
+    if (!repeatBtn_) return;
+    const QString text = mode == PlaybackQueue::RepeatMode::All ? QStringLiteral("🔁 전체 반복")
+                       : mode == PlaybackQueue::RepeatMode::One ? QStringLiteral("🔂 한 곡 반복")
+                       : QStringLiteral("🔁 반복 끔");
+    repeatBtn_->setText(text);
 }
 
 // ── 토스트 알림 ──────────────────────────────────────────────────────────────

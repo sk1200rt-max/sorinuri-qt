@@ -19,6 +19,7 @@
 #include <QAbstractItemDelegate>
 #include <QPainter>
 #include <QStyleOptionViewItem>
+#include "PlaybackQueue.h"
 
 // ──────────────────────────────────────────────────────────────────────────────
 // OriginalsWidget — SORINURI ORIGINALS 탭
@@ -81,12 +82,19 @@ public:
     void setCurrentFile(const QString& fileUrl);
     // 설정에서 API URL 변경 시 호출
     void setApiUrl(const QString& url);
+    // MainWindow의 통합 재생 대기열에 저장된 사용자 재생목록·반복 상태를 UI에 반영한다.
+    void setSavedPlaylistNames(const QStringList& names);
+    void setRepeatMode(PlaybackQueue::RepeatMode mode);
 
 signals:
     // 곡 URL을 MainWindow에 전달하여 재생 요청
     void playRequested(const QString& url);
-    // 전체 재생 (M3U URL)
-    void playlistRequested(const QString& m3uUrl);
+    // 필터·정렬 결과를 통합 대기열로 재생한다. source가 originals/youtube인 항목을 함께 지원한다.
+    void queueRequested(const QList<PlaybackQueue::Entry>& entries, int startIndex);
+    void savePlaylistRequested(const QList<PlaybackQueue::Entry>& entries);
+    void loadSavedPlaylistRequested(const QString& name);
+    void deleteSavedPlaylistRequested(const QString& name);
+    void repeatModeRequested(PlaybackQueue::RepeatMode mode);
 
 private slots:
     void fetchSongs();
@@ -98,12 +106,17 @@ private slots:
     void onItemDoubleClicked(QListWidgetItem* item);
     void onPlayAllClicked();
     void onYouTubeClicked();
+    void onSavePlaylistClicked();
+    void onLoadSavedPlaylistClicked();
+    void onDeleteSavedPlaylistClicked();
+    void onRepeatModeClicked();
 
 private:
     void setupUI();
     void applyFilter();
     void updateList();
     void fetchThumbnail(const SongInfo& song);
+    QList<PlaybackQueue::Entry> queueEntries(bool useYouTube) const;
     void showToast(const QString& msg);
 
     QNetworkAccessManager* nam_          = nullptr;
@@ -134,6 +147,9 @@ private:
     QWidget*             catBar_       = nullptr;
     QList<QPushButton*>  catBtns_;
     SongItemDelegate*    delegate_     = nullptr;
+    QComboBox*            savedPlaylistCombo_ = nullptr;
+    QPushButton*          repeatBtn_   = nullptr;
+    PlaybackQueue::RepeatMode repeatMode_ = PlaybackQueue::RepeatMode::Off;
 
     static const QStringList CATEGORIES;
 };

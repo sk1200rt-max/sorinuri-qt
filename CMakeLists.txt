@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(Sorinuri VERSION 6.18.9 LANGUAGES CXX)
+project(Sorinuri VERSION 6.19.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -43,6 +43,8 @@ set(SOURCES
     src/MpvCore.h
     src/PlaylistWidget.cpp
     src/PlaylistWidget.h
+    src/PlaybackQueue.cpp
+    src/PlaybackQueue.h
     src/ControlBar.cpp
     src/ControlBar.h
     src/AudioSettings.cpp

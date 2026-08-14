@@ -16,6 +16,7 @@
 #include <QEvent>
 #include <QMessageBox>
 #include <QProgressDialog>
+#include <QInputDialog>
 #include <QFileDialog>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -59,6 +60,7 @@ MainWindow::MainWindow(QWidget* parent)
 
     // yt-dlp 관리자 - 지연 초기화 (시작 직후 네트워크 요청 방지)
     ytdlp_ = nullptr;
+    playbackQueue_ = new PlaybackQueue(this);
 
     setupUI();
     setupConnections();
@@ -74,6 +76,12 @@ MainWindow::MainWindow(QWidget* parent)
                 this, &MainWindow::onYtdlpDownloadProgress);
         connect(ytdlp_, &YtdlpManager::downloadFailed,
                 this, &MainWindow::onYtdlpDownloadFailed);
+        if (!pendingYouTubeQueue_.isEmpty()) {
+            const QList<PlaybackQueue::Entry> queue = pendingYouTubeQueue_;
+            const int startIndex = pendingYouTubeQueueStartIndex_;
+            pendingYouTubeQueue_.clear();
+            playQueue(queue, startIndex);
+        }
     });
 
     // 스마트폰 리모컨 서버 자동 시작 (설정에서 활성화된 경우)
@@ -235,6 +243,8 @@ void MainWindow::setupConnections() {
             core->setSpdifCodecs(codecs);
             qInfo() << "[MainWindow] mpvInitialized: 패스스루 코덱 적용:" << codecs;
         }
+        // 통합 대기열의 반복 모드는 MPV 초기화가 끝난 뒤 적용한다.
+        applyQueueRepeatMode();
         // 시작 파일 처리
         if (!pendingStartupFiles_.isEmpty()) {
             qInfo() << "[MainWindow] mpvInitialized: pendingStartupFiles_ 처리" << pendingStartupFiles_;
@@ -245,6 +255,16 @@ void MainWindow::setupConnections() {
     }, Qt::SingleShotConnection);
 
     auto* core = mpvWidget_->core();
+
+    connect(playbackQueue_, &PlaybackQueue::repeatModeChanged, this,
+            [this](PlaybackQueue::RepeatMode mode) {
+        applyQueueRepeatMode();
+        const QString label = mode == PlaybackQueue::RepeatMode::All ? QStringLiteral("전체 반복")
+                            : mode == PlaybackQueue::RepeatMode::One ? QStringLiteral("한 곡 반복")
+                            : QStringLiteral("반복 끔");
+        if (originalsWidget_) originalsWidget_->setRepeatMode(mode);
+        if (osdWidget_) osdWidget_->showInfo(QStringLiteral("🔁 %1").arg(label), 1600);
+    });
 
     connect(core, &MpvCore::fileLoaded,         this, &MainWindow::onFileLoaded);
     connect(core, &MpvCore::playbackStarted,    this, &MainWindow::onPlaybackStarted);
@@ -396,57 +416,99 @@ void MainWindow::setupConnections() {
     connect(musicPage_, &MusicWidget::shuffleToggled, this, [core](bool on) {
         core->setProperty("shuffle", on ? QString("yes") : QString("no"));
     });
-    connect(musicPage_, &MusicWidget::repeatToggled, this, [core](bool on) {
-        core->setProperty("loop-file", on ? QString("inf") : QString("no"));
+    connect(musicPage_, &MusicWidget::repeatToggled, this, [this](bool on) {
+        playbackQueue_->setRepeatMode(on ? PlaybackQueue::RepeatMode::One
+                                         : PlaybackQueue::RepeatMode::Off);
     });
     // miniPlayer_, whisperWidget_, chapterWidget_ 연결은 지연 초기화
     // (toggleMiniPlayer, onProFeaturesRequested에서 처음 생성 시 연결)
 }
 
 void MainWindow::openFiles(const QStringList& paths) {
-    // HiDPI 근본 수정: MPV 초기화 전이면 pendingStartupFiles_에 저장
-    // initializeGL()이 완료되면 mpvInitialized 시그널이 발생하고
-    // setupConnections()의 슬롯에서 이 큐를 처리함
+    QList<PlaybackQueue::Entry> entries;
+    for (const QString& path : paths) {
+        if (path.trimmed().isEmpty()) continue;
+        PlaybackQueue::Entry entry;
+        entry.url = path;
+        entry.title = QFileInfo(path).completeBaseName();
+        entry.source = path.startsWith("http") ? "stream" : "local";
+        entries.append(entry);
+    }
+    playQueue(entries);
+}
+
+void MainWindow::playQueue(const QList<PlaybackQueue::Entry>& entries, int startIndex) {
+    if (entries.isEmpty()) return;
+    playbackQueue_->replace(entries, startIndex);
+    applyQueueRepeatMode();
+
+    const bool containsYouTube = std::any_of(entries.cbegin(), entries.cend(),
+        [](const PlaybackQueue::Entry& entry) { return entry.source == QStringLiteral("youtube"); });
+    if (containsYouTube && (!ytdlp_ || !ytdlp_->isAvailable())) {
+        pendingYouTubeQueue_ = entries;
+        pendingYouTubeQueueStartIndex_ = startIndex;
+        if (ytdlp_ && !ytdlpProgress_) {
+            ytdlpProgress_ = new QProgressDialog("YouTube 재생 준비 중...", "취소", 0, 100, this);
+            ytdlpProgress_->setWindowTitle("yt-dlp 설치");
+            ytdlpProgress_->setWindowModality(Qt::WindowModal);
+            connect(ytdlpProgress_, &QProgressDialog::canceled, this, [this]() {
+                pendingYouTubeQueue_.clear();
+            });
+            ytdlpProgress_->show();
+            ytdlp_->downloadOrUpdate();
+        }
+        return;
+    }
+    if (containsYouTube && ytdlp_ && ytdlp_->isAvailable()) {
+        const QString ytdlpDir = QFileInfo(ytdlp_->ytdlpPath()).absolutePath();
+        mpvWidget_->core()->setProperty("ytdl-raw-options", QString("paths=home:%1").arg(ytdlpDir));
+    }
+
     if (!mpvWidget_->isMpvInitialized()) {
-        qInfo() << "[MainWindow] openFiles: MPV 초기화 전 → pendingStartupFiles_에 저장" << paths;
-        pendingStartupFiles_ = paths;
+        pendingStartupFiles_ = playbackQueue_->urls();
+        qInfo() << "[MainWindow] playQueue: MPV 초기화 전 → 대기열 보관" << pendingStartupFiles_;
         return;
     }
 
-    bool first = true;
-    for (const QString& path : paths) {
-        // QFileInfo::exists() 체크 제거: 한글/공백/UNC/네트워크 경로에서 false 반환하는 버그 수정
-        // MPV가 직접 파일 존재 여부를 판단하므로 Qt 측 체크 불필요
-        if (path.trimmed().isEmpty()) continue;
-        if (first) {
-            currentFilePath_ = path;
-            // 음악 파일이면 자동으로 HiFi 모드로 전환
-            if (HiFiEngine::isMusicFile(path)) {
-                switchToMusicMode();
-                hifiEngine_->applyAll();
-            } else {
-                switchToVideoMode();
-            }
-            // switchToVideoMode/MusicMode에서 QOpenGLWidget 컨텍스트가 재배치될 수 있음.
-            // QTimer::singleShot(0)으로 현재 이벤트 루프 사이클이 끝난 후 loadFile 호출.
-            // → 컨텍스트 메뉴 닫힌 처리가 완전히 끝난 후 실행 보장.
-            // 0ms: MPV 초기화 완료 후 호출되므로 타이밍 의존 불필요.
-            const QString pathCopy = path;
-            // 150ms 지연: 우클릭 컨텍스트 메뉴 닫힘 이벤트가 완전히 처리된 후 loadFile 호출
-            // 문제: 메뉴 닫힘 → QOpenGLWidget doneCurrent() → 50ms 내 loadFile 호출 시
-            //       MPV 렌더 스레드가 OpenGL 컨텍스트를 찾지 못해 재생 실패
-            // 해결: 150ms로 늘려 메뉴 닫힘 처리 완료 보장
-            //       + makeCurrent()로 OpenGL 컨텍스트 명시적 활성화
-            QTimer::singleShot(150, this, [this, pathCopy]() {
-                // makeCurrent/doneCurrent 제거: MPV 렌더 스레드가 별도로 컨텍스트를 관리하므로
-                // 메인 스레드에서 makeCurrent() 호출 시 렌더 스레드와 충돌 가능
-                // → loadFile()만 호출 (MPV가 자체적으로 컨텍스트 처리)
-                mpvWidget_->loadFile(pathCopy);
-            });
-            first = false;
-        } else {
-            mpvWidget_->appendFile(path);
-        }
+    const PlaybackQueue::Entry current = playbackQueue_->currentEntry();
+    if (current.url.isEmpty()) return;
+    currentFilePath_ = current.url;
+    if (HiFiEngine::isMusicFile(current.url)) {
+        switchToMusicMode();
+        hifiEngine_->applyAll();
+    } else {
+        switchToVideoMode();
+    }
+
+    const QList<PlaybackQueue::Entry> queue = playbackQueue_->entries();
+    QTimer::singleShot(150, this, [this, queue, startIndex]() {
+        if (!mpvWidget_->isMpvInitialized() || queue.isEmpty()) return;
+        const int safeIndex = qBound(0, startIndex, queue.size() - 1);
+        mpvWidget_->loadFile(queue.at(safeIndex).url);
+        for (int index = safeIndex + 1; index < queue.size(); ++index)
+            mpvWidget_->appendFile(queue.at(index).url);
+        // 선택 항목 앞의 곡도 동일한 순환 대기열에 포함한다.
+        for (int index = 0; index < safeIndex; ++index)
+            mpvWidget_->appendFile(queue.at(index).url);
+    });
+}
+
+void MainWindow::applyQueueRepeatMode() {
+    if (!playbackQueue_ || !mpvWidget_ || !mpvWidget_->isMpvInitialized()) return;
+    auto* core = mpvWidget_->core();
+    switch (playbackQueue_->repeatMode()) {
+    case PlaybackQueue::RepeatMode::One:
+        core->setProperty("loop-file", "inf");
+        core->setProperty("loop-playlist", "no");
+        break;
+    case PlaybackQueue::RepeatMode::All:
+        core->setProperty("loop-file", "no");
+        core->setProperty("loop-playlist", "inf");
+        break;
+    case PlaybackQueue::RepeatMode::Off:
+        core->setProperty("loop-file", "no");
+        core->setProperty("loop-playlist", "no");
+        break;
     }
 }
 
@@ -534,6 +596,8 @@ void MainWindow::onFileLoaded(const QString& path) {
     if (!currentFilePath_.isEmpty() && currentFilePath_ != path)
         saveResumePosition();
     currentFilePath_ = path;
+    if (playbackQueue_)
+        playbackQueue_->setCurrentUrl(path);
     lastPosition_ = 0.0;
     updateWindowTitle(QFileInfo(path).fileName());
     addToRecentFiles(path);
@@ -691,6 +755,27 @@ void MainWindow::onPlaybackPaused() {
 #endif
 }
 void MainWindow::onPlaybackEnded() {
+    // MPV 대기열의 곡 사이 EOF는 즉시 다음 항목으로 전환된다. 이 경우에는
+    // 로고·정지 상태를 표시하지 않고, 실제 idle 상태일 때만 종료 UI를 갱신한다.
+    if (playbackQueue_ && !playbackQueue_->isEmpty()) {
+        QTimer::singleShot(80, this, [this]() {
+            if (!mpvWidget_->core()->getProperty("idle-active").toBool()) return;
+            isPlaying_ = false;
+            clearResumePosition(currentFilePath_);
+            if (uiHideTimer_) uiHideTimer_->stop();
+            showUI();
+            if (!isMusicMode_) {
+                controlBar_->setPlaying(false);
+                mpvWidget_->showLogo(true);
+            } else {
+                musicPage_->setPlaying(false);
+            }
+#ifdef Q_OS_WIN
+            SetThreadExecutionState(ES_CONTINUOUS);
+#endif
+        });
+        return;
+    }
     isPlaying_ = false;
     clearResumePosition(currentFilePath_);
     if (uiHideTimer_) uiHideTimer_->stop();
@@ -1363,12 +1448,38 @@ void MainWindow::toggleProFeatures() {
         if (!originalsWidget_) {
             originalsWidget_ = new OriginalsWidget(proFeatures_);
             proFeatures_->addTab(originalsWidget_, "♪ ORIGINALS");
-            // 공 URL 재생 요청 연결
-            connect(originalsWidget_, &OriginalsWidget::playRequested,
-                    this, [this](const QString& url) { openFiles({url}); });
-            // M3U 전체 재생 연결
-            connect(originalsWidget_, &OriginalsWidget::playlistRequested,
-                    this, [this](const QString& m3uUrl) { openFiles({m3uUrl}); });
+            // 오리지널·YouTube 정렬 결과를 같은 통합 대기열로 재생한다.
+            connect(originalsWidget_, &OriginalsWidget::queueRequested,
+                    this, [this](const QList<PlaybackQueue::Entry>& entries, int startIndex) {
+                playQueue(entries, startIndex);
+            });
+            connect(originalsWidget_, &OriginalsWidget::savePlaylistRequested,
+                    this, [this](const QList<PlaybackQueue::Entry>& entries) {
+                bool accepted = false;
+                const QString name = QInputDialog::getText(this, "재생목록 저장", "재생목록 이름:",
+                                                           QLineEdit::Normal, QString(), &accepted).trimmed();
+                if (!accepted || name.isEmpty()) return;
+                if (!playbackQueue_->saveNamedPlaylist(name, entries)) return;
+                originalsWidget_->setSavedPlaylistNames(playbackQueue_->savedPlaylistNames());
+                if (osdWidget_) osdWidget_->showInfo(QString("♪ 재생목록 저장: %1").arg(name), 1800);
+            });
+            connect(originalsWidget_, &OriginalsWidget::loadSavedPlaylistRequested,
+                    this, [this](const QString& name) {
+                const QList<PlaybackQueue::Entry> entries = playbackQueue_->loadNamedPlaylist(name);
+                if (!entries.isEmpty()) playQueue(entries);
+            });
+            connect(originalsWidget_, &OriginalsWidget::deleteSavedPlaylistRequested,
+                    this, [this](const QString& name) {
+                if (!playbackQueue_->removeNamedPlaylist(name)) return;
+                originalsWidget_->setSavedPlaylistNames(playbackQueue_->savedPlaylistNames());
+                if (osdWidget_) osdWidget_->showInfo(QString("재생목록 삭제: %1").arg(name), 1600);
+            });
+            connect(originalsWidget_, &OriginalsWidget::repeatModeRequested,
+                    this, [this](PlaybackQueue::RepeatMode mode) {
+                playbackQueue_->setRepeatMode(mode);
+            });
+            originalsWidget_->setSavedPlaylistNames(playbackQueue_->savedPlaylistNames());
+            originalsWidget_->setRepeatMode(playbackQueue_->repeatMode());
         }
         // 현재 재생 중 파일 전달
         if (originalsWidget_)
@@ -2008,6 +2119,18 @@ void MainWindow::onOpenUrl() {
 }
 
 void MainWindow::openUrl(const QString& url) {
+    // yt-dlp 지연 초기화 전 URL 입력이 와도 재생 요청을 잃지 않는다.
+    if (!ytdlp_) {
+        pendingUrl_ = url;
+        QTimer::singleShot(550, this, [this]() {
+            if (!pendingUrl_.isEmpty()) {
+                const QString queuedUrl = pendingUrl_;
+                pendingUrl_.clear();
+                openUrl(queuedUrl);
+            }
+        });
+        return;
+    }
     // URL을 직접 MPV에 전달 (ytdl=yes로 자동 처리)
     // yt-dlp가 없으면 자동 다운로드
     if (!ytdlp_->isAvailable() && YtdlpManager::isSupportedUrl(url)) {
@@ -2043,8 +2166,11 @@ void MainWindow::openUrl(const QString& url) {
     }
 
     mpvWidget_->showLogo(false);
-    mpvWidget_->core()->loadFile(url, false);
-    updateWindowTitle(url);
+    PlaybackQueue::Entry entry;
+    entry.url = url;
+    entry.title = url;
+    entry.source = YtdlpManager::isYouTubeUrl(url) ? QStringLiteral("youtube") : QStringLiteral("stream");
+    playQueue({entry});
 }
 
 void MainWindow::onYtdlpReady(const QString& path) {
@@ -2053,6 +2179,13 @@ void MainWindow::onYtdlpReady(const QString& path) {
         ytdlpProgress_->close();
         ytdlpProgress_->deleteLater();
         ytdlpProgress_ = nullptr;
+    }
+    if (!pendingYouTubeQueue_.isEmpty()) {
+        const QList<PlaybackQueue::Entry> queue = pendingYouTubeQueue_;
+        const int startIndex = pendingYouTubeQueueStartIndex_;
+        pendingYouTubeQueue_.clear();
+        playQueue(queue, startIndex);
+        return;
     }
     if (!pendingUrl_.isEmpty()) {
         QString url = pendingUrl_;
@@ -2072,6 +2205,7 @@ void MainWindow::onYtdlpDownloadFailed(const QString& error) {
         ytdlpProgress_ = nullptr;
     }
     pendingUrl_.clear();
+    pendingYouTubeQueue_.clear();
     QMessageBox::warning(this, "yt-dlp 다운로드 실패",
         QString("yt-dlp를 다운로드할 수 없습니다.\n%1\n\n"
                 "yt-dlp.exe를 수동으로 다운로드하여 "

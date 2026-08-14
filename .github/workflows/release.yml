@@ -75,6 +75,11 @@ jobs:
         shell: bash
         run: PYTHONUTF8=1 python3 scripts/verify_file_associations.py
 
+      # ── 통합 재생 대기열·YouTube·반복 모드 회귀 검증 ──────────────────
+      - name: Verify unified playback queue
+        shell: bash
+        run: PYTHONUTF8=1 python3 scripts/verify_playback_queue.py
+
       # ── Visual Studio 환경 설정 ────────────────────────────────────
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
