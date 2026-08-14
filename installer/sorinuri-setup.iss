@@ -257,7 +257,7 @@ Root: HKLM64; Subkey: "Software\RegisteredApplications"; ValueType: string; Valu
 ; Applications\Sorinuri.exe와 SupportedTypes도 같은 범위로 명시한다.
 Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe"; ValueType: string; ValueName: "FriendlyAppName"; ValueData: "소리누리"; Flags: uninsdeletekey; Tasks: fileassoc
 Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: fileassoc
-Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\shell\open\command"; ValueType: string; ValueName: ""; ValueData: "\"{app}\{#MyAppExeName}\" \"%1\""; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: fileassoc
 Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\SupportedTypes"; ValueType: string; ValueName: ".mkv"; ValueData: ""; Tasks: fileassoc
 Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\SupportedTypes"; ValueType: string; ValueName: ".mp4"; ValueData: ""; Tasks: fileassoc
 Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\SupportedTypes"; ValueType: string; ValueName: ".avi"; ValueData: ""; Tasks: fileassoc
