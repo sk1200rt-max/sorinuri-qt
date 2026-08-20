@@ -38,7 +38,7 @@ DOMAINS: dict[str, tuple[str, ...]] = {
         "src/YtdlpManager.cpp", "src/YtdlpManager.h",
     ),
     "installer": (
-        "installer/", "resources/sorinuri.rc",
+        "installer/", "resources/sorinuri.rc", "src/UpdateDialog.cpp", "src/UpdateDialog.h",
     ),
 }
 

@@ -7,6 +7,7 @@
 #include <QDir>
 #include <QStandardPaths>
 #include <QProcess>
+#include <QFileInfo>
 #include <QMessageBox>
 #include <QApplication>
 #include <QDebug>
@@ -112,11 +113,29 @@ void UpdateDialog::onUpdateClicked() {
 }
 
 void UpdateDialog::startDownload() {
-    // 임시 폴더에 설치파일 저장
-    QString tempDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
-    localInstallerPath_ = tempDir + "/Sorinuri-Setup-latest.exe";
+    // Windows 사용자 로컬 앱 데이터 폴더에 절대 경로로 저장한다. 네트워크 드라이브·상대
+    // 경로는 Inno Setup 및 ShellExecuteEx에서 코드 1203을 유발할 수 있으므로 사용하지 않는다.
+    QString updateDir = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
+    if (updateDir.isEmpty())
+        updateDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
+    if (updateDir.isEmpty())
+        updateDir = QDir::tempPath();
+    updateDir = QDir(updateDir).filePath("updates");
 
-    // 이전 임시파일 정리
+    QDir updateDirectory(updateDir);
+    if (!updateDirectory.exists() && !QDir().mkpath(updateDir)) {
+        statusLabel_->setText("⚠ 업데이트 폴더를 만들 수 없습니다. 업데이트를 다시 시도해 주세요.");
+        downloading_ = false;
+        updateBtn_->setEnabled(true);
+        skipBtn_->setEnabled(true);
+        progressBar_->setVisible(false);
+        qWarning() << "[UpdateDialog] 업데이트 폴더 생성 실패:" << updateDir;
+        return;
+    }
+
+    localInstallerPath_ = updateDirectory.absoluteFilePath("Sorinuri-Setup-pending.exe");
+
+    // 이전 미완료 설치파일 정리
     QFile::remove(localInstallerPath_);
 
     // 스트리밍 저장 파일 열기
@@ -216,10 +235,28 @@ void UpdateDialog::onDownloadFinished(QNetworkReply* reply) {
     statusLabel_->setText("설치 중...");
     progressBar_->setValue(100);
 
-    // 설치파일 실행 후 앱 종료
-    qDebug() << "[UpdateDialog] 설치 시작:" << localInstallerPath_
+    // 설치 파일은 반드시 로컬 절대 경로와 해당 폴더를 작업 경로로 지정해 실행한다.
+    // 실행이 실패하면 현재 앱을 종료하지 않고 사용자에게 재시도 경로를 남긴다.
+    const QString installerPath = fi.absoluteFilePath();
+    const QString workingDirectory = fi.absolutePath();
+    qint64 installerPid = 0;
+    const bool started = QProcess::startDetached(
+        installerPath, QStringList(), workingDirectory, &installerPid);
+    if (!started) {
+        downloading_ = false;
+        updateBtn_->setEnabled(true);
+        skipBtn_->setEnabled(true);
+        progressBar_->setVisible(false);
+        statusLabel_->setText(
+            "⚠ 설치 프로그램을 시작하지 못했습니다. '지금 업데이트'를 다시 눌러 재시도하세요.");
+        qWarning() << "[UpdateDialog] 설치 프로그램 시작 실패:" << installerPath
+                   << "작업 폴더:" << workingDirectory;
+        return;
+    }
+
+    qDebug() << "[UpdateDialog] 설치 시작:" << installerPath
+             << "PID:" << installerPid
              << "크기:" << fi.size() / 1024 / 1024 << "MB";
-    QProcess::startDetached(localInstallerPath_, QStringList());
     accept();
     QApplication::quit();
 }

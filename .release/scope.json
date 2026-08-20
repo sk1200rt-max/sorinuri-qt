@@ -1,5 +1,5 @@
 {
-  "version": "6.19.2",
-  "domain": "ui,installer",
-  "purpose": "설치 마법사와 첫 창 표시의 체감 지연 개선"
+  "version": "6.19.3",
+  "domain": "installer",
+  "purpose": "자동 업데이트 설치 경로와 설치 후 기본 앱 설정 화면 흐름 안정화"
 }

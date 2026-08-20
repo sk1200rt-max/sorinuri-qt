@@ -3,7 +3,7 @@
 
 #define MyAppName "소리누리"
 #define MyAppNameEn "Sorinuri"
-#define MyAppVersion "6.19.2"
+#define MyAppVersion "6.19.3"
 #define MyAppPublisher "Gaon Communication"
 #define MyAppURL "https://sorinuri.com"
 #define MyAppExeName "Sorinuri.exe"
@@ -80,9 +80,9 @@ Name: "{userappdata}\Microsoft\Internet Explorer\Quick Launch\{#MyAppName}"; Fil
 ; Visual C++ 런타임 자동 설치 (이미 설치되어 있으면 건너뜀)
 Filename: "{tmp}\vc_redist.x64.exe"; Parameters: "/install /quiet /norestart"; StatusMsg: "Visual C++ 런타임 설치 중..."; Flags: skipifdoesntexist waituntilterminated
 ; Windows 10/11은 기본 앱을 설치 프로그램이 강제할 수 없다(UserChoice 보호).
-; 파일 연결 작업을 선택했을 때 Microsoft 기본 앱 UI를 직접 열어 사용자가
-; 소리누리를 MP4 등 등록 형식의 기본 앱으로 확정할 수 있게 한다.
-Filename: "{app}\{#MyAppExeName}"; Parameters: "--register-file-associations"; Flags: nowait skipifsilent; Tasks: fileassoc
+; 파일 연결 작업은 위 레지스트리 등록과 SHChangeNotify로만 완료한다. 설치 직후
+; Settings를 자동 실행하지 않아 업그레이드 흐름을 중단시키거나 ShellExecute 오류를
+; 표시하지 않는다. 사용자는 필요할 때 Windows 기본 앱 화면에서 선택할 수 있다.
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 
 [Registry]

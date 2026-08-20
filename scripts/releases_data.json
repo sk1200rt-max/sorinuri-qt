@@ -1,5 +1,14 @@
 [
   {
+    "version": "6.19.3",
+    "date": "2026-08-20",
+    "title": "업데이트 및 설치 흐름 안정화",
+    "desc": "업데이트 설치 파일을 사용자 로컬 경로에서 검증 후 실행하고, 설치 완료 뒤 기본 앱 설정 화면을 자동 실행하지 않도록 개선했습니다.",
+    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.19.3.exe",
+    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.19.3-Portable.zip",
+    "tags": []
+  },
+  {
     "version": "6.19.2",
     "date": "2026-08-20",
     "title": "빠른 설치 시작 · 첫 화면 우선 표시",

@@ -29,7 +29,6 @@ for ext in extensions:
         errors.append(f".{ext}: Applications\\Sorinuri.exe SupportedTypes 등록 누락")
 
 required_installer = [
-    'Parameters: "--register-file-associations"',
     'Root: HKLM64; Subkey: "Software\\RegisteredApplications"',
     'Root: HKLM64; Subkey: "Software\\Classes\\Applications\\Sorinuri.exe"',
     'Root: HKLM64; Subkey: "Software\\Microsoft\\Windows\\CurrentVersion\\App Paths\\Sorinuri.exe"',
@@ -40,6 +39,11 @@ required_installer = [
 for needle in required_installer:
     if needle not in installer:
         errors.append(f"인스톨러 필수 파일 연결 또는 설치 시작 최적화 경로 누락: {needle}")
+
+# 기본 앱은 Windows 시스템 UI에서만 사용자가 지정할 수 있다. 설치 프로그램이
+# 해당 UI를 자동 실행하면 업그레이드 흐름을 가로막고 ShellExecute 오류가 노출될 수 있다.
+if 'Parameters: "--register-file-associations"' in installer:
+    errors.append("설치 직후 기본 앱 설정 화면 자동 실행 경로가 남아 있습니다.")
 
 required_app = [
     '"register-file-associations"',
@@ -56,4 +60,4 @@ if errors:
         print(f"- {error}", file=sys.stderr)
     sys.exit(1)
 
-print(f"파일 연결 정책 검증 통과: {len(extensions)}개 형식, HKLM64 Capabilities, 실행 파일 등록, Windows 기본 앱 상세 화면 확인")
+print(f"파일 연결 정책 검증 통과: {len(extensions)}개 형식, HKLM64 Capabilities, 실행 파일 등록, 사용자 선택형 Windows 기본 앱 화면 확인")
