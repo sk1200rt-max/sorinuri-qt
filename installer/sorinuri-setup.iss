@@ -3,7 +3,7 @@
 
 #define MyAppName "소리누리"
 #define MyAppNameEn "Sorinuri"
-#define MyAppVersion "6.19.1"
+#define MyAppVersion "6.19.2"
 #define MyAppPublisher "Gaon Communication"
 #define MyAppURL "https://sorinuri.com"
 #define MyAppExeName "Sorinuri.exe"
@@ -24,10 +24,10 @@ AllowNoIcons=yes
 OutputDir=..\dist
 OutputBaseFilename=Sorinuri-Setup-{#MyAppVersion}
 SetupIconFile=..\resources\sorinuri.ico
-; 설치 마법사 첫 화면과 설치 진행의 즉시 반응을 우선한다.
-; ZIP은 압축률은 낮지만 해제 속도와 메모리 사용량이 매우 낮아, 대용량 미디어
-; 번들에서 LZMA 계열의 ‘준비 중’ 지연을 줄인다. 파일은 커지지만 설치 체감을 우선한다.
-Compression=zip/9
+; 설치 실행 파일 자체의 크기를 줄여 Windows Defender/SmartScreen의 초기 파일 검사와
+; 디스크 I/O 부담을 낮춘다. lzma2/normal은 해제 시 약 2MB만 필요해 저사양 환경에서도
+; 안정적이며, non-solid 구성은 마법사 표시 뒤 필요한 파일을 바로 추출할 수 있다.
+Compression=lzma2/normal
 SolidCompression=no
 ArchitecturesInstallIn64BitMode=x64compatible
 ArchitecturesAllowed=x64compatible

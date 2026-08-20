@@ -1,5 +1,5 @@
 {
-  "version": "6.19.1",
+  "version": "6.19.2",
   "domain": "ui,installer",
-  "purpose": "Windows 기본 앱 등록 복구와 설치 시작 반응성 개선"
+  "purpose": "설치 마법사와 첫 창 표시의 체감 지연 개선"
 }

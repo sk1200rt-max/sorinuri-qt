@@ -151,8 +151,10 @@ void MainWindow::setupUI() {
     videoPage_ = videoContainer;  // videoPage_ 멤버에 저장 (멀티뷰 전환용)
     playerStack_ = new QStackedWidget(playerPage_);
     playerStack_->addWidget(videoContainer);  // index 0: 영상
-    musicPage_ = new MusicWidget(mpvWidget_->core(), playerPage_);
-    playerStack_->addWidget(musicPage_);      // index 1: 음악
+    // 음악 화면은 스펙트럼 타이머·EQ 컨트롤을 다수 생성하므로 첫 음악 재생 때까지
+    // 빈 플레이스홀더만 유지한다. 영상만 보는 사용자의 첫 창 표시를 빠르게 한다.
+    musicPlaceholder_ = new QWidget(playerPage_);
+    playerStack_->addWidget(musicPlaceholder_);  // index 1: 지연 생성 음악 화면
     playerLayout->addWidget(playerStack_, 1);
     // HiFi 엔진 초기화
     hifiEngine_ = new HiFiEngine(mpvWidget_->core(), this);
@@ -180,10 +182,10 @@ void MainWindow::setupUI() {
 
     // 오디오 정보는 ControlBar에 인라인으로 통합됨 (AudioInfoBar 제거)
 
-    // ── 전문 기능 패널 (기본 숨김, P 키로 토글) ──────────────────────
-    proFeatures_ = new ProFeaturesWidget(this);
-    proFeatures_->hide();
-    mainLayout->addWidget(proFeatures_);
+    // ── 전문 기능 패널 (첫 사용 시 생성) ─────────────────────────────
+    // 다수의 탭·컨트롤을 만드는 패널은 시작 화면을 늦추므로 P 키 또는 관련
+    // 단축키를 처음 사용할 때 ensureProFeatures()에서 생성한다.
+    proFeatures_ = nullptr;
 
     // ── 단축키 오버레이 (영상 위에 표시) ─────────────────────────────
     shortcutOverlay_ = new ShortcutOverlay(mpvWidget_);
@@ -209,6 +211,68 @@ void MainWindow::setupUI() {
     });
     connect(splashAdWidget_, &SplashAdWidget::clicked, this, [this](int adId, const QString& slot) {
         adManager_->reportClick(adId, slot);
+    });
+}
+
+void MainWindow::ensureProFeatures() {
+    if (proFeatures_) return;
+
+    proFeatures_ = new ProFeaturesWidget(this);
+    proFeatures_->hide();
+    if (auto* layout = qobject_cast<QVBoxLayout*>(centralWidget()->layout()))
+        layout->addWidget(proFeatures_);
+
+    auto* core = mpvWidget_->core();
+    proFeatures_->connectMpv(core);
+    connect(proFeatures_, &ProFeaturesWidget::closeRequested,
+            this, &MainWindow::toggleProFeatures);
+}
+
+void MainWindow::ensureMusicPage() {
+    if (musicPage_) return;
+
+    auto* core = mpvWidget_->core();
+    musicPage_ = new MusicWidget(core, playerPage_);
+    const int index = playerStack_->indexOf(musicPlaceholder_);
+    playerStack_->insertWidget(index >= 0 ? index : 1, musicPage_);
+    if (musicPlaceholder_) {
+        playerStack_->removeWidget(musicPlaceholder_);
+        musicPlaceholder_->deleteLater();
+        musicPlaceholder_ = nullptr;
+    }
+
+    connect(musicPage_, &MusicWidget::seekRequested, this, &MainWindow::onMusicSeekRequested);
+    connect(musicPage_, &MusicWidget::volumeChanged, this, &MainWindow::onMusicVolumeChanged);
+    connect(musicPage_, &MusicWidget::playPauseRequested, core, &MpvCore::togglePause);
+    connect(musicPage_, &MusicWidget::prevRequested, [core]() { core->command({"playlist-prev"}); });
+    connect(musicPage_, &MusicWidget::nextRequested, [core]() { core->command({"playlist-next"}); });
+    connect(musicPage_, &MusicWidget::eqRequested, this, &MainWindow::onSettingsRequested);
+    connect(musicPage_, &MusicWidget::settingsRequested, this, &MainWindow::onSettingsRequested);
+    connect(core, &MpvCore::positionChanged, musicPage_, [this](double pos) {
+        if (musicPage_) musicPage_->updatePosition(pos, totalDuration_);
+    });
+    connect(core, &MpvCore::playbackStarted, musicPage_, [this]() {
+        if (musicPage_) musicPage_->setPlaying(true);
+    });
+    connect(core, &MpvCore::playbackPaused, musicPage_, [this]() {
+        if (musicPage_) musicPage_->setPlaying(false);
+    });
+    connect(core, &MpvCore::audioFormatChanged, musicPage_,
+            [this, core](const QString&, int, int, const QString&) {
+        if (!musicPage_ || !isMusicMode_) return;
+        const int outRate = core->getProperty("audio-out-params/samplerate").toInt();
+        const QString outFmt = core->getProperty("audio-out-params/format").toString();
+        const bool exclusive = core->getProperty("audio-exclusive").toBool();
+        if (outRate > 0) musicPage_->setOutputInfo(outRate, outFmt, exclusive);
+    });
+    connect(musicPage_, &MusicWidget::miniModeRequested, this, &MainWindow::toggleMiniPlayer);
+    connect(musicPage_, &MusicWidget::compactModeRequested, this, &MainWindow::toggleCompactPlayer);
+    connect(musicPage_, &MusicWidget::shuffleToggled, this, [core](bool on) {
+        core->setProperty("shuffle", on ? QString("yes") : QString("no"));
+    });
+    connect(musicPage_, &MusicWidget::repeatToggled, this, [this](bool on) {
+        playbackQueue_->setRepeatMode(on ? PlaybackQueue::RepeatMode::One
+                                         : PlaybackQueue::RepeatMode::Off);
     });
 }
 
@@ -347,12 +411,6 @@ void MainWindow::setupConnections() {
     connect(controlBar_, &ControlBar::nextClicked,       [core]() { core->command({"playlist-next"}); });
     connect(controlBar_, &ControlBar::settingsClicked,   this, &MainWindow::onSettingsRequested);
 
-    // 전문 기능 패널 연결
-    proFeatures_->connectMpv(core);
-    // 패널 내부 닫기 버튼 → toggleProFeatures (앱 종료 아님)
-    connect(proFeatures_, &ProFeaturesWidget::closeRequested,
-            this, &MainWindow::toggleProFeatures);
-
     connect(titleBar_, &TitleBar::minimizeClicked,   this, &QMainWindow::showMinimized);
     connect(titleBar_, &TitleBar::maximizeClicked, this, [this]() {
         if (isMaximized()) {
@@ -384,42 +442,7 @@ void MainWindow::setupConnections() {
     // OTT 타이틀 변경 시 윈도우 타이틀 업데이트
     // OTT titleChanged 연결은 switchToOttMode에서 처리
 
-    // 음악 모드 MusicWidget 시그널 연결
-    connect(musicPage_, &MusicWidget::seekRequested,    this, &MainWindow::onMusicSeekRequested);
-    connect(musicPage_, &MusicWidget::volumeChanged,    this, &MainWindow::onMusicVolumeChanged);
-    connect(musicPage_, &MusicWidget::playPauseRequested, core, &MpvCore::togglePause);
-    connect(musicPage_, &MusicWidget::prevRequested,    [core]() { core->command({"playlist-prev"}); });
-    connect(musicPage_, &MusicWidget::nextRequested,    [core]() { core->command({"playlist-next"}); });
-    connect(musicPage_, &MusicWidget::eqRequested,      this, &MainWindow::onSettingsRequested);
-    connect(musicPage_, &MusicWidget::settingsRequested, this, &MainWindow::onSettingsRequested);
-    // 음악 모드에서도 위치/재생 상태 업데이트
-    connect(core, &MpvCore::positionChanged, musicPage_, [this](double pos) {
-        musicPage_->updatePosition(pos, totalDuration_);
-    });
-    connect(core, &MpvCore::playbackStarted, musicPage_, [this]() { musicPage_->setPlaying(true); });
-    connect(core, &MpvCore::playbackPaused,  musicPage_, [this]() { musicPage_->setPlaying(false); });
-    // 비트퍼펙트 상태 실시간 표시: 실제 AO 출력 경로 조회 후 음악 화면에 반영
-    connect(core, &MpvCore::audioFormatChanged, musicPage_,
-            [this, core](const QString&, int, int, const QString&) {
-        if (!isMusicMode_) return;
-        const int outRate = core->getProperty("audio-out-params/samplerate").toInt();
-        const QString outFmt = core->getProperty("audio-out-params/format").toString();
-        const bool exclusive = core->getProperty("audio-exclusive").toBool();
-        if (outRate > 0)
-            musicPage_->setOutputInfo(outRate, outFmt, exclusive);
-    });
-    // 미니 플레이어 연결
-    connect(musicPage_, &MusicWidget::miniModeRequested, this, &MainWindow::toggleMiniPlayer);
-    // 소형 모드 (코팩트 플레이어) 연결
-    connect(musicPage_, &MusicWidget::compactModeRequested, this, &MainWindow::toggleCompactPlayer);
-    // 셔플/반복 시그널 연결 - MPV 속성 직접 적용
-    connect(musicPage_, &MusicWidget::shuffleToggled, this, [core](bool on) {
-        core->setProperty("shuffle", on ? QString("yes") : QString("no"));
-    });
-    connect(musicPage_, &MusicWidget::repeatToggled, this, [this](bool on) {
-        playbackQueue_->setRepeatMode(on ? PlaybackQueue::RepeatMode::One
-                                         : PlaybackQueue::RepeatMode::Off);
-    });
+    // 음악 화면 연결은 ensureMusicPage()에서 첫 음악 재생 시 생성한다.
     // miniPlayer_, whisperWidget_, chapterWidget_ 연결은 지연 초기화
     // (toggleMiniPlayer, onProFeaturesRequested에서 처음 생성 시 연결)
 }
@@ -513,8 +536,9 @@ void MainWindow::applyQueueRepeatMode() {
 }
 
 void MainWindow::switchToMusicMode() {
+    ensureMusicPage();
     isMusicMode_ = true;
-    playerStack_->setCurrentIndex(1);
+    playerStack_->setCurrentWidget(musicPage_);
     controlBar_->hide();
     // 음악 모드: 타이틀바는 항상 표시 (상단고정/최소화/종료 버튼 보여야 함)
     titleBar_->show();
@@ -538,12 +562,14 @@ void MainWindow::switchToVideoMode() {
     controlBar_->show();
     // 스펙트럼 비활성화 (영상 모드에서는 불필요)
     mpvWidget_->core()->setSpectrumEnabled(false);
-    disconnect(mpvWidget_->core(), &MpvCore::spectrumReady,
-               musicPage_, &MusicWidget::updateSpectrum);
+    if (musicPage_) {
+        disconnect(mpvWidget_->core(), &MpvCore::spectrumReady,
+                   musicPage_, &MusicWidget::updateSpectrum);
+    }
 }
 
 void MainWindow::loadMusicMeta(const QString& path) {
-    if (!musicPage_) return;
+    ensureMusicPage();
     auto* core = mpvWidget_->core();
     MusicMeta meta;
     meta.codec      = core->getProperty("audio-codec-name").toString();
@@ -1043,7 +1069,12 @@ void MainWindow::keyPressEvent(QKeyEvent* e) {
         }
     }
 
-    switch (e->key()) {
+    const int key = e->key();
+    if (key == Qt::Key_A || key == Qt::Key_B || key == Qt::Key_D ||
+        key == Qt::Key_Z || key == Qt::Key_Greater || key == Qt::Key_Less)
+        ensureProFeatures();
+
+    switch (key) {
     case Qt::Key_Space:  core->togglePause(); break;
     case Qt::Key_Return:
     case Qt::Key_Enter:  core->togglePause(); break;  // Enter로 재생/일시정지
@@ -1239,9 +1270,10 @@ void MainWindow::keyPressEvent(QKeyEvent* e) {
 }
 
 void MainWindow::toggleProFeatures() {
+    ensureProFeatures();
     // 상태 플래그를 추정으로 토글하지 않는다. 사이드 탭·닫기 버튼·단축키가
     // 섞여도 실제 위젯의 표시 상태를 단일 기준으로 사용한다.
-    isProFeaturesOpen_ = proFeatures_ && !proFeatures_->isVisible();
+    isProFeaturesOpen_ = !proFeatures_->isVisible();
     if (isProFeaturesOpen_) {
         showUI();
         if (uiHideTimer_) uiHideTimer_->stop();

@@ -1,5 +1,14 @@
 [
   {
+    "version": "6.19.2",
+    "date": "2026-08-20",
+    "title": "빠른 설치 시작 · 첫 화면 우선 표시",
+    "desc": "설치 실행 파일의 저메모리 압축 구성과 음악·전문 기능 화면의 지연 생성을 적용해 설치 마법사와 프로그램 첫 화면 반응성을 개선했습니다.",
+    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.19.2.exe",
+    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.19.2-Portable.zip",
+    "tags": []
+  },
+  {
     "version": "6.19.1",
     "date": "2026-08-14",
     "title": "Windows 파일 연결과 빠른 설치 시작",

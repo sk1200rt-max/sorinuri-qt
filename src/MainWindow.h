@@ -117,6 +117,8 @@ private slots:
 private:
     void setupUI();
     void setupConnections();
+    void ensureProFeatures();  // 첫 사용 시 생성하여 초기 창 표시를 우선한다.
+    void ensureMusicPage();    // 첫 음악 재생 시 생성하여 타이머·컨트롤 초기화를 지연한다.
     void loadSettings();
     void saveSettings();
     void updateWindowTitle(const QString& filename = {});
@@ -141,9 +143,10 @@ private:
     OttWidget*      ottPage_     = nullptr;
 
     // ── 플레이어 페이지 내부 스택 (영상 / 음악) ───────────
-    QStackedWidget* playerStack_  = nullptr;
-    QWidget*        videoPage_    = nullptr;
-    MusicWidget*    musicPage_    = nullptr;
+    QStackedWidget* playerStack_       = nullptr;
+    QWidget*        videoPage_         = nullptr;
+    QWidget*        musicPlaceholder_  = nullptr;
+    MusicWidget*    musicPage_         = nullptr;
 
     // 위젯
     TitleBar*          titleBar_        = nullptr;

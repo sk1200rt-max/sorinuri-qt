@@ -34,12 +34,12 @@ required_installer = [
     'Root: HKLM64; Subkey: "Software\\Classes\\Applications\\Sorinuri.exe"',
     'Root: HKLM64; Subkey: "Software\\Microsoft\\Windows\\CurrentVersion\\App Paths\\Sorinuri.exe"',
     'SHChangeNotifyDirect($08000000, $1003, 0, 0);',
-    'Compression=zip/9',
+    'Compression=lzma2/normal',
     'SolidCompression=no',
 ]
 for needle in required_installer:
     if needle not in installer:
-        errors.append(f"인스톨러 필수 파일 연결 또는 빠른 시작 경로 누락: {needle}")
+        errors.append(f"인스톨러 필수 파일 연결 또는 설치 시작 최적화 경로 누락: {needle}")
 
 required_app = [
     '"register-file-associations"',
