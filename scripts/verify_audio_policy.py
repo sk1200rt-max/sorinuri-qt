@@ -11,7 +11,7 @@ text = source.read_text(encoding="utf-8")
 required = {
     "WASAPI 출력 사용": 'mpv_set_property_string(mpv_, "ao", "wasapi")',
     "독점 모드 기본값": 's.value("audio/exclusive", true)',
-    "HDMI 7.1 화이트리스트": 'mpv_set_property_string(mpv_, "audio-channels", "7.1,5.1,stereo")',
+    "원본 우선 자동 채널 협상": 'mpv_set_property_string(mpv_, "audio-channels", "auto")',
     "디코더 선행 다운믹스 차단": 'mpv_set_property_string(mpv_, "ad-lavc-downmix", "no")',
     "스테레오 다운믹스 정규화": 'mpv_set_property_string(mpv_, "audio-normalize-downmix", "yes")',
     "비트스트림 코덱 목록": '"ac3,eac3,dts,dts-hd,truehd"',
@@ -21,10 +21,10 @@ for name, needle in required.items():
         print(f"오디오 정책 검증 실패: {name} 설정을 찾을 수 없습니다.", file=sys.stderr)
         sys.exit(1)
 
-# HDMI 리시버에서 OS가 과도한 레이아웃을 보고할 수 있으므로 auto는 금지한다.
-forbidden = 'mpv_set_property_string(mpv_, "audio-channels", "auto")'
+# 고정 레이아웃 목록은 Windows 장치 재초기화 뒤 2.0으로 협상될 수 있으므로 금지한다.
+forbidden = 'mpv_set_property_string(mpv_, "audio-channels", "7.1,5.1,stereo")'
 if forbidden in text:
-    print("오디오 정책 검증 실패: HDMI에서 안전하지 않은 auto 채널 협상이 추가됐습니다.", file=sys.stderr)
+    print("오디오 정책 검증 실패: 고정 채널 화이트리스트가 남아 있습니다.", file=sys.stderr)
     sys.exit(1)
 
-print("오디오 정책 검증 통과: WASAPI, 7.1/5.1/stereo, 원본 다운믹스 보호, 비트스트림 확인")
+print("오디오 정책 검증 통과: WASAPI, 원본 우선 자동 다채널 협상, 원본 다운믹스 보호, 비트스트림 확인")

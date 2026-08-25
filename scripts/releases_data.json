@@ -1,5 +1,14 @@
 [
   {
+    "version": "6.19.4",
+    "date": "2026-08-25",
+    "title": "멀티채널·절전 복귀·자막 설정 적용 복구",
+    "desc": "HDMI/WASAPI에서 원본 6채널 협상을 복구하고 절전 복귀 뒤 오디오 출력 정책을 안전하게 재적용합니다. 새 파일 재생 시에도 저장한 자막 크기와 스타일이 즉시 반영됩니다.",
+    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.19.4.exe",
+    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.19.4-Portable.zip",
+    "tags": []
+  },
+  {
     "version": "6.19.3",
     "date": "2026-08-20",
     "title": "업데이트 및 설치 흐름 안정화",

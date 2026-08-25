@@ -62,6 +62,16 @@ MainWindow::MainWindow(QWidget* parent)
     ytdlp_ = nullptr;
     playbackQueue_ = new PlaybackQueue(this);
 
+    // 절전 복귀와 HDMI 장치 변경은 연속해서 발생할 수 있다. 타이머를 재시작해
+    // 드라이버가 완전히 복원된 뒤 한 번만 WASAPI 출력을 재협상한다.
+    audioOutputRecoveryTimer_ = new QTimer(this);
+    audioOutputRecoveryTimer_->setSingleShot(true);
+    connect(audioOutputRecoveryTimer_, &QTimer::timeout, this, [this]() {
+        if (!mpvWidget_ || !mpvWidget_->core()) return;
+        mpvWidget_->core()->restoreAudioOutputAfterDeviceChange();
+        qInfo() << "[MainWindow] 절전/장치 변경 후 오디오 출력 복구 완료";
+    });
+
     setupUI();
     setupConnections();
     loadSettings();
@@ -103,6 +113,11 @@ MainWindow::MainWindow(QWidget* parent)
 }
 
 MainWindow::~MainWindow() { saveSettings(); }
+
+void MainWindow::scheduleAudioOutputRecovery(int delayMs) {
+    if (!audioOutputRecoveryTimer_) return;
+    audioOutputRecoveryTimer_->start(qMax(0, delayMs));
+}
 
 void MainWindow::setupUI() {
     // 키 이벤트가 항상 MainWindow로 전달되도록 포커스 정책 설정
@@ -1617,17 +1632,16 @@ bool MainWindow::nativeEvent(const QByteArray& type, void* msg, qintptr* result)
             if (m->wParam == PBT_APMRESUMESUSPEND ||
                 m->wParam == PBT_APMRESUMEAUTOMATIC ||
                 m->wParam == PBT_APMRESUMECRITICAL) {
-                qInfo() << "[MainWindow] 절전 복귀 감지 → 렌더링 컨텍스트 갱신 예약";
-                // 500ms 지연: 드라이버가 컨텍스트를 완전히 복원할 시간 확보
+                qInfo() << "[MainWindow] 절전 복귀 감지 → 렌더링·오디오 출력 복구 예약";
+                // 렌더링은 빠르게 갱신하되, HDMI/WASAPI 엔드포인트는 드라이버가
+                // 완전히 복원된 뒤에만 정책을 재협상한다.
                 QTimer::singleShot(500, this, [this]() {
                     if (mpvWidget_) {
-                        // 렌더링만 갱신 - redetectGpuAndApply() 제거
-                        // redetectGpuAndApply()가 내부적으로 ao-reload를 호출하여
-                        // WASAPI 채널 협상이 초기화되면서 DD+/5.1ch 패스스루가 깨짐
                         mpvWidget_->update();
                         qInfo() << "[MainWindow] 절전 복귀 후 렌더링 재시작 완료";
                     }
                 });
+                scheduleAudioOutputRecovery(1200);
             }
             // ─ 배터리 모드 전환: 타이머 해상도 유지 ─────────────────────────
             // Windows 10 2004+: 배터리 모드 전환 시 타이머 해상도가 낮아질 수 있음
@@ -1650,18 +1664,11 @@ bool MainWindow::nativeEvent(const QByteArray& type, void* msg, qintptr* result)
             const WPARAM DBT_DEVICEREMOVECOMPLETE_W = 0x8004;
             if (m->wParam == DBT_DEVICEARRIVAL_W ||
                 m->wParam == DBT_DEVICEREMOVECOMPLETE_W) {
-                qInfo() << "[MainWindow] 오디오 장치 변경 감지 → MPV ao-reload 예약";
-                // 200ms 지연: 드라이버가 장치를 완전히 등록할 시간 확보
-                QTimer::singleShot(200, this, [this, wParam = m->wParam]() {
-                    if (!mpvWidget_ || !mpvWidget_->core()) return;
-                    auto* core = mpvWidget_->core();
-
-                    // 오디오 장치 재초기화 (v6.18.0 방식 유지)
-                    // HDMI 자동 감지 + setAudioExclusive 호출 제거
-                    // → 재생 중 채널 매핑 초기화 방지
-                    core->command({"ao-reload"});
-                    qInfo() << "[MainWindow] 오디오 장치 재초기화 완료";
-                });
+                qInfo() << "[MainWindow] 오디오 장치 변경 감지 → 출력 정책 복구 예약";
+                // 장치 열거가 끝난 뒤 선택 장치·독점·원본 채널·패스스루 정책을
+                // 모두 복원한 다음 AO를 재초기화한다. 절전 복귀 이벤트와 겹치면
+                // 타이머가 병합되어 한 번만 실행된다.
+                scheduleAudioOutputRecovery(800);
             }
         }
 

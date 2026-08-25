@@ -59,6 +59,9 @@ public:
     void setAudioExclusive(bool exclusive);
     void setAudioPassthrough(bool passthrough);
     void setSpdifCodecs(const QStringList& codecs);
+    // 절전 복귀·HDMI 재연결 뒤 WASAPI 출력 정책을 다시 협상한다.
+    // ao-reload 전에 장치·독점·채널·패스스루 설정을 모두 복원해 2.0 폴백을 방지한다.
+    void restoreAudioOutputAfterDeviceChange();
     QVariantList audioDeviceList() const;
     bool deviceLikelySupportsPassthrough() const;
 
@@ -150,6 +153,7 @@ private slots:
 private:
     void handleEvent(mpv_event* event);
     void handlePropertyChange(mpv_event_property* prop);
+    void applyStoredSubtitleStyle();
     static void wakeupCallback(void* ctx);
 
     mpv_handle* mpv_       = nullptr;

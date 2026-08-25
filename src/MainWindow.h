@@ -228,4 +228,8 @@ private:
     int    resizeEdge_  = 0;
     static const int RESIZE_MARGIN = 6;
     int getResizeEdge(const QPoint& pos) const;
+
+    // 절전 복귀·HDMI 장치 변경이 연속 도착해도 한 번만 오디오 출력을 복구한다.
+    void scheduleAudioOutputRecovery(int delayMs);
+    QTimer* audioOutputRecoveryTimer_ = nullptr;
 };

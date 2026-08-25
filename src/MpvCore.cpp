@@ -331,12 +331,12 @@ bool MpvCore::initialize(WId windowId) {
         "ac3,eac3,dts,dts-hd,truehd"));
     // 오디오 초기화 실패 시 영상은 계속 재생 (null 오디오 폴백)
     check_error(mpv_set_property_string(mpv_, "audio-fallback-to-null", "yes"));
-    // HDMI 멀티채널 정책: 리시버가 지원하는 7.1 → 5.1 → stereo만
-    // 명시적으로 허용한다. mpv 공식 매뉴얼은 HDMI에서 auto가 OS가 보고한
-    // 미지원 레이아웃을 선택할 수 있어, 지원 레이아웃 화이트리스트 사용을 권고한다.
+    // HDMI 멀티채널 정책: mpv가 오디오 원본 레이아웃을 우선해 현재 WASAPI
+    // 엔드포인트와 협상하도록 auto를 사용한다. 고정 레이아웃 목록은 장치 재초기화
+    // 뒤 Windows 오디오 API가 2.0을 선택하는 사례가 있어 사용하지 않는다.
     // 7.1 리시버에서는 7.1 원본은 7.1, 5.1 원본은 5.1, 스테레오 원본은
     // stereo로 유지되어 원본 채널을 임의 확장하지 않는다.
-    check_error(mpv_set_property_string(mpv_, "audio-channels", "7.1,5.1,stereo"));
+    check_error(mpv_set_property_string(mpv_, "audio-channels", "auto"));
     // AAC/AC-3/DTS 디코더의 선행 다운믹스를 차단하고 항상 원본 레이아웃을
     // mpv/WASAPI 협상 단계로 전달한다. PCM 2.0 폴백 시에도 LFE 혼합 차이를
     // 만드는 코덱별 다운믹스 경로를 사용하지 않는다.
@@ -350,6 +350,8 @@ bool MpvCore::initialize(WId windowId) {
     // 메타데이터가 없는 외부 SMI/SRT는 sub-auto=fuzzy가 파일명 기준으로 탐색한다.
     check_error(mpv_set_property_string(mpv_, "slang", "ko,kor,korean"));
     check_error(mpv_set_property_string(mpv_, "sub-auto", "fuzzy"));
+    // 설정 화면에서 저장한 자막 스타일을 첫 재생 전에도 적용한다.
+    applyStoredSubtitleStyle();
 
     // 오디오 필터 초기화
     check_error(mpv_set_property_string(mpv_, "af", ""));
@@ -422,6 +424,13 @@ void MpvCore::handleEvent(mpv_event* event) {
         mpv_free(rawPath);
         qInfo() << "[MPV] FILE_LOADED:" << path;
         appLog(QString("EVENT FILE_LOADED: %1").arg(path));
+        // 파일별 MPV 옵션이 새 세션에서 초기화될 수 있으므로 저장된 자막 스타일을
+        // 즉시와 트랙 준비 뒤에 한 번 더 적용한다.
+        applyStoredSubtitleStyle();
+        QTimer::singleShot(150, this, [this]() {
+            if (mpv_ && initialized_)
+                applyStoredSubtitleStyle();
+        });
         // pause 해제: 동기 + 비동기 두 번 실행으로 확실히 재생 시작
         int pauseFlag = 0;
         mpv_set_property(mpv_, "pause", MPV_FORMAT_FLAG, &pauseFlag);  // 동기
@@ -811,6 +820,65 @@ void MpvCore::setMuted(bool muted) {
 void MpvCore::setSpeed(double speed) {
     if (!initialized_) return;
     mpv_set_property_async(mpv_, 0, "speed", MPV_FORMAT_DOUBLE, &speed);
+}
+
+void MpvCore::applyStoredSubtitleStyle() {
+    if (!mpv_) return;
+
+    QSettings settings("Sorinuri", "SorinuriPlayer");
+    const QString font = settings.value("subtitle/font", "맑은 고딕").toString();
+    const int size = qBound(12, settings.value("subtitle/size", 36).toInt(), 96);
+    const bool bold = settings.value("subtitle/bold", false).toBool();
+    const bool shadow = settings.value("subtitle/shadow", true).toBool();
+    const int colorIndex = settings.value("subtitle/color", 0).toInt();
+    static const QStringList colors = {
+        QStringLiteral("#FFFFFFFF"), QStringLiteral("#FFFFFF00"),
+        QStringLiteral("#FF87CEEB"), QStringLiteral("#FF90EE90"),
+    };
+
+    check_error(mpv_set_property_string(mpv_, "sub-font", font.toUtf8().constData()));
+    check_error(mpv_set_property_string(mpv_, "sub-font-size", QByteArray::number(size).constData()));
+    check_error(mpv_set_property_string(mpv_, "sub-bold", bold ? "yes" : "no"));
+    check_error(mpv_set_property_string(mpv_, "sub-shadow-offset", shadow ? "2" : "0"));
+    const QString color = colors.value(colorIndex, colors.first());
+    check_error(mpv_set_property_string(mpv_, "sub-color", color.toUtf8().constData()));
+    check_error(mpv_set_property_string(mpv_, "sub-auto",
+        settings.value("subtitle/auto_load", true).toBool() ? "fuzzy" : "no"));
+    appLog(QString("자막 스타일 적용: font=%1 size=%2").arg(font).arg(size));
+}
+
+void MpvCore::restoreAudioOutputAfterDeviceChange() {
+    if (!initialized_) return;
+
+    QSettings settings("Sorinuri", "SorinuriPlayer");
+    const QString device = settings.value("audio/device", "auto").toString();
+    const bool exclusive = settings.value("audio/exclusive", true).toBool();
+    const bool passthrough = settings.value("audio/passthrough", true).toBool();
+    QStringList codecs;
+    if (settings.value("audio/pt_ac3", true).toBool()) codecs << "ac3";
+    if (settings.value("audio/pt_eac3", true).toBool()) codecs << "eac3";
+    if (settings.value("audio/pt_dts", true).toBool()) codecs << "dts";
+    if (settings.value("audio/pt_dtshd", true).toBool()) codecs << "dts-hd";
+    if (settings.value("audio/pt_truehd", true).toBool()) codecs << "truehd";
+
+    // ao-reload는 실험적 명령이므로, 호출 전 현재 사용자가 선택한 장치·독점 모드·
+    // 원본 채널 협상·패스스루 정책을 먼저 모두 복원한다.
+    mpv_set_property_string(mpv_, "audio-device", device.toUtf8().constData());
+    mpv_set_property_string(mpv_, "audio-exclusive", exclusive ? "yes" : "no");
+    mpv_set_property_string(mpv_, "audio-channels", "auto");
+    mpv_set_property_string(mpv_, "ad-lavc-downmix", "no");
+    mpv_set_property_string(mpv_, "audio-normalize-downmix", "yes");
+    spdifCodecs_ = codecs.join(',');
+    passthroughEnabled_ = passthrough;
+    mpv_set_property_string(mpv_, "audio-spdif",
+        passthrough ? spdifCodecs_.toUtf8().constData() : "");
+
+    const char* reloadArgs[] = { "ao-reload", nullptr };
+    mpv_command_async(mpv_, 0, reloadArgs);
+    appLog(QString("오디오 출력 복구: device=%1 exclusive=%2 channels=auto passthrough=%3 codecs=%4")
+               .arg(device).arg(exclusive).arg(passthrough).arg(spdifCodecs_));
+    qInfo() << "[MPV] 절전/장치 변경 후 오디오 정책 재협상:"
+            << device << "exclusive=" << exclusive << "passthrough=" << passthrough;
 }
 
 void MpvCore::setAudioDevice(const QString& device) {

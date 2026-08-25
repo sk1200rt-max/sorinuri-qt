@@ -70,6 +70,11 @@ jobs:
         shell: bash
         run: PYTHONUTF8=1 python3 scripts/verify_audio_policy.py
 
+      # ── 절전 복귀 오디오·새 파일 자막 스타일 회귀 검증 ───────────────
+      - name: Verify audio resume and subtitle lifecycle
+        shell: bash
+        run: PYTHONUTF8=1 python3 scripts/verify_audio_resume_subtitle.py
+
       # ── 파일 연결·Windows 기본 앱 등록 검증 ──────────────────────────
       - name: Verify file association policy
         shell: bash
