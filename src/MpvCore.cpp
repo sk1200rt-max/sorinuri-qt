@@ -87,8 +87,9 @@ static QString actualAudioOutput(mpv_handle* mpv, int& channelCount, int& sample
 MpvCore::MpvCore(QObject* parent) : QObject(parent) {
     setlocale(LC_NUMERIC, "C");
 
-    mpv_ = mpv_create();
-    if (!mpv_) throw std::runtime_error("mpv_create() failed");
+    // libmpv 객체는 initialize()에서 생성한다. Windows에서는 libmpv-2.dll을
+    // delay-load하므로, 이 생성자를 첫 창 표시 전에 호출해도 미디어 DLL 적재와
+    // GPU/WASAPI 초기화가 앞당겨지지 않는다.
 
     // 이벤트 타이머 (Qt 이벤트 루프와 연동)
     eventTimer_ = new QTimer(this);
@@ -114,6 +115,16 @@ MpvCore::~MpvCore() {
 
 bool MpvCore::initialize(WId windowId) {
     if (initialized_) return true;
+
+    // 첫 호출 시에만 libmpv 객체를 만든다. 이 지점은 MpvWidget의 첫 프레임 뒤
+    // 지연 초기화 경로에서 호출되어, 실행 파일 로더가 UI 표시를 막지 않게 한다.
+    if (!mpv_) {
+        mpv_ = mpv_create();
+        if (!mpv_) {
+            qCritical() << "[MPV] mpv_create 실패";
+            return false;
+        }
+    }
 
     // ── mpv_initialize 이전에 설정해야 하는 옵션 ──────────────────
     if (windowId != 0) {

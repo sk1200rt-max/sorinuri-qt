@@ -42,3 +42,23 @@
 - 현재 설정한 `SolidCompression=no`는 파일별 임의 접근을 가능하게 해, solid 압축에서 발생하는 불필요한 선행 데이터 해제와 재시도 비용을 피한다. [Inno Setup: SolidCompression](https://jrsoftware.org/ishelp/topic_setup_solidcompression.htm)
 
 따라서 설치 화면이 실행 파일을 연 직후 늦게 뜨는 현상은 현재 압축 설정을 더 바꾸는 것보다, Windows가 인터넷에서 내려받은 신규 실행 파일의 SmartScreen/Defender 평판 검사를 마치는 시간과 관련될 가능성을 분리해서 봐야 한다. 앱 코드 변경으로는 해당 보안 검사 단계를 제거하지 않는다.
+
+## 상용 플레이어 대비 추가 분석
+
+### 확인된 차이
+
+소리누리는 `MpvWidget` 생성자에서 `MpvCore`를 즉시 만들고, Windows 실행 파일은 `libmpv-2.dll`을 일반 import library로 연결한다. 따라서 기존 구조에서는 첫 창을 표시하기 전에 Windows 로더가 libmpv 및 종속 미디어 DLL을 적재하고, 이어서 `MpvCore::initialize()`가 GPU/WASAPI/렌더링 환경을 설정한다. 반면 상용 플레이어는 일반적으로 재생 엔진과 코덱 모듈을 첫 창 표시 이후 또는 재생 요청 시점에 적재한다.
+
+### 추가 최적화 후보
+
+| 후보 | 근거 | 안전 조건 |
+|---|---|---|
+| `libmpv-2.dll` delay-load | MSVC `/DELAYLOAD`는 지정 DLL을 해당 DLL 함수의 첫 호출 때까지 적재하지 않는다. | `delayimp.lib`를 링크하고, libmpv 첫 호출이 첫 창이 표시된 이후의 지연 초기화 경로에만 남도록 확인한다. |
+| 첫 창 이후 mpv 객체 생성 | 현재 `MpvCore` 생성자가 `mpv_create()`를 즉시 호출한다. | 기존 `pendingStartupFiles_`와 `mpvInitialized` 신호로 외부 파일 전달·자동 재생을 보존한다. |
+| 부가 기능 매니저 지연 생성 | 초기 `MainWindow`는 광고·클라우드·Last.fm·SMTC 객체와 다수 컨트롤을 동기 구성한다. | 재생 엔진과 직접 관계없는 기능만 창 표시 뒤로 미루며, 사용자 요청 시 즉시 생성한다. |
+
+### 공식 근거
+
+MSVC의 `/DELAYLOAD:<dll>`는 프로그램이 해당 DLL 함수를 **처음 호출할 때까지** 지정 DLL의 적재를 미룬다. 기본 helper를 사용할 경우 `delayimp.lib` 링크가 필요하다. [Microsoft: /DELAYLOAD](https://learn.microsoft.com/en-us/cpp/build/reference/delayload-delay-load-import?view=msvc-170) [Microsoft: Delay-loaded DLL linker support](https://learn.microsoft.com/en-us/cpp/build/reference/linker-support-for-delay-loaded-dlls?view=msvc-170)
+
+지연 적재 중 DLL을 못 찾으면 런타임 예외가 발생할 수 있으므로, 설치·포터블 패키지의 `libmpv-2.dll` 포함 검증은 유지해야 하며 첫 호출은 현재의 명시적인 `MpvCore::initialize()` 경로에 한정한다.

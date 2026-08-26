@@ -1,5 +1,5 @@
 {
-  "version": "6.19.5",
-  "domain": "renderer",
-  "purpose": "노트북 설치·첫 실행 반응성 개선과 libmpv 초기화 지연"
+  "version": "6.19.6",
+  "domain": "audio,renderer",
+  "purpose": "노트북 첫 창 반응성 개선을 위한 libmpv delay-load와 객체 지연 생성"
 }

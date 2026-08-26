@@ -1,5 +1,14 @@
 [
   {
+    "version": "6.19.6",
+    "date": "2026-08-26",
+    "title": "노트북 시작 반응성 추가 개선",
+    "desc": "Windows가 첫 창을 표시하기 전에 libmpv와 종속 미디어 DLL을 적재하던 경로를 첫 재생 엔진 초기화 시점으로 지연했습니다. 첫 화면 표시와 초기 파일 자동 재생을 함께 보존합니다.",
+    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.19.6.exe",
+    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.19.6-Portable.zip",
+    "tags": []
+  },
+  {
     "version": "6.19.5",
     "date": "2026-08-26",
     "title": "설치·첫 실행 반응성 개선",

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(Sorinuri VERSION 6.19.5 LANGUAGES CXX)
+project(Sorinuri VERSION 6.19.6 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -151,12 +151,16 @@ if(WIN32)
     # (RC 파일에 이미 Per-Monitor V2 manifest가 포함되어 있으므로 중복 방지)
     if(MSVC)
         set_target_properties(Sorinuri PROPERTIES
-            # MANIFEST:NO: RC 파일에 이미 Per-Monitor V2 manifest 포함됨
+            # MANIFEST:NO: RC 파일에 이미 Per-Monitor V2 manifest가 포함됨
             # /EXPORT: NvOptimusEnablement / AmdPowerXpressRequestHighPerformance를
             # EXE export table에 포함시켜 NVIDIA Optimus / AMD Hybrid GPU가
             # 노트북에서 전용 GPU를 자동 선택하도록 함
             LINK_FLAGS "/MANIFEST:NO"
         )
+        # libmpv와 그 종속 미디어 DLL은 mpv_create()를 처음 호출할 때만 적재한다.
+        # 첫 Qt 창을 먼저 표시해 노트북에서 실행 직후의 무거운 대기를 줄인다.
+        target_link_options(Sorinuri PRIVATE "/DELAYLOAD:libmpv-2.dll")
+        target_link_libraries(Sorinuri PRIVATE delayimp)
     endif()
 else()
     add_executable(Sorinuri ${SOURCES})
