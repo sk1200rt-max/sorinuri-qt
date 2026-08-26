@@ -78,9 +78,46 @@ void MpvWidget::onContextAboutToBeDestroyed() {
 }
 
 void MpvWidget::initializeGL() {
+    // Qt는 이 시점에 OpenGL 컨텍스트와 빈 FBO를 준비한다. libmpv 초기화는
+    // WASAPI·GPU·렌더 환경을 동기 설정하므로, 먼저 빈 프레임을 합성한 후
+    // 이벤트 루프에서 시작해 노트북의 창 표시 지연을 줄인다.
+    queueDeferredMpvInitialization();
+
+    // ── 멀티모니터 이동 감지 ─────────────────────────────────────
+    // Qt가 FBO·DPI·위젯 크기를 다시 만들고 paintGL()은 매 프레임 물리 크기를
+    // 계산한다. 화면 이동으로 MPV 출력/오디오를 재초기화하지 않는다.
+    if (QWindow* win = window()->windowHandle()) {
+        connectScreenChanged(win);
+    } else {
+        screenChangedConnected_ = false;
+        qInfo() << "[MpvWidget] windowHandle 없음 → showEvent에서 멀티모니터 감지 연결 재시도";
+    }
+
+    updateLogoPos();
+}
+
+void MpvWidget::queueDeferredMpvInitialization() {
+    if (mpvInitializationQueued_ || renderCtx_ || !context()) return;
+    mpvInitializationQueued_ = true;
+
+    // 첫 프레임이 화면에 반영될 시간을 보장한다. 이 지연 동안 파일 열기 요청은
+    // MainWindow의 pendingStartupFiles_에 보관되며 mpvInitialized 이후 처리된다.
+    QTimer::singleShot(80, this, [this]() {
+        mpvInitializationQueued_ = false;
+        if (renderCtx_ || !context()) return;
+
+        makeCurrent();
+        const bool ready = initializeMpvRenderContext();
+        doneCurrent();
+        if (ready) update();
+    });
+}
+
+bool MpvWidget::initializeMpvRenderContext() {
+    if (renderCtx_) return true;
     if (!core_->initialize(0)) {
         qCritical() << "[MpvWidget] MPV 초기화 실패";
-        return;
+        return false;
     }
 
     mpv_opengl_init_params glInitParams = { getGlProcAddress, nullptr };
@@ -92,46 +129,18 @@ void MpvWidget::initializeGL() {
 
     if (mpv_render_context_create(&renderCtx_, core_->handle(), params) < 0) {
         qCritical() << "[MpvWidget] MPV render context 생성 실패";
-        return;
+        return false;
     }
 
     mpv_render_context_set_update_callback(renderCtx_, MpvWidget::onUpdate,
                                            reinterpret_cast<void*>(this));
-
-    qInfo() << "[MpvWidget] OpenGL render context 초기화 완료";
-
-    // ── Qt6 공식 권장: OpenGL 컨텍스트 파괴 시 renderCtx_ 안전 해제 ───────────────
-    // 절전/화면 잠금 복귀, 외부 모니터 연결/해제, reparent 시
-    // QOpenGLContext가 파괴되면 renderCtx_는 유효하지 않은 상태가 됨
-    // aboutToBeDestroyed 시그널에 연결하여 renderCtx_ 안전 해제
-    // 참고: https://doc.qt.io/qt-6/qopenglwidget.html#resource-initialization-and-cleanup
     connect(context(), &QOpenGLContext::aboutToBeDestroyed,
             this, &MpvWidget::onContextAboutToBeDestroyed,
-            Qt::DirectConnection);  // DirectConnection: 파괴 시점에 동기 호출 보장
+            Qt::DirectConnection);
 
-    // HiDPI 근본 수정: initializeGL() 완료 후 mpvInitialized 시그널 emit
-    // → MainWindow가 pendingStartupFiles_를 처리하는 트리거
-    // QTimer::singleShot(0): 현재 initializeGL() 스택이 완전히 끝난 후 emit
-    // (renderCtx_ 설정 완료 보장)
+    qInfo() << "[MpvWidget] 지연 OpenGL/MPV render context 초기화 완료";
     QTimer::singleShot(0, this, [this]() { emit mpvInitialized(); });
-
-    // MpvCore::initialize()는 이 initializeGL() 안에서 호출되므로 이미 유효한
-    // OpenGL 컨텍스트를 사용해 렌더링 환경을 결정한다. 여기서 다시 GPU를
-    // 재감지하면 첫 화면 표시가 지연되고 AO/렌더러 재협상이 발생할 수 있다.
-    // Qt가 FBO·DPI·화면 크기를 처리하므로 추가 재초기화는 하지 않는다.
-
-    // ── 멀티모니터 이동 감지 ─────────────────────────────────────
-    // Qt가 FBO·DPI·위젯 크기를 다시 만들고 paintGL()은 매 프레임 물리 크기를
-    // 계산한다. 화면 이동으로 MPV 출력/오디오를 재초기화하지 않는다.
-    // 폴백 연결은 로고 위치와 렌더 갱신만 처리한다.
-    if (QWindow* win = window()->windowHandle()) {
-        connectScreenChanged(win);
-    } else {
-        screenChangedConnected_ = false;
-        qInfo() << "[MpvWidget] windowHandle 없음 → showEvent에서 멀티모니터 감지 연결 재시도";
-    }
-
-    updateLogoPos();
+    return true;
 }
 
 void MpvWidget::paintGL() {

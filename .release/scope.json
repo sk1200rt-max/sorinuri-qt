@@ -1,5 +1,5 @@
 {
-  "version": "6.19.4",
-  "domain": "audio,ui",
-  "purpose": "6채널 원본 출력·절전 복귀 오디오 정책·새 재생 자막 스타일 적용 복구"
+  "version": "6.19.5",
+  "domain": "renderer",
+  "purpose": "노트북 설치·첫 실행 반응성 개선과 libmpv 초기화 지연"
 }

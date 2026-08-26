@@ -47,9 +47,14 @@ private slots:
 
 private:
     static void onUpdate(void* ctx);
+    // 첫 Qt 프레임이 합성된 뒤 libmpv·WASAPI·렌더 컨텍스트를 준비한다.
+    // OpenGL 컨텍스트가 current인 GUI 스레드에서만 호출한다.
+    bool initializeMpvRenderContext();
+    void queueDeferredMpvInitialization();
 
     MpvCore*             core_       = nullptr;
     mpv_render_context*  renderCtx_  = nullptr;
+    bool mpvInitializationQueued_ = false;
     bool  screenChangedConnected_ = false;  // 멀티모니터 감지 연결 여부
     void  connectScreenChanged(QWindow* win);  // 멀티모니터 시그널 연결 헬퍼
 

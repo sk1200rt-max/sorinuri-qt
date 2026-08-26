@@ -1,5 +1,14 @@
 [
   {
+    "version": "6.19.5",
+    "date": "2026-08-26",
+    "title": "설치·첫 실행 반응성 개선",
+    "desc": "첫 화면을 먼저 표시한 뒤 libmpv·WASAPI·렌더링 환경 초기화를 시작해 노트북에서 실행 시 무겁게 느껴지던 대기 시간을 줄였습니다. 초기 파일 자동 재생과 기존 오디오 정책은 유지됩니다.",
+    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.19.5.exe",
+    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.19.5-Portable.zip",
+    "tags": []
+  },
+  {
     "version": "6.19.4",
     "date": "2026-08-25",
     "title": "멀티채널·절전 복귀·자막 설정 적용 복구",

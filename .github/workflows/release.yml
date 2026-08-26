@@ -75,6 +75,11 @@ jobs:
         shell: bash
         run: PYTHONUTF8=1 python3 scripts/verify_audio_resume_subtitle.py
 
+      # ── 첫 프레임·지연 MPV 초기화·초기 파일 재생 회귀 검증 ───────────
+      - name: Verify startup responsiveness
+        shell: bash
+        run: PYTHONUTF8=1 python3 scripts/verify_startup_responsiveness.py
+
       # ── 파일 연결·Windows 기본 앱 등록 검증 ──────────────────────────
       - name: Verify file association policy
         shell: bash
