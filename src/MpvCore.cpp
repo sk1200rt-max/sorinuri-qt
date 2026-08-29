@@ -91,14 +91,11 @@ MpvCore::MpvCore(QObject* parent) : QObject(parent) {
     // delay-load하므로, 이 생성자를 첫 창 표시 전에 호출해도 미디어 DLL 적재와
     // GPU/WASAPI 초기화가 앞당겨지지 않는다.
 
-    // 이벤트 타이머 (Qt 이벤트 루프와 연동)
-    eventTimer_ = new QTimer(this);
-    eventTimer_->setInterval(16);  // ~60fps
-    connect(eventTimer_, &QTimer::timeout, this, &MpvCore::onMpvEvents);
+    // mpv_set_wakeup_callback()이 새 이벤트를 Qt 이벤트 루프에 전달한다.
+    // 별도 16ms polling timer를 두지 않아 유휴 상태의 지속 wake-up을 피한다.
 }
 
 MpvCore::~MpvCore() {
-    if (eventTimer_) { eventTimer_->stop(); }
     if (spectrumTimer_) { spectrumTimer_->stop(); }
     if (frameDropTimer_) { frameDropTimer_->stop(); }
     if (mpv_ && initialized_) {
@@ -400,9 +397,9 @@ bool MpvCore::initialize(WId windowId) {
     mpv_observe_property(mpv_, 0, "container-fps",   MPV_FORMAT_DOUBLE);
     mpv_observe_property(mpv_, 0, "video-codec",     MPV_FORMAT_STRING);
 
-    // wakeup callback 대신 타이머 사용 (Qt 스레드 안전)
+    // wakeup callback은 mpv 내부 스레드에서 호출될 수 있으므로 Qt 메인 루프로
+    // 큐잉한다. 이벤트가 도착할 때만 mpv_wait_event(..., 0)을 비워낸다.
     mpv_set_wakeup_callback(mpv_, wakeupCallback, this);
-    eventTimer_->start();
 
     initialized_ = true;
     qInfo() << "[MPV] 초기화 완료 WID:" << windowId;

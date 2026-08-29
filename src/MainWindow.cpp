@@ -39,8 +39,6 @@
 #ifdef Q_OS_WIN
 #include <windows.h>
 #include <windowsx.h>
-#include <timeapi.h>  // timeBeginPeriod (배터리 모드 전환 시 타이머 해상도 유지)
-#pragma comment(lib, "winmm.lib")
 #endif
 
 static const QStringList MEDIA_EXTS = {
@@ -564,8 +562,10 @@ void MainWindow::switchToMusicMode() {
     if (musicPage_) musicPage_->unsetCursor();
     // 음악 모드: 걪리스 재생 항상 활성화 (앨범 연속 재생 시 공백 제거)
     mpvWidget_->core()->setProperty("gapless-audio", QString("yes"));
-    // 스펙트럼 활성화 (음악 모드에서만 동작)
-    mpvWidget_->core()->setSpectrumEnabled(true);
+    // 스펙트럼은 실제 재생 중인 음악 화면에서만 활성화한다. 화면 전환·로딩 중
+    // 60fps 폴링과 피크 repaint가 계속되지 않도록 재생 이벤트가 제어한다.
+    if (musicPage_) musicPage_->setVisualizationActive(isPlaying_);
+    mpvWidget_->core()->setSpectrumEnabled(isPlaying_);
     connect(mpvWidget_->core(), &MpvCore::spectrumReady,
             musicPage_, &MusicWidget::updateSpectrum,
             Qt::UniqueConnection);
@@ -578,6 +578,7 @@ void MainWindow::switchToVideoMode() {
     // 스펙트럼 비활성화 (영상 모드에서는 불필요)
     mpvWidget_->core()->setSpectrumEnabled(false);
     if (musicPage_) {
+        musicPage_->setVisualizationActive(false);
         disconnect(mpvWidget_->core(), &MpvCore::spectrumReady,
                    musicPage_, &MusicWidget::updateSpectrum);
     }
@@ -770,6 +771,10 @@ void MainWindow::hideUI() {
 
 void MainWindow::onPlaybackStarted() {
     if (!isMusicMode_) controlBar_->setPlaying(true);
+    if (isMusicMode_ && musicPage_) {
+        musicPage_->setVisualizationActive(true);
+        mpvWidget_->core()->setSpectrumEnabled(true);
+    }
     // UI 자동 숨김 타이머 설정 (영상 모드에서만 사용)
     if (!uiHideTimer_) {
         uiHideTimer_ = new QTimer(this);
@@ -786,6 +791,10 @@ void MainWindow::onPlaybackStarted() {
 }
 void MainWindow::onPlaybackPaused() {
     isPlaying_ = false;
+    if (isMusicMode_ && musicPage_) {
+        musicPage_->setVisualizationActive(false);
+        mpvWidget_->core()->setSpectrumEnabled(false);
+    }
     controlBar_->setPlaying(false);
     // 일시정지 시 UI 항상 표시
     if (uiHideTimer_) uiHideTimer_->stop();
@@ -796,6 +805,10 @@ void MainWindow::onPlaybackPaused() {
 #endif
 }
 void MainWindow::onPlaybackEnded() {
+    if (isMusicMode_ && musicPage_) {
+        musicPage_->setVisualizationActive(false);
+        mpvWidget_->core()->setSpectrumEnabled(false);
+    }
     // MPV 대기열의 곡 사이 EOF는 즉시 다음 항목으로 전환된다. 이 경우에는
     // 로고·정지 상태를 표시하지 않고, 실제 idle 상태일 때만 종료 UI를 갱신한다.
     if (playbackQueue_ && !playbackQueue_->isEmpty()) {
@@ -833,6 +846,10 @@ void MainWindow::onPlaybackEnded() {
 }
 void MainWindow::onPlaybackStopped() {
     isPlaying_ = false;
+    if (isMusicMode_ && musicPage_) {
+        musicPage_->setVisualizationActive(false);
+        mpvWidget_->core()->setSpectrumEnabled(false);
+    }
     if (uiHideTimer_) uiHideTimer_->stop();
     showUI();
     if (!isMusicMode_) {
@@ -1602,6 +1619,35 @@ void MainWindow::resizeEvent(QResizeEvent* e) {
     }
 }
 
+void MainWindow::showEvent(QShowEvent* e) {
+    QMainWindow::showEvent(e);
+    enableWindowsSnapIntegration();
+}
+
+void MainWindow::enableWindowsSnapIntegration() {
+#ifdef Q_OS_WIN
+    if (windowsSnapIntegrationApplied_) return;
+
+    // FramelessWindowHint는 표준 제목 표시줄만 감출 뿐, 창 스냅에 필요한
+    // 크기 조절·최대화·시스템 메뉴 스타일까지 없애면 안 된다. HWND가 실제로
+    // 생성된 showEvent 시점에 보강하고 SWP_FRAMECHANGED로 Windows에 알린다.
+    const HWND hwnd = reinterpret_cast<HWND>(winId());
+    if (!hwnd) return;
+    const LONG_PTR style = GetWindowLongPtrW(hwnd, GWL_STYLE);
+    const LONG_PTR required = WS_THICKFRAME | WS_MAXIMIZEBOX | WS_MINIMIZEBOX | WS_SYSMENU;
+    if ((style & required) != required) {
+        SetWindowLongPtrW(hwnd, GWL_STYLE, style | required);
+        SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
+                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
+                     SWP_NOACTIVATE | SWP_FRAMECHANGED);
+    }
+    windowsSnapIntegrationApplied_ = true;
+    qInfo() << "[MainWindow] Windows Snap/시스템 창 스타일 활성화";
+#else
+    windowsSnapIntegrationApplied_ = true;
+#endif
+}
+
 // ── 창 크기 조절 ──────────────────────────────────────────────────
 int MainWindow::getResizeEdge(const QPoint& pos) const {
     int m = RESIZE_MARGIN, w = width(), h = height();
@@ -1643,13 +1689,9 @@ bool MainWindow::nativeEvent(const QByteArray& type, void* msg, qintptr* result)
                 });
                 scheduleAudioOutputRecovery(1200);
             }
-            // ─ 배터리 모드 전환: 타이머 해상도 유지 ─────────────────────────
-            // Windows 10 2004+: 배터리 모드 전환 시 타이머 해상도가 낮아질 수 있음
-            // timeBeginPeriod(1) 재호출로 1ms 해상도 강제 유지 → 프레임 타이밍 안정화
-            if (m->wParam == PBT_APMPOWERSTATUSCHANGE) {
-                qInfo() << "[MainWindow] 전원 상태 변경 감지 → 타이머 해상도 재설정";
-                timeBeginPeriod(1);
-            }
+            // 전원 상태 변경에서 timeBeginPeriod(1)을 반복 요청하지 않는다.
+            // Windows는 각 요청마다 동일한 timeEndPeriod 호출을 요구하며, libmpv는
+            // 자체 재생 수명주기에서 필요한 타이머 해상도를 관리한다.
             // WM_POWERBROADCAST는 반드시 TRUE 반환 (Windows 문서 요구사항)
             *result = TRUE;
             return true;
@@ -1730,6 +1772,15 @@ bool MainWindow::nativeEvent(const QByteArray& type, void* msg, qintptr* result)
             int screenY = GET_Y_LPARAM(m->lParam);
             QPoint logicalGlobal(qRound(screenX / dpr), qRound(screenY / dpr));
             QPoint pos = mapFromGlobal(logicalGlobal);
+
+            // Windows 11은 사용자 지정 타이틀바의 최대화 버튼 영역을
+            // HTMAXBUTTON으로 받아야 hover Snap Layout을 표시한다.
+            if (!isFullscreen_ && titleBar_ &&
+                titleBar_->maximizeButtonRectInWindow().contains(pos)) {
+                *result = HTMAXBUTTON;
+                return true;
+            }
+
             int edge = getResizeEdge(pos);
             if (edge > 0) {
                 static const LRESULT edges[] = {0,HTLEFT,HTRIGHT,HTTOP,HTBOTTOM,

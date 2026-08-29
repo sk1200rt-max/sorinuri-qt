@@ -157,7 +157,6 @@ private:
     static void wakeupCallback(void* ctx);
 
     mpv_handle* mpv_       = nullptr;
-    QTimer*     eventTimer_ = nullptr;
     bool        initialized_ = false;
     bool        isLaptop_    = false;  // 노트북 감지 시 true → applyVideoSyncByFps에서 display-resample 차단
 

@@ -2,6 +2,7 @@
 #include "UiTheme.h"
 #include <QIcon>
 #include <QPixmap>
+#include <QWindow>
 
 QPushButton* TitleBar::makeIconBtn(const QString& svgPath, const QString& tooltip,
                                     const QString& hoverBg, int w) {
@@ -143,17 +144,40 @@ void TitleBar::setFullscreenMode(bool fs) {
     btnMax_->setIcon(QIcon(fs ? ":/icons/restore.svg" : ":/icons/maximize.svg"));
 }
 
+QRect TitleBar::maximizeButtonRectInWindow() const {
+    if (!btnMax_ || !window()) return {};
+    return QRect(btnMax_->mapTo(window(), QPoint(0, 0)), btnMax_->size());
+}
+
 void TitleBar::mousePressEvent(QMouseEvent* e) {
     if (e->button() == Qt::LeftButton) {
+        // 좌표를 직접 옮기면 Windows가 비클라이언트 드래그를 보지 못해
+        // 화면 가장자리 스냅·상단 최대화가 동작하지 않는다. 지원 플랫폼에서는
+        // 시스템 드래그로 넘기고, 지원하지 않는 경우에만 기존 좌표 이동을 사용한다.
+        if (window() && window()->windowHandle() &&
+            window()->windowHandle()->startSystemMove()) {
+            e->accept();
+            return;
+        }
         dragging_  = true;
         dragStart_ = e->globalPosition().toPoint() - window()->pos();
+        e->accept();
+        return;
     }
+    QWidget::mousePressEvent(e);
 }
 
 void TitleBar::mouseMoveEvent(QMouseEvent* e) {
-    if (dragging_ && (e->buttons() & Qt::LeftButton))
+    if (dragging_ && (e->buttons() & Qt::LeftButton)) {
         window()->move(e->globalPosition().toPoint() - dragStart_);
+        e->accept();
+        return;
+    }
+    QWidget::mouseMoveEvent(e);
 }
 
-void TitleBar::mouseReleaseEvent(QMouseEvent*) { dragging_ = false; }
+void TitleBar::mouseReleaseEvent(QMouseEvent* e) {
+    dragging_ = false;
+    QWidget::mouseReleaseEvent(e);
+}
 void TitleBar::mouseDoubleClickEvent(QMouseEvent*) { emit maximizeClicked(); }

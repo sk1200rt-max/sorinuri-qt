@@ -86,12 +86,21 @@ CompactPlayerWidget::CompactPlayerWidget(QWidget* parent)
     peakTimer_ = new QTimer(this);
     peakTimer_->setInterval(40);
     connect(peakTimer_, &QTimer::timeout, this, [this]() {
-        bool ch = false;
-        for (int i = 0; i < specPeak_.size(); ++i)
-            if (specPeak_[i] > 0.001f) { specPeak_[i] *= 0.88f; ch = true; }
-        if (ch) update();
+        bool changed = false;
+        for (int i = 0; i < specPeak_.size(); ++i) {
+            if (specPeak_[i] > 0.001f) {
+                specPeak_[i] *= 0.88f;
+                changed = true;
+            }
+        }
+        if (changed) {
+            update();
+        } else {
+            // 피크 감쇠가 끝났으면 25fps 타이머도 멈춘다. 새 스펙트럼 데이터가
+            // 도착하면 updateSpectrum()이 다시 시작한다.
+            peakTimer_->stop();
+        }
     });
-    peakTimer_->start();
 
     setupUI();
     setupConnections();
@@ -596,9 +605,12 @@ void CompactPlayerWidget::setPlaylist(const QStringList& paths, int currentIndex
 
 void CompactPlayerWidget::updateSpectrum(const QVector<float>& bins) {
     int n = qMin(bins.size(), specBins_.size());
+    bool hasPeak = false;
     for (int i = 0; i < n; ++i) {
         specBins_[i] = bins[i];
         if (bins[i] > specPeak_[i]) specPeak_[i] = bins[i];
+        hasPeak = hasPeak || bins[i] > 0.001f;
     }
+    if (hasPeak && peakTimer_ && !peakTimer_->isActive()) peakTimer_->start();
     update();
 }

@@ -1,5 +1,14 @@
 [
   {
+    "version": "6.19.7",
+    "date": "2026-08-29",
+    "title": "Windows 창 배치 및 유휴 반응성 개선",
+    "desc": "무테 창의 Windows 스냅·가장자리 배치와 불필요한 유휴 타이머를 개선했습니다.",
+    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.19.7.exe",
+    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.19.7-Portable.zip",
+    "tags": []
+  },
+  {
     "version": "6.19.6",
     "date": "2026-08-26",
     "title": "노트북 시작 반응성 추가 개선",

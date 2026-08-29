@@ -207,7 +207,8 @@ MusicWidget::MusicWidget(MpvCore* core, QWidget* parent):QWidget(parent),core_(c
         for(int i=0;i<specPeak_.size();++i) if(specPeak_[i]>0.002f){specPeak_[i]*=0.92f;ch=true;}
         if(ch) update();
     });
-    peakTimer_->start();
+    // 음악 화면이 처음 만들어져도 백그라운드 타이머를 시작하지 않는다.
+    // 실제 음악 재생 화면이 활성화될 때 setVisualizationActive()가 시작한다.
     rotationTimer_=new QTimer(this);rotationTimer_->setInterval(33);
     connect(rotationTimer_,&QTimer::timeout,this,&MusicWidget::onRotationTick);
     setupUI();setupConnections();
@@ -697,12 +698,29 @@ void MusicWidget::updatePosition(double pos,double duration){
 void MusicWidget::setPlaying(bool playing){
     isPlaying_=playing;
     btnPlay_->setText(playing?"⏸":"▶");
-    if(playing) rotationTimer_->start();
+    if(playing && visualizationActive_) rotationTimer_->start();
     else rotationTimer_->stop();
     update();
 }
 
+void MusicWidget::setVisualizationActive(bool active) {
+    if (visualizationActive_ == active) return;
+    visualizationActive_ = active;
+    if (!peakTimer_ || !rotationTimer_) return;
+
+    if (active) {
+        peakTimer_->start();
+        if (isPlaying_) rotationTimer_->start();
+    } else {
+        // 영상 모드·일시정지·숨겨진 음악 화면에서는 20/30fps wake-up과 repaint를
+        // 멈춰 다른 응용 프로그램과 GPU·CPU 시간을 경쟁하지 않게 한다.
+        peakTimer_->stop();
+        rotationTimer_->stop();
+    }
+}
+
 void MusicWidget::updateSpectrum(const QVector<float>& bins){
+    if (!visualizationActive_) return;
     specBins_=bins;
     for(int i=0;i<qMin(bins.size(),specPeak_.size());++i)
         if(bins[i]>specPeak_[i]) specPeak_[i]=bins[i];

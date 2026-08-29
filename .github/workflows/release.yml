@@ -80,6 +80,11 @@ jobs:
         shell: bash
         run: PYTHONUTF8=1 python3 scripts/verify_startup_responsiveness.py
 
+      # ── Windows Snap·유휴 반응성 회귀 검증 ───────────────────────────
+      - name: Verify Windows Snap and idle responsiveness
+        shell: bash
+        run: PYTHONUTF8=1 python3 scripts/verify_window_snap_responsiveness.py
+
       # ── 파일 연결·Windows 기본 앱 등록 검증 ──────────────────────────
       - name: Verify file association policy
         shell: bash

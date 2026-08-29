@@ -80,6 +80,8 @@ public:
     const MusicMeta& currentMeta() const { return currentMeta_; }
     void updatePosition(double pos, double duration);
     void setPlaying(bool playing);
+    // 음악 화면이 실제로 재생·표시될 때만 스펙트럼과 앨범아트 애니메이션을 갱신한다.
+    void setVisualizationActive(bool active);
     void updateSpectrum(const QVector<float>& bins);
     // 비트퍼펙트 상태 실시간 표시: 실제 출력 경로(AO 샘플레이트/포맷/Exclusive)
     void setOutputInfo(int outSampleRate, const QString& outFormat, bool exclusive);
@@ -194,6 +196,7 @@ private:
     bool          isShuffle_    = false;
     bool          isRepeat_     = false;
     bool          miniMode_     = false;
+    bool          visualizationActive_ = false;
     double        duration_     = 0;
     MusicMeta     currentMeta_;
 };

@@ -1,5 +1,5 @@
 {
-  "version": "6.19.6",
-  "domain": "audio,renderer",
-  "purpose": "노트북 첫 창 반응성 개선을 위한 libmpv delay-load와 객체 지연 생성"
+  "version": "6.19.7",
+  "domain": "ui,renderer,audio",
+  "purpose": "Windows Snap·유휴 반응성 개선"
 }
