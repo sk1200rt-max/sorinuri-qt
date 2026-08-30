@@ -54,6 +54,12 @@ checks += [
      "전역 마우스 이동마다 전체 UI를 표시하면 안 됩니다."),
     ("revealUiForVideoEdge(me->pos());" in main_cpp,
      "비디오 마우스 이동은 가장자리 노출 함수로만 처리해야 합니다."),
+    ("setCursor(Qt::BlankCursor)" not in main_cpp and
+     "mpvWidget_->setCursor(Qt::BlankCursor)" not in main_cpp,
+     "UI를 숨길 때 영상 영역의 마우스 포인터를 숨기면 안 됩니다."),
+    ("if (cursor().shape() == Qt::BlankCursor) unsetCursor();" in main_cpp and
+     "mpvWidget_->unsetCursor();" in main_cpp,
+     "이전 상태에서 숨겨진 포인터를 항상 복원해야 합니다."),
     ("if (controlBar_) controlBar_->hide();\n        showTopUi();" in main_cpp and
      "if (titleBar_) titleBar_->hide();\n        showBottomUi();" in main_cpp,
      "상단·하단 가장자리에서는 반대쪽 UI를 함께 표시하면 안 됩니다."),

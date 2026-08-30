@@ -1,5 +1,14 @@
 [
   {
+    "version": "6.20.3",
+    "date": "2026-08-30",
+    "title": "영상 조작 중 마우스 포인터 유지",
+    "desc": "상단·하단 UI 자동 숨김은 유지하되 중앙 영상 영역에서 마우스 포인터를 숨기지 않도록 복구합니다.",
+    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.20.3.exe",
+    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.20.3-Portable.zip",
+    "tags": []
+  },
+  {
     "version": "6.20.2",
     "date": "2026-08-30",
     "title": "HDMI DD+ 6채널 패스스루 복구",

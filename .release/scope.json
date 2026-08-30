@@ -1,5 +1,5 @@
 {
-  "version": "6.20.2",
-  "domain": "audio",
-  "purpose": "HDMI DD+ 초기 패스스루와 실제 출력 장치 협상 복구"
+  "version": "6.20.3",
+  "domain": "ui",
+  "purpose": "영상 UI 자동 숨김 중 마우스 포인터 가시성 복구"
 }

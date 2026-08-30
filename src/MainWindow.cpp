@@ -799,8 +799,10 @@ void MainWindow::hideUI() {
         if (titleBar_) titleBar_->hide();
         if (controlBar_) controlBar_->hide();
         uiVisible_ = false;
-        setCursor(Qt::BlankCursor);
-        if (mpvWidget_) mpvWidget_->setCursor(Qt::BlankCursor);
+        // 중앙 영상 영역에서는 UI만 숨긴다. 사용자가 화면을 조작할 수 있도록
+        // 전체 화면·창 모드·팝업 복귀 상태 모두에서 마우스 포인터는 유지한다.
+        if (cursor().shape() == Qt::BlankCursor) unsetCursor();
+        if (mpvWidget_) mpvWidget_->unsetCursor();
     }
 }
 
