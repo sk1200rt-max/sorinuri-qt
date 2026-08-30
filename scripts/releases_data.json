@@ -1,5 +1,14 @@
 [
   {
+    "version": "6.20.2",
+    "date": "2026-08-30",
+    "title": "HDMI DD+ 6채널 패스스루 복구",
+    "desc": "저장된 HDMI 장치·독점 모드·E-AC3 패스스루를 mpv 오디오 출력 초기화 전에 적용하고 HDMI 복구 경로에서 비트스트림 설정을 보존합니다.",
+    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.20.2.exe",
+    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.20.2-Portable.zip",
+    "tags": []
+  },
+  {
     "version": "6.20.1",
     "date": "2026-08-30",
     "title": "무테 Snap·파일 연결 완성",

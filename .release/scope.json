@@ -1,5 +1,5 @@
 {
-  "version": "6.20.1",
-  "domain": "ui,renderer,installer",
-  "purpose": "무테 UI를 보존한 Windows Snap 복구와 전체 지원 파일 형식 연결 등록"
+  "version": "6.20.2",
+  "domain": "audio",
+  "purpose": "HDMI DD+ 초기 패스스루와 실제 출력 장치 협상 복구"
 }

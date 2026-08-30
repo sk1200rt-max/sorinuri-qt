@@ -167,6 +167,38 @@ bool MpvCore::initialize(WId windowId) {
     // 새 파일 로드 시 pause 상태를 유지하지 않음
     check_error(mpv_set_option_string(mpv_, "pause",      "no"));
 
+    // ── 오디오: WASAPI 독점·HDMI 장치·패스스루 (mpv_initialize 전 적용) ──
+    // DD+/DTS 비트스트림은 AO가 처음 열릴 때의 장치·독점·audio-spdif 조합으로
+    // 결정된다. 초기화 뒤에 값을 나누어 적용하면 기본 2.0 장치로 먼저 협상된 뒤
+    // PCM 폴백이 유지될 수 있으므로, 저장된 사용자 정책을 AO 생성 전에 한 번에 적용한다.
+    {
+        QSettings s("Sorinuri", "SorinuriPlayer");
+        QString savedDevice = s.value("audio/device", "auto").toString().trimmed();
+        if (savedDevice.isEmpty()) savedDevice = QStringLiteral("auto");
+        const bool savedExclusive = s.value("audio/exclusive", true).toBool();
+        passthroughEnabled_ = s.value("audio/passthrough", true).toBool();
+
+        QStringList codecs;
+        if (s.value("audio/pt_ac3", true).toBool()) codecs << QStringLiteral("ac3");
+        if (s.value("audio/pt_eac3", true).toBool()) codecs << QStringLiteral("eac3");
+        if (s.value("audio/pt_dts", true).toBool()) codecs << QStringLiteral("dts");
+        if (s.value("audio/pt_dtshd", true).toBool()) codecs << QStringLiteral("dts-hd");
+        if (s.value("audio/pt_truehd", true).toBool()) codecs << QStringLiteral("truehd");
+        spdifCodecs_ = codecs.join(',');
+
+        check_error(mpv_set_option_string(mpv_, "ao", "wasapi"));
+        check_error(mpv_set_option_string(mpv_, "audio-device",
+            savedDevice.toUtf8().constData()));
+        check_error(mpv_set_option_string(mpv_, "audio-exclusive",
+            savedExclusive ? "yes" : "no"));
+        check_error(mpv_set_option_string(mpv_, "audio-spdif",
+            passthroughEnabled_ ? spdifCodecs_.toUtf8().constData() : ""));
+        qInfo() << "[MPV] WASAPI 초기 정책: device=" << savedDevice
+                << "exclusive=" << savedExclusive
+                << "passthrough=" << passthroughEnabled_
+                << "codecs=" << spdifCodecs_;
+    }
+
     // ── mpv_initialize ────────────────────────────────────────────
     int ret = mpv_initialize(mpv_);
     if (ret < 0) {
@@ -317,26 +349,6 @@ bool MpvCore::initialize(WId windowId) {
             env.ditherMode.toUtf8().constData()));
     }
 
-    // ── 오디오: WASAPI 독점 모드 (기본값: 독점) ──────────────────────────
-    // 독점 모드: Windows 미디어 미서를 우회하여 원본 비트스트림 출력
-    //   - Dolby/DTS 패스스루 동작 보장
-    //   - 리샘플링 없이 원본 음질 유지
-    //   - 5.1/7.1 멀티채널 원본 출력
-    // 독점 모드 실패 시 ao-reload 자동복구가 공유 모드로 폴백 처리
-    // 사용자가 설정에서 명시적으로 공유 모드로 변경 가능
-    {
-        QSettings s("Sorinuri", "SorinuriPlayer");
-        const bool savedExclusive = s.value("audio/exclusive", true).toBool();  // 기본값: 독점
-        check_error(mpv_set_property_string(mpv_, "ao", "wasapi"));
-        check_error(mpv_set_property_string(mpv_, "audio-exclusive",
-            savedExclusive ? "yes" : "no"));
-        qInfo() << "[MPV] WASAPI 모드:"
-                << (savedExclusive ? "독점 (Exclusive) - 원본 음질" : "공유 (Shared) - 사용자 설정");
-    }
-    // 패스스루: 돌비 애트모스/DTS:X 원본 비트스트림 리시버로 전송
-    // (독점 모드에서만 실질적으로 동작)
-    check_error(mpv_set_property_string(mpv_, "audio-spdif",
-        "ac3,eac3,dts,dts-hd,truehd"));
     // 오디오 초기화 실패 시 영상은 계속 재생 (null 오디오 폴백)
     check_error(mpv_set_property_string(mpv_, "audio-fallback-to-null", "yes"));
     // HDMI 멀티채널 정책: mpv가 오디오 원본 레이아웃을 우선해 현재 WASAPI
@@ -486,11 +498,19 @@ void MpvCore::handleEvent(mpv_event* event) {
             mpv_get_property(mpv_, "core-idle", MPV_FORMAT_FLAG, &coreIdle);
             appLog(QString("워치독: pause=%1 time-pos=%2 core-idle=%3")
                        .arg(paused).arg(pos).arg(coreIdle));
-            // pause 아닌데 재생이 멈춤(core-idle) + 위치 0 부근 → AO 멈춤
+            // pause 아닌데 재생이 멈춤(core-idle) + 위치 0 부근 → AO 멈춤.
+            // HDMI/AVR에서는 DD+ 비트스트림을 해제하지 않고 현 정책 그대로 재협상한다.
+            // 비-HDMI 장치에서만 PCM 복구를 위해 passthrough를 해제한다.
             if (!paused && coreIdle && pos < 0.5) {
-                appLog("워치독: 재생 멈춤 감지 → spdif 해제 + ao-reload 강제 복구");
-                qWarning() << "[MPV] 워치독: 재생 멈춤 → ao-reload 복구";
-                mpv_set_property_string(mpv_, "audio-spdif", "");
+                const bool passthroughCapable = deviceLikelySupportsPassthrough();
+                appLog(passthroughCapable
+                    ? "워치독: HDMI/AVR 추정 → SPDIF 유지 + ao-reload 복구"
+                    : "워치독: 비패스스루 장치 추정 → SPDIF 해제 + ao-reload 복구");
+                qWarning() << "[MPV] 워치독: 재생 멈춤 →"
+                           << (passthroughCapable ? "비트스트림 유지" : "PCM 복구")
+                           << "+ ao-reload";
+                if (!passthroughCapable)
+                    mpv_set_property_string(mpv_, "audio-spdif", "");
                 const char* reloadArgs[] = { "ao-reload", nullptr };
                 mpv_command_async(mpv_, 0, reloadArgs);
                 int pf = 0;
@@ -591,12 +611,19 @@ void MpvCore::handleEvent(mpv_event* event) {
         //   비트스트림 패스스루/음질에 영향 없음.
         if (msg->log_level <= MPV_LOG_LEVEL_ERROR &&
             strstr(msg->text, "Failed to initialize audio driver")) {
-            appLog("AO 초기화 실패 감지 → 자동 복구 시작");
-            qWarning() << "[MPV] AO 실패 감지 → spdif 해제 후 ao-reload";
-            // 1) 패스스루 해제 (현재 장치가 미지원이므로 PCM 디코딩으로 전환)
-            mpv_set_property_string(mpv_, "audio-spdif", "");
-            // 2) Exclusive 실패 가능성 대비: 재시도는 Exclusive 유지,
-            //    ao-reload로 AO 재초기화 (장치가 Exclusive PCM은 지원)
+            const bool passthroughCapable = deviceLikelySupportsPassthrough();
+            appLog(passthroughCapable
+                ? "AO 초기화 실패 감지 → HDMI/AVR SPDIF 유지 복구"
+                : "AO 초기화 실패 감지 → 비패스스루 PCM 복구");
+            qWarning() << "[MPV] AO 실패 감지 →"
+                       << (passthroughCapable ? "SPDIF 유지" : "SPDIF 해제")
+                       << "후 ao-reload";
+            // HDMI/AVR 후보에서 오류가 났다고 DD+/DTS 정책을 즉시 지우지 않는다.
+            // 해당 장치가 아닌 경우에만 PCM 디코딩 폴백을 허용한다.
+            if (!passthroughCapable)
+                mpv_set_property_string(mpv_, "audio-spdif", "");
+            // Exclusive 실패 가능성 대비: 재시도는 Exclusive 유지,
+            // ao-reload로 AO 재초기화 (장치가 Exclusive PCM은 지원)
             const char* reloadArgs[] = { "ao-reload", nullptr };
             mpv_command_async(mpv_, 0, reloadArgs);
             // 3) 재생 상태 보장
@@ -711,22 +738,22 @@ bool MpvCore::deviceLikelySupportsPassthrough() const {
         selected = dev ? QString::fromUtf8(dev) : QStringLiteral("auto");
         mpv_free(dev);
     }
+    // audio-device=auto인 경우 목록의 첫 번째 장치를 추정하면 노트북 스피커를
+    // 잘못 선택할 수 있다. 실제 AO가 선택한 endpoint를 우선 사용해야 HDMI AVR의
+    // 비트스트림 복구가 PCM 폴백으로 바뀌지 않는다.
+    QString detected;
+    char* detectedRaw = mpv_get_property_string(mpv_, "audio-out-detected-device");
+    if (detectedRaw) {
+        detected = QString::fromUtf8(detectedRaw);
+        mpv_free(detectedRaw);
+    }
+    const QString effectiveDevice = selected != "auto" ? selected : detected;
     QString desc;
     const QVariantList devices = audioDeviceList();
-    if (selected != "auto") {
+    if (!effectiveDevice.isEmpty()) {
         for (const QVariant& item : devices) {
             QVariantMap m = item.toMap();
-            if (m.value("name").toString() == selected) {
-                desc = m.value("description").toString();
-                break;
-            }
-        }
-    }
-    // auto이거나 못 찾으면 첫 번째 wasapi 장치(기본 출력)의 description 사용
-    if (desc.isEmpty()) {
-        for (const QVariant& item : devices) {
-            QVariantMap m = item.toMap();
-            if (m.value("name").toString().startsWith("wasapi/")) {
+            if (m.value("name").toString() == effectiveDevice) {
                 desc = m.value("description").toString();
                 break;
             }
