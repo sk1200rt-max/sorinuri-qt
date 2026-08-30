@@ -710,31 +710,59 @@ void MainWindow::onFileLoaded(const QString& path) {
     });
 }
 
-void MainWindow::showUI() {
-    if (!uiVisible_) {
-        if (isMusicMode_) {
-            // 음악 모드: 타이틀바만 표시, ControlBar는 절대 표시하지 않음
-            // (MusicWidget 내부에 자체 시크바가 있으므로 중복 방지)
-            titleBar_->show();
-        } else if (isFullscreen_) {
-            // 영상 전체화면: 타이틀바 숨김 유지, 컨트롤바만 표시
-            controlBar_->show();
-        } else {
-            // 영상 창 모드: 타이틀바+컨트롤바 모두 표시
-            titleBar_->show();
-            controlBar_->show();
-        }
-        uiVisible_ = true;
-    }
-    // 마우스 커서 복원 (음악 모드 포함 항상 복원)
-    if (cursor().shape() == Qt::BlankCursor)
-        unsetCursor();
-    mpvWidget_->unsetCursor();
+namespace {
+constexpr int TOP_UI_REVEAL_ZONE = 56;
+constexpr int BOTTOM_UI_REVEAL_ZONE = 96;
+constexpr int UI_AUTO_HIDE_DELAY_MS = 3000;
+}
+
+void MainWindow::showTopUi() {
+    if (!titleBar_) return;
+    titleBar_->show();
+    uiVisible_ = true;
+
+    // 비디오 가장자리에서 UI를 다시 호출할 수 있도록 커서를 복원한다.
+    if (cursor().shape() == Qt::BlankCursor) unsetCursor();
+    if (mpvWidget_) mpvWidget_->unsetCursor();
     if (musicPage_) musicPage_->unsetCursor();
-    // 재생 중 마우스 움직임이 있으면 3초 후 숨김 타이머 재시작
-    // 음악 모드에서는 타이머 비활성화 (커서/타이틀바 숨기지 않음)
-    if (isPlaying_ && !isMusicMode_ && uiHideTimer_) {
-        uiHideTimer_->start(3000);
+    if (isPlaying_ && !isMusicMode_ && uiHideTimer_)
+        uiHideTimer_->start(UI_AUTO_HIDE_DELAY_MS);
+}
+
+void MainWindow::showBottomUi() {
+    // 음악 모드는 MusicWidget의 자체 컨트롤을 사용하므로 별도 하단바를 표시하지 않는다.
+    if (isMusicMode_ || !controlBar_) return;
+    controlBar_->show();
+    uiVisible_ = true;
+
+    if (cursor().shape() == Qt::BlankCursor) unsetCursor();
+    if (mpvWidget_) mpvWidget_->unsetCursor();
+    if (isPlaying_ && uiHideTimer_)
+        uiHideTimer_->start(UI_AUTO_HIDE_DELAY_MS);
+}
+
+void MainWindow::showUI() {
+    // 명시적 동작(일시정지, 팝업, 우클릭, 설정 복귀)에서는 두 영역을 함께 표시한다.
+    // 단순 마우스 이동은 revealUiForVideoEdge()만 호출하므로 중앙 영상 영역에서 UI가 나타나지 않는다.
+    if (isMusicMode_) {
+        showTopUi();
+        return;
+    }
+    showTopUi();
+    showBottomUi();
+}
+
+void MainWindow::revealUiForVideoEdge(const QPoint& videoPosition) {
+    if (isMusicMode_ || !isPlaying_ || !mpvWidget_) return;
+
+    // 중앙 영상 영역의 단순 마우스 이동은 어떠한 UI도 표시하지 않는다.
+    if (videoPosition.y() <= TOP_UI_REVEAL_ZONE) {
+        // 가장자리 동작은 해당 영역만 표시한다. 중앙 화면과 반대쪽 UI는 가리지 않는다.
+        if (controlBar_) controlBar_->hide();
+        showTopUi();
+    } else if (videoPosition.y() >= mpvWidget_->height() - BOTTOM_UI_REVEAL_ZONE) {
+        if (titleBar_) titleBar_->hide();
+        showBottomUi();
     }
 }
 
@@ -748,24 +776,18 @@ void MainWindow::hideUI() {
         return;
     }
     // 전문 기능 패널이 실제로 열려 있으면 UI/커서를 숨기지 않음.
-    // 플래그가 지연된 경우에도 패널 위에서 마우스가 사라지지 않도록 실제 가시성으로 판단한다.
     if (proFeatures_ && proFeatures_->isVisible()) {
-        if (uiHideTimer_) uiHideTimer_->start(3000);
+        if (uiHideTimer_) uiHideTimer_->start(UI_AUTO_HIDE_DELAY_MS);
         return;
     }
     if (uiVisible_ && isPlaying_) {
-        if (isFullscreen_) {
-            // 영상 전체화면: 컨트롤바만 숨김
-            controlBar_->hide();
-        } else {
-            // 영상 창 모드: 타이틀바+컨트롤바 모두 숨김
-            titleBar_->hide();
-            controlBar_->hide();
-        }
+        // 전체 화면·창 모드 모두 노출 중인 상단·하단 UI만 숨긴다.
+        // 레이아웃을 변경하지 않는 hide()만 사용하므로 영상 프레임과 오버레이는 유지된다.
+        if (titleBar_) titleBar_->hide();
+        if (controlBar_) controlBar_->hide();
         uiVisible_ = false;
-        // 마우스 커서 숨김 (영상 모드에서만)
         setCursor(Qt::BlankCursor);
-        mpvWidget_->setCursor(Qt::BlankCursor);
+        if (mpvWidget_) mpvWidget_->setCursor(Qt::BlankCursor);
     }
 }
 
@@ -1619,35 +1641,6 @@ void MainWindow::resizeEvent(QResizeEvent* e) {
     }
 }
 
-void MainWindow::showEvent(QShowEvent* e) {
-    QMainWindow::showEvent(e);
-    enableWindowsSnapIntegration();
-}
-
-void MainWindow::enableWindowsSnapIntegration() {
-#ifdef Q_OS_WIN
-    if (windowsSnapIntegrationApplied_) return;
-
-    // FramelessWindowHint는 표준 제목 표시줄만 감출 뿐, 창 스냅에 필요한
-    // 크기 조절·최대화·시스템 메뉴 스타일까지 없애면 안 된다. HWND가 실제로
-    // 생성된 showEvent 시점에 보강하고 SWP_FRAMECHANGED로 Windows에 알린다.
-    const HWND hwnd = reinterpret_cast<HWND>(winId());
-    if (!hwnd) return;
-    const LONG_PTR style = GetWindowLongPtrW(hwnd, GWL_STYLE);
-    const LONG_PTR required = WS_THICKFRAME | WS_MAXIMIZEBOX | WS_MINIMIZEBOX | WS_SYSMENU;
-    if ((style & required) != required) {
-        SetWindowLongPtrW(hwnd, GWL_STYLE, style | required);
-        SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
-                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
-                     SWP_NOACTIVATE | SWP_FRAMECHANGED);
-    }
-    windowsSnapIntegrationApplied_ = true;
-    qInfo() << "[MainWindow] Windows Snap/시스템 창 스타일 활성화";
-#else
-    windowsSnapIntegrationApplied_ = true;
-#endif
-}
-
 // ── 창 크기 조절 ──────────────────────────────────────────────────
 int MainWindow::getResizeEdge(const QPoint& pos) const {
     int m = RESIZE_MARGIN, w = width(), h = height();
@@ -1773,14 +1766,6 @@ bool MainWindow::nativeEvent(const QByteArray& type, void* msg, qintptr* result)
             QPoint logicalGlobal(qRound(screenX / dpr), qRound(screenY / dpr));
             QPoint pos = mapFromGlobal(logicalGlobal);
 
-            // Windows 11은 사용자 지정 타이틀바의 최대화 버튼 영역을
-            // HTMAXBUTTON으로 받아야 hover Snap Layout을 표시한다.
-            if (!isFullscreen_ && titleBar_ &&
-                titleBar_->maximizeButtonRectInWindow().contains(pos)) {
-                *result = HTMAXBUTTON;
-                return true;
-            }
-
             int edge = getResizeEdge(pos);
             if (edge > 0) {
                 static const LRESULT edges[] = {0,HTLEFT,HTRIGHT,HTTOP,HTBOTTOM,
@@ -1807,11 +1792,6 @@ void MainWindow::mousePressEvent(QMouseEvent* e) {
 }
 
 bool MainWindow::eventFilter(QObject* obj, QEvent* event) {
-    // ── 마우스 이동 시 showUI() 전역 호출 ──────────────────────────────
-    // 자식 위젯 위에서도 uiHideTimer_를 리셋하여 커서가 숨겨지지 않도록 한다.
-    if (event->type() == QEvent::MouseMove) {
-        showUI();
-    }
     if (obj == mpvWidget_) {
         // 클릭 시 MainWindow로 포커스 재설정 - 키 이벤트가 keyPressEvent로 정상 전달됨
         if (event->type() == QEvent::MouseButtonPress) {
@@ -1825,16 +1805,10 @@ bool MainWindow::eventFilter(QObject* obj, QEvent* event) {
             }
         }
         if (event->type() == QEvent::MouseMove) {
+            // 중앙 영상 영역의 마우스 이동은 UI를 건드리지 않는다.
+            // 상단·하단 가장자리 진입에만 각각의 UI를 노출한다.
             auto* me = static_cast<QMouseEvent*>(event);
-            showUI();
-            // 전체화면: 상단 60px 영역에 마우스 오면 타이틀바 일시 표시
-            if (isFullscreen_) {
-                if (me->pos().y() <= 60) {
-                    titleBar_->show();
-                } else {
-                    if (!uiVisible_) titleBar_->hide();
-                }
-            }
+            revealUiForVideoEdge(me->pos());
         } else if (event->type() == QEvent::MouseButtonDblClick) {
             // 영상 더블클릭 → 전체화면 토글 (팟플레이어 동일 동작)
             auto* me = static_cast<QMouseEvent*>(event);
@@ -1863,8 +1837,7 @@ bool MainWindow::eventFilter(QObject* obj, QEvent* event) {
 }
 
 void MainWindow::mouseMoveEvent(QMouseEvent* e) {
-    // 마우스 움직임 시 UI 표시 (3초 후 다시 숨김)
-    showUI();
+    // 중앙 화면의 단순 마우스 이동은 UI 노출을 유발하지 않는다.
     if (!resizing_) {
         int edge = getResizeEdge(e->pos());
         if (edge == 0) {

@@ -1,5 +1,5 @@
 {
-  "version": "6.19.9",
-  "domain": "installer",
-  "purpose": "사전 테스트 패키지 전달 안정화"
+  "version": "6.20.0",
+  "domain": "ui",
+  "purpose": "무테 창 시스템 프레임 회귀 복구 및 상단·하단 가장자리 UI 노출"
 }

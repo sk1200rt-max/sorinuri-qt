@@ -144,11 +144,6 @@ void TitleBar::setFullscreenMode(bool fs) {
     btnMax_->setIcon(QIcon(fs ? ":/icons/restore.svg" : ":/icons/maximize.svg"));
 }
 
-QRect TitleBar::maximizeButtonRectInWindow() const {
-    if (!btnMax_ || !window()) return {};
-    return QRect(btnMax_->mapTo(window(), QPoint(0, 0)), btnMax_->size());
-}
-
 void TitleBar::mousePressEvent(QMouseEvent* e) {
     if (e->button() == Qt::LeftButton) {
         // 좌표를 직접 옮기면 Windows가 비클라이언트 드래그를 보지 못해

@@ -4,7 +4,6 @@
 #include <QPushButton>
 #include <QHBoxLayout>
 #include <QMouseEvent>
-#include <QRect>
 
 class TitleBar : public QWidget {
     Q_OBJECT
@@ -14,9 +13,6 @@ public:
     void setAudioBadge(const QString& codec);
     void setFullscreenMode(bool fs);
     void setAlwaysOnTop(bool pinned);
-    // Windows Snap Layout이 사용자 지정 최대화 버튼을 인식하도록
-    // MainWindow의 WM_NCHITTEST 처리에서 사용할 논리 좌표 영역을 반환한다.
-    QRect maximizeButtonRectInWindow() const;
 
 signals:
     void minimizeClicked();

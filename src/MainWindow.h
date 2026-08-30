@@ -72,7 +72,6 @@ protected:
     void mouseMoveEvent(QMouseEvent* e) override;
     void mouseReleaseEvent(QMouseEvent* e) override;
     void resizeEvent(QResizeEvent* e) override;
-    void showEvent(QShowEvent* e) override;
     bool eventFilter(QObject* obj, QEvent* event) override;
 
 private slots:
@@ -128,8 +127,10 @@ private:
     void applyQueueRepeatMode();
     void loadMusicMeta(const QString& path);
     void showUI();
+    void showTopUi();
+    void showBottomUi();
+    void revealUiForVideoEdge(const QPoint& videoPosition);
     void hideUI();
-    void enableWindowsSnapIntegration();
 
     // 이어보기 (재생 위치 저장/복원)
     void saveResumePosition();
@@ -234,5 +235,4 @@ private:
     // 절전 복귀·HDMI 장치 변경이 연속 도착해도 한 번만 오디오 출력을 복구한다.
     void scheduleAudioOutputRecovery(int delayMs);
     QTimer* audioOutputRecoveryTimer_ = nullptr;
-    bool windowsSnapIntegrationApplied_ = false;
 };

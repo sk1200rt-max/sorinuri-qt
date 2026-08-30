@@ -1,5 +1,14 @@
 [
   {
+    "version": "6.20.0",
+    "date": "2026-08-30",
+    "title": "무테 UI 복구와 가장자리 컨트롤 노출",
+    "desc": "상단 흰색 시스템 바와 UI 잘림을 일으킨 창 스타일 주입을 제거하고, 재생 중 상단과 하단 가장자리에서만 해당 UI가 나타나도록 개선했습니다.",
+    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.20.0.exe",
+    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.20.0-Portable.zip",
+    "tags": []
+  },
+  {
     "version": "6.19.9",
     "date": "2026-08-30",
     "title": "실장비 사전 테스트 패키지 안정화",
