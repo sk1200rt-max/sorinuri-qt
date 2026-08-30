@@ -3,7 +3,7 @@
 
 #define MyAppName "소리누리"
 #define MyAppNameEn "Sorinuri"
-#define MyAppVersion "6.20.0"
+#define MyAppVersion "6.20.1"
 #define MyAppPublisher "Gaon Communication"
 #define MyAppURL "https://sorinuri.com"
 #define MyAppExeName "Sorinuri.exe"
@@ -79,10 +79,12 @@ Name: "{userappdata}\Microsoft\Internet Explorer\Quick Launch\{#MyAppName}"; Fil
 [Run]
 ; Visual C++ 런타임 자동 설치 (이미 설치되어 있으면 건너뜀)
 Filename: "{tmp}\vc_redist.x64.exe"; Parameters: "/install /quiet /norestart"; StatusMsg: "Visual C++ 런타임 설치 중..."; Flags: skipifdoesntexist waituntilterminated
-; Windows 10/11은 기본 앱을 설치 프로그램이 강제할 수 없다(UserChoice 보호).
-; 파일 연결 작업은 위 레지스트리 등록과 SHChangeNotify로만 완료한다. 설치 직후
-; Settings를 자동 실행하지 않아 업그레이드 흐름을 중단시키거나 ShellExecute 오류를
-; 표시하지 않는다. 사용자는 필요할 때 Windows 기본 앱 화면에서 선택할 수 있다.
+; Windows 10/11의 UserChoice 기본값은 설치 프로그램이 강제할 수 없다.
+; 다만 사용자가 '호환 파일 형식을 소리누리로 연결'을 선택한 경우에는 레지스트리
+; 등록·Explorer 갱신이 끝난 뒤 해당 기본 앱 화면을 열어 한 번의 '기본값으로 설정'으로
+; 전체 지원 형식을 소리누리로 확정할 수 있게 한다. 원래 사용자 컨텍스트로 실행해
+; 관리자 권한 Settings 프로세스와 ShellExecute 오류를 피한다.
+Filename: "{app}\{#MyAppExeName}"; Parameters: "--register-file-associations"; Flags: nowait skipifsilent runasoriginaluser; Tasks: fileassoc
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 
 [Registry]
@@ -219,6 +221,197 @@ Root: HKLM64; Subkey: "Software\Classes\Sorinuri.mka\DefaultIcon"; ValueType: st
 Root: HKLM64; Subkey: "Software\Classes\Sorinuri.mka\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: fileassoc
 
 
+; ── v6.20.1: 공개 지원 형식 전체 등록 ───────────────────────────────
+Root: HKLM64; Subkey: "Software\Classes\.asf\OpenWithProgids"; ValueType: string; ValueName: "Sorinuri.asf"; ValueData: ""; Flags: uninsdeletevalue; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.asf"; ValueType: string; ValueName: ""; ValueData: "ASF 비디오 파일"; Flags: uninsdeletekey; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.asf\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.asf\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: fileassoc
+
+Root: HKLM64; Subkey: "Software\Classes\.f4v\OpenWithProgids"; ValueType: string; ValueName: "Sorinuri.f4v"; ValueData: ""; Flags: uninsdeletevalue; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.f4v"; ValueType: string; ValueName: ""; ValueData: "F4V 비디오 파일"; Flags: uninsdeletekey; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.f4v\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.f4v\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: fileassoc
+
+Root: HKLM64; Subkey: "Software\Classes\.mts\OpenWithProgids"; ValueType: string; ValueName: "Sorinuri.mts"; ValueData: ""; Flags: uninsdeletevalue; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.mts"; ValueType: string; ValueName: ""; ValueData: "MTS 비디오 파일"; Flags: uninsdeletekey; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.mts\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.mts\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: fileassoc
+
+Root: HKLM64; Subkey: "Software\Classes\.m2t\OpenWithProgids"; ValueType: string; ValueName: "Sorinuri.m2t"; ValueData: ""; Flags: uninsdeletevalue; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.m2t"; ValueType: string; ValueName: ""; ValueData: "M2T 비디오 파일"; Flags: uninsdeletekey; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.m2t\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.m2t\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: fileassoc
+
+Root: HKLM64; Subkey: "Software\Classes\.ogm\OpenWithProgids"; ValueType: string; ValueName: "Sorinuri.ogm"; ValueData: ""; Flags: uninsdeletevalue; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.ogm"; ValueType: string; ValueName: ""; ValueData: "OGM 미디어 파일"; Flags: uninsdeletekey; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.ogm\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.ogm\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: fileassoc
+
+Root: HKLM64; Subkey: "Software\Classes\.3g2\OpenWithProgids"; ValueType: string; ValueName: "Sorinuri.3g2"; ValueData: ""; Flags: uninsdeletevalue; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.3g2"; ValueType: string; ValueName: ""; ValueData: "3GPP2 비디오 파일"; Flags: uninsdeletekey; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.3g2\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.3g2\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: fileassoc
+
+Root: HKLM64; Subkey: "Software\Classes\.mpg\OpenWithProgids"; ValueType: string; ValueName: "Sorinuri.mpg"; ValueData: ""; Flags: uninsdeletevalue; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.mpg"; ValueType: string; ValueName: ""; ValueData: "MPEG 비디오 파일"; Flags: uninsdeletekey; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.mpg\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.mpg\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: fileassoc
+
+Root: HKLM64; Subkey: "Software\Classes\.mpeg\OpenWithProgids"; ValueType: string; ValueName: "Sorinuri.mpeg"; ValueData: ""; Flags: uninsdeletevalue; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.mpeg"; ValueType: string; ValueName: ""; ValueData: "MPEG 비디오 파일"; Flags: uninsdeletekey; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.mpeg\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.mpeg\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: fileassoc
+
+Root: HKLM64; Subkey: "Software\Classes\.mpe\OpenWithProgids"; ValueType: string; ValueName: "Sorinuri.mpe"; ValueData: ""; Flags: uninsdeletevalue; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.mpe"; ValueType: string; ValueName: ""; ValueData: "MPEG 비디오 파일"; Flags: uninsdeletekey; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.mpe\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.mpe\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: fileassoc
+
+Root: HKLM64; Subkey: "Software\Classes\.vob\OpenWithProgids"; ValueType: string; ValueName: "Sorinuri.vob"; ValueData: ""; Flags: uninsdeletevalue; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.vob"; ValueType: string; ValueName: ""; ValueData: "DVD 비디오 파일"; Flags: uninsdeletekey; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.vob\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.vob\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: fileassoc
+
+Root: HKLM64; Subkey: "Software\Classes\.divx\OpenWithProgids"; ValueType: string; ValueName: "Sorinuri.divx"; ValueData: ""; Flags: uninsdeletevalue; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.divx"; ValueType: string; ValueName: ""; ValueData: "DivX 비디오 파일"; Flags: uninsdeletekey; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.divx\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.divx\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: fileassoc
+
+Root: HKLM64; Subkey: "Software\Classes\.xvid\OpenWithProgids"; ValueType: string; ValueName: "Sorinuri.xvid"; ValueData: ""; Flags: uninsdeletevalue; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.xvid"; ValueType: string; ValueName: ""; ValueData: "Xvid 비디오 파일"; Flags: uninsdeletekey; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.xvid\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.xvid\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: fileassoc
+
+Root: HKLM64; Subkey: "Software\Classes\.mxf\OpenWithProgids"; ValueType: string; ValueName: "Sorinuri.mxf"; ValueData: ""; Flags: uninsdeletevalue; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.mxf"; ValueType: string; ValueName: ""; ValueData: "MXF 비디오 파일"; Flags: uninsdeletekey; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.mxf\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.mxf\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: fileassoc
+
+Root: HKLM64; Subkey: "Software\Classes\.dvr-ms\OpenWithProgids"; ValueType: string; ValueName: "Sorinuri.dvr-ms"; ValueData: ""; Flags: uninsdeletevalue; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.dvr-ms"; ValueType: string; ValueName: ""; ValueData: "DVR-MS 비디오 파일"; Flags: uninsdeletekey; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.dvr-ms\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.dvr-ms\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: fileassoc
+
+Root: HKLM64; Subkey: "Software\Classes\.tp\OpenWithProgids"; ValueType: string; ValueName: "Sorinuri.tp"; ValueData: ""; Flags: uninsdeletevalue; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.tp"; ValueType: string; ValueName: ""; ValueData: "MPEG 전송 스트림"; Flags: uninsdeletekey; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.tp\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.tp\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: fileassoc
+
+Root: HKLM64; Subkey: "Software\Classes\.trp\OpenWithProgids"; ValueType: string; ValueName: "Sorinuri.trp"; ValueData: ""; Flags: uninsdeletevalue; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.trp"; ValueType: string; ValueName: ""; ValueData: "MPEG 전송 스트림"; Flags: uninsdeletekey; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.trp\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.trp\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: fileassoc
+
+Root: HKLM64; Subkey: "Software\Classes\.tod\OpenWithProgids"; ValueType: string; ValueName: "Sorinuri.tod"; ValueData: ""; Flags: uninsdeletevalue; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.tod"; ValueType: string; ValueName: ""; ValueData: "TOD 비디오 파일"; Flags: uninsdeletekey; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.tod\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.tod\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: fileassoc
+
+Root: HKLM64; Subkey: "Software\Classes\.mod\OpenWithProgids"; ValueType: string; ValueName: "Sorinuri.mod"; ValueData: ""; Flags: uninsdeletevalue; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.mod"; ValueType: string; ValueName: ""; ValueData: "MOD 비디오 파일"; Flags: uninsdeletekey; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.mod\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.mod\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: fileassoc
+
+Root: HKLM64; Subkey: "Software\Classes\.mp2\OpenWithProgids"; ValueType: string; ValueName: "Sorinuri.mp2"; ValueData: ""; Flags: uninsdeletevalue; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.mp2"; ValueType: string; ValueName: ""; ValueData: "MPEG 오디오 파일"; Flags: uninsdeletekey; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.mp2\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.mp2\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: fileassoc
+
+Root: HKLM64; Subkey: "Software\Classes\.mpa\OpenWithProgids"; ValueType: string; ValueName: "Sorinuri.mpa"; ValueData: ""; Flags: uninsdeletevalue; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.mpa"; ValueType: string; ValueName: ""; ValueData: "MPEG 오디오 파일"; Flags: uninsdeletekey; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.mpa\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.mpa\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: fileassoc
+
+Root: HKLM64; Subkey: "Software\Classes\.alac\OpenWithProgids"; ValueType: string; ValueName: "Sorinuri.alac"; ValueData: ""; Flags: uninsdeletevalue; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.alac"; ValueType: string; ValueName: ""; ValueData: "ALAC 오디오 파일"; Flags: uninsdeletekey; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.alac\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.alac\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: fileassoc
+
+Root: HKLM64; Subkey: "Software\Classes\.wave\OpenWithProgids"; ValueType: string; ValueName: "Sorinuri.wave"; ValueData: ""; Flags: uninsdeletevalue; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.wave"; ValueType: string; ValueName: ""; ValueData: "WAVE 오디오 파일"; Flags: uninsdeletekey; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.wave\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.wave\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: fileassoc
+
+Root: HKLM64; Subkey: "Software\Classes\.oga\OpenWithProgids"; ValueType: string; ValueName: "Sorinuri.oga"; ValueData: ""; Flags: uninsdeletevalue; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.oga"; ValueType: string; ValueName: ""; ValueData: "Ogg 오디오 파일"; Flags: uninsdeletekey; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.oga\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.oga\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: fileassoc
+
+Root: HKLM64; Subkey: "Software\Classes\.wv\OpenWithProgids"; ValueType: string; ValueName: "Sorinuri.wv"; ValueData: ""; Flags: uninsdeletevalue; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.wv"; ValueType: string; ValueName: ""; ValueData: "WavPack 오디오 파일"; Flags: uninsdeletekey; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.wv\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.wv\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: fileassoc
+
+Root: HKLM64; Subkey: "Software\Classes\.dsd\OpenWithProgids"; ValueType: string; ValueName: "Sorinuri.dsd"; ValueData: ""; Flags: uninsdeletevalue; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.dsd"; ValueType: string; ValueName: ""; ValueData: "DSD 오디오 파일"; Flags: uninsdeletekey; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.dsd\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.dsd\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: fileassoc
+
+Root: HKLM64; Subkey: "Software\Classes\.dts\OpenWithProgids"; ValueType: string; ValueName: "Sorinuri.dts"; ValueData: ""; Flags: uninsdeletevalue; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.dts"; ValueType: string; ValueName: ""; ValueData: "DTS 오디오 파일"; Flags: uninsdeletekey; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.dts\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.dts\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: fileassoc
+
+Root: HKLM64; Subkey: "Software\Classes\.ac3\OpenWithProgids"; ValueType: string; ValueName: "Sorinuri.ac3"; ValueData: ""; Flags: uninsdeletevalue; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.ac3"; ValueType: string; ValueName: ""; ValueData: "Dolby Digital 오디오 파일"; Flags: uninsdeletekey; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.ac3\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.ac3\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: fileassoc
+
+Root: HKLM64; Subkey: "Software\Classes\.eac3\OpenWithProgids"; ValueType: string; ValueName: "Sorinuri.eac3"; ValueData: ""; Flags: uninsdeletevalue; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.eac3"; ValueType: string; ValueName: ""; ValueData: "Dolby Digital Plus 오디오 파일"; Flags: uninsdeletekey; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.eac3\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.eac3\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: fileassoc
+
+Root: HKLM64; Subkey: "Software\Classes\.truehd\OpenWithProgids"; ValueType: string; ValueName: "Sorinuri.truehd"; ValueData: ""; Flags: uninsdeletevalue; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.truehd"; ValueType: string; ValueName: ""; ValueData: "Dolby TrueHD 오디오 파일"; Flags: uninsdeletekey; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.truehd\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.truehd\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: fileassoc
+
+Root: HKLM64; Subkey: "Software\Classes\.thd\OpenWithProgids"; ValueType: string; ValueName: "Sorinuri.thd"; ValueData: ""; Flags: uninsdeletevalue; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.thd"; ValueType: string; ValueName: ""; ValueData: "Dolby TrueHD 오디오 파일"; Flags: uninsdeletekey; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.thd\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.thd\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: fileassoc
+
+Root: HKLM64; Subkey: "Software\Classes\.aiff\OpenWithProgids"; ValueType: string; ValueName: "Sorinuri.aiff"; ValueData: ""; Flags: uninsdeletevalue; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.aiff"; ValueType: string; ValueName: ""; ValueData: "AIFF 오디오 파일"; Flags: uninsdeletekey; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.aiff\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.aiff\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: fileassoc
+
+Root: HKLM64; Subkey: "Software\Classes\.aif\OpenWithProgids"; ValueType: string; ValueName: "Sorinuri.aif"; ValueData: ""; Flags: uninsdeletevalue; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.aif"; ValueType: string; ValueName: ""; ValueData: "AIFF 오디오 파일"; Flags: uninsdeletekey; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.aif\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.aif\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: fileassoc
+
+Root: HKLM64; Subkey: "Software\Classes\.au\OpenWithProgids"; ValueType: string; ValueName: "Sorinuri.au"; ValueData: ""; Flags: uninsdeletevalue; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.au"; ValueType: string; ValueName: ""; ValueData: "AU 오디오 파일"; Flags: uninsdeletekey; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.au\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.au\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: fileassoc
+
+Root: HKLM64; Subkey: "Software\Classes\.amr\OpenWithProgids"; ValueType: string; ValueName: "Sorinuri.amr"; ValueData: ""; Flags: uninsdeletevalue; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.amr"; ValueType: string; ValueName: ""; ValueData: "AMR 오디오 파일"; Flags: uninsdeletekey; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.amr\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.amr\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: fileassoc
+
+Root: HKLM64; Subkey: "Software\Classes\.tak\OpenWithProgids"; ValueType: string; ValueName: "Sorinuri.tak"; ValueData: ""; Flags: uninsdeletevalue; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.tak"; ValueType: string; ValueName: ""; ValueData: "TAK 오디오 파일"; Flags: uninsdeletekey; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.tak\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.tak\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: fileassoc
+
+Root: HKLM64; Subkey: "Software\Classes\.tta\OpenWithProgids"; ValueType: string; ValueName: "Sorinuri.tta"; ValueData: ""; Flags: uninsdeletevalue; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.tta"; ValueType: string; ValueName: ""; ValueData: "TTA 오디오 파일"; Flags: uninsdeletekey; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.tta\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.tta\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: fileassoc
+
+Root: HKLM64; Subkey: "Software\Classes\.mpc\OpenWithProgids"; ValueType: string; ValueName: "Sorinuri.mpc"; ValueData: ""; Flags: uninsdeletevalue; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.mpc"; ValueType: string; ValueName: ""; ValueData: "Musepack 오디오 파일"; Flags: uninsdeletekey; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.mpc\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.mpc\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: fileassoc
+
+Root: HKLM64; Subkey: "Software\Classes\.spx\OpenWithProgids"; ValueType: string; ValueName: "Sorinuri.spx"; ValueData: ""; Flags: uninsdeletevalue; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.spx"; ValueType: string; ValueName: ""; ValueData: "Speex 오디오 파일"; Flags: uninsdeletekey; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.spx\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Sorinuri.spx\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: fileassoc
+
 ; ── Windows Capabilities 등록 (탐색기 우클릭 "연결 프로그램" 목록 표시 필수) ──────────
 ; RegisteredApplications 없이는 Windows가 소리누리를 연결 프로그램 목록에 표시하지 않음
 Root: HKLM64; Subkey: "Software\Sorinuri\Capabilities"; ValueType: string; ValueName: "ApplicationName"; ValueData: "소리누리"; Flags: uninsdeletekey; Tasks: fileassoc
@@ -249,6 +442,44 @@ Root: HKLM64; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueTy
 Root: HKLM64; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".dsf"; ValueData: "Sorinuri.dsf"; Tasks: fileassoc
 Root: HKLM64; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".dff"; ValueData: "Sorinuri.dff"; Tasks: fileassoc
 Root: HKLM64; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".mka"; ValueData: "Sorinuri.mka"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".asf"; ValueData: "Sorinuri.asf"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".f4v"; ValueData: "Sorinuri.f4v"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".mts"; ValueData: "Sorinuri.mts"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".m2t"; ValueData: "Sorinuri.m2t"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".ogm"; ValueData: "Sorinuri.ogm"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".3g2"; ValueData: "Sorinuri.3g2"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".mpg"; ValueData: "Sorinuri.mpg"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".mpeg"; ValueData: "Sorinuri.mpeg"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".mpe"; ValueData: "Sorinuri.mpe"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".vob"; ValueData: "Sorinuri.vob"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".divx"; ValueData: "Sorinuri.divx"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".xvid"; ValueData: "Sorinuri.xvid"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".mxf"; ValueData: "Sorinuri.mxf"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".dvr-ms"; ValueData: "Sorinuri.dvr-ms"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".tp"; ValueData: "Sorinuri.tp"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".trp"; ValueData: "Sorinuri.trp"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".tod"; ValueData: "Sorinuri.tod"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".mod"; ValueData: "Sorinuri.mod"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".mp2"; ValueData: "Sorinuri.mp2"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".mpa"; ValueData: "Sorinuri.mpa"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".alac"; ValueData: "Sorinuri.alac"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".wave"; ValueData: "Sorinuri.wave"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".oga"; ValueData: "Sorinuri.oga"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".wv"; ValueData: "Sorinuri.wv"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".dsd"; ValueData: "Sorinuri.dsd"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".dts"; ValueData: "Sorinuri.dts"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".ac3"; ValueData: "Sorinuri.ac3"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".eac3"; ValueData: "Sorinuri.eac3"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".truehd"; ValueData: "Sorinuri.truehd"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".thd"; ValueData: "Sorinuri.thd"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".aiff"; ValueData: "Sorinuri.aiff"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".aif"; ValueData: "Sorinuri.aif"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".au"; ValueData: "Sorinuri.au"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".amr"; ValueData: "Sorinuri.amr"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".tak"; ValueData: "Sorinuri.tak"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".tta"; ValueData: "Sorinuri.tta"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".mpc"; ValueData: "Sorinuri.mpc"; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Sorinuri\Capabilities\FileAssociations"; ValueType: string; ValueName: ".spx"; ValueData: "Sorinuri.spx"; Tasks: fileassoc
 ; RegisteredApplications: Windows에 소리누리를 공식 등록 (연결 프로그램 목록 표시 핵심 키)
 Root: HKLM64; Subkey: "Software\RegisteredApplications"; ValueType: string; ValueName: "소리누리"; ValueData: "Software\Sorinuri\Capabilities"; Flags: uninsdeletevalue; Tasks: fileassoc
 
@@ -284,6 +515,44 @@ Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\SupportedTypes
 Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\SupportedTypes"; ValueType: string; ValueName: ".dsf"; ValueData: ""; Tasks: fileassoc
 Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\SupportedTypes"; ValueType: string; ValueName: ".dff"; ValueData: ""; Tasks: fileassoc
 Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\SupportedTypes"; ValueType: string; ValueName: ".mka"; ValueData: ""; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\SupportedTypes"; ValueType: string; ValueName: ".asf"; ValueData: ""; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\SupportedTypes"; ValueType: string; ValueName: ".f4v"; ValueData: ""; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\SupportedTypes"; ValueType: string; ValueName: ".mts"; ValueData: ""; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\SupportedTypes"; ValueType: string; ValueName: ".m2t"; ValueData: ""; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\SupportedTypes"; ValueType: string; ValueName: ".ogm"; ValueData: ""; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\SupportedTypes"; ValueType: string; ValueName: ".3g2"; ValueData: ""; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\SupportedTypes"; ValueType: string; ValueName: ".mpg"; ValueData: ""; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\SupportedTypes"; ValueType: string; ValueName: ".mpeg"; ValueData: ""; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\SupportedTypes"; ValueType: string; ValueName: ".mpe"; ValueData: ""; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\SupportedTypes"; ValueType: string; ValueName: ".vob"; ValueData: ""; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\SupportedTypes"; ValueType: string; ValueName: ".divx"; ValueData: ""; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\SupportedTypes"; ValueType: string; ValueName: ".xvid"; ValueData: ""; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\SupportedTypes"; ValueType: string; ValueName: ".mxf"; ValueData: ""; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\SupportedTypes"; ValueType: string; ValueName: ".dvr-ms"; ValueData: ""; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\SupportedTypes"; ValueType: string; ValueName: ".tp"; ValueData: ""; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\SupportedTypes"; ValueType: string; ValueName: ".trp"; ValueData: ""; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\SupportedTypes"; ValueType: string; ValueName: ".tod"; ValueData: ""; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\SupportedTypes"; ValueType: string; ValueName: ".mod"; ValueData: ""; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\SupportedTypes"; ValueType: string; ValueName: ".mp2"; ValueData: ""; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\SupportedTypes"; ValueType: string; ValueName: ".mpa"; ValueData: ""; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\SupportedTypes"; ValueType: string; ValueName: ".alac"; ValueData: ""; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\SupportedTypes"; ValueType: string; ValueName: ".wave"; ValueData: ""; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\SupportedTypes"; ValueType: string; ValueName: ".oga"; ValueData: ""; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\SupportedTypes"; ValueType: string; ValueName: ".wv"; ValueData: ""; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\SupportedTypes"; ValueType: string; ValueName: ".dsd"; ValueData: ""; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\SupportedTypes"; ValueType: string; ValueName: ".dts"; ValueData: ""; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\SupportedTypes"; ValueType: string; ValueName: ".ac3"; ValueData: ""; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\SupportedTypes"; ValueType: string; ValueName: ".eac3"; ValueData: ""; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\SupportedTypes"; ValueType: string; ValueName: ".truehd"; ValueData: ""; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\SupportedTypes"; ValueType: string; ValueName: ".thd"; ValueData: ""; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\SupportedTypes"; ValueType: string; ValueName: ".aiff"; ValueData: ""; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\SupportedTypes"; ValueType: string; ValueName: ".aif"; ValueData: ""; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\SupportedTypes"; ValueType: string; ValueName: ".au"; ValueData: ""; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\SupportedTypes"; ValueType: string; ValueName: ".amr"; ValueData: ""; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\SupportedTypes"; ValueType: string; ValueName: ".tak"; ValueData: ""; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\SupportedTypes"; ValueType: string; ValueName: ".tta"; ValueData: ""; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\SupportedTypes"; ValueType: string; ValueName: ".mpc"; ValueData: ""; Tasks: fileassoc
+Root: HKLM64; Subkey: "Software\Classes\Applications\Sorinuri.exe\SupportedTypes"; ValueType: string; ValueName: ".spx"; ValueData: ""; Tasks: fileassoc
 Root: HKLM64; Subkey: "Software\Microsoft\Windows\CurrentVersion\App Paths\Sorinuri.exe"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName}"; Flags: uninsdeletekey; Tasks: fileassoc
 
 [UninstallDelete]

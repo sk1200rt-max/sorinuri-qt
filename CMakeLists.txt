@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(Sorinuri VERSION 6.20.0 LANGUAGES CXX)
+project(Sorinuri VERSION 6.20.1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -204,7 +204,7 @@ if(WIN32)
     # WRL (Windows Runtime C++ Template Library) - WebView2 COM 인터페이스용
     # RuntimeObject.lib: RoInitialize, RoGetActivationFactory (SMTC WinRT)
     # runtimeobject.lib: Windows SDK 이름 (MSVC 소문자)
-    target_link_libraries(Sorinuri PRIVATE ole32 oleaut32 shlwapi winmm runtimeobject)  # winmm: timeBeginPeriod (타이머 해상도 1ms, 노트북 끊김 방지)
+    target_link_libraries(Sorinuri PRIVATE ole32 oleaut32 shlwapi winmm runtimeobject dwmapi)  # dwmapi: custom frame을 유지한 Windows Snap 처리
     # SMTC: ISystemMediaTransportControlsInterop 인터페이스 헤더 포함
     target_compile_definitions(Sorinuri PRIVATE
         WINVER=0x0A00

@@ -39,11 +39,19 @@
 #ifdef Q_OS_WIN
 #include <windows.h>
 #include <windowsx.h>
+#include <dwmapi.h>
 #endif
 
+// 설치의 Windows 파일 연결·파일 열기·라이브러리 판정에 사용하는 공개 지원 형식이다.
+// libmpv가 여는 모든 임의 확장자를 강제 연결하지 않고, 소리누리 UI가 명시적으로
+// 지원하는 오디오·비디오 컨테이너만 하나의 호환 목록으로 유지한다.
 static const QStringList MEDIA_EXTS = {
-    "mkv","mp4","avi","mov","wmv","flv","ts","m2ts","m4v","webm","ogv","3gp",
-    "mp3","flac","aac","ogg","wav","wma","m4a","opus","dts","ac3","truehd"
+    "mkv", "mp4", "avi", "mov", "wmv", "asf", "flv", "f4v", "ts", "m2ts", "mts", "m2t",
+    "m4v", "webm", "ogv", "ogm", "3gp", "3g2", "mpg", "mpeg", "mpe", "vob", "rm", "rmvb",
+    "divx", "xvid", "mxf", "dvr-ms", "tp", "trp", "tod", "mod",
+    "mp3", "mp2", "mpa", "aac", "m4a", "alac", "flac", "wav", "wave", "wma", "ogg", "oga",
+    "opus", "ape", "wv", "dsf", "dff", "dsd", "mka", "dts", "ac3", "eac3", "truehd", "thd",
+    "aiff", "aif", "au", "amr", "tak", "tta", "mpc", "spx"
 };
 
 MainWindow::MainWindow(QWidget* parent)
@@ -54,7 +62,12 @@ MainWindow::MainWindow(QWidget* parent)
     // 여기서는 250% 배율의 작은 논리 해상도를 막지 않는 안전한 하한만 둔다.
     setMinimumSize(640, 420);
     setAcceptDrops(true);
-    setWindowFlags(Qt::FramelessWindowHint | Qt::Window);
+    // Windows Snap은 WS_THICKFRAME·WS_MAXIMIZEBOX를 가진 표준 최상위 창에서만
+    // 정상 동작한다. 표준 프레임을 생성 단계부터 유지하고, nativeEvent의
+    // WM_NCCALCSIZE에서 비클라이언트 영역을 클라이언트로 확장해 소리누리의
+    // 커스텀 타이틀바만 보이게 한다. FramelessWindowHint와 사후 스타일 주입은
+    // HiDPI 환경에서 시스템 바·레이아웃 잘림을 유발하므로 사용하지 않는다.
+    setWindowFlags(Qt::Window);
 
     // yt-dlp 관리자 - 지연 초기화 (시작 직후 네트워크 요청 방지)
     ytdlp_ = nullptr;
@@ -998,8 +1011,11 @@ void MainWindow::onTracksChanged() { trackSelector_->refresh(); }
 void MainWindow::onOpenFile() {
     QStringList paths = QFileDialog::getOpenFileNames(
         this, "파일 열기", {},
-        "미디어 파일 (*.mkv *.mp4 *.avi *.mov *.wmv *.flv *.ts *.m2ts "
-        "*.m4v *.webm *.mp3 *.flac *.aac *.wav *.dts *.ac3 *.truehd);;"
+        "미디어 파일 (*.mkv *.mp4 *.avi *.mov *.wmv *.asf *.flv *.f4v *.ts *.m2ts *.mts *.m2t "
+        "*.m4v *.webm *.ogv *.ogm *.3gp *.3g2 *.mpg *.mpeg *.mpe *.vob *.rm *.rmvb *.divx *.xvid "
+        "*.mxf *.dvr-ms *.tp *.trp *.tod *.mod *.mp3 *.mp2 *.mpa *.aac *.m4a *.alac *.flac *.wav "
+        "*.wave *.wma *.ogg *.oga *.opus *.ape *.wv *.dsf *.dff *.dsd *.mka *.dts *.ac3 *.eac3 "
+        "*.truehd *.thd *.aiff *.aif *.au *.amr *.tak *.tta *.mpc *.spx);;"
         "모든 파일 (*.*)");
     if (!paths.isEmpty()) openFiles(paths);
 }
@@ -1641,6 +1657,22 @@ void MainWindow::resizeEvent(QResizeEvent* e) {
     }
 }
 
+void MainWindow::showEvent(QShowEvent* e) {
+    QMainWindow::showEvent(e);
+#ifdef Q_OS_WIN
+    // Qt::Window가 만든 표준 WS_THICKFRAME/WS_MAXIMIZEBOX 스타일을 사후에
+    // 변경하지 않는다. WM_NCCALCSIZE를 즉시 발생시켜 프레임만 클라이언트로
+    // 확장하면 Windows Snap은 유지하면서 소리누리의 다크 타이틀바가 전면에 남는다.
+    if (!customFrameInitialized_ && !isFullScreen()) {
+        const HWND hwnd = reinterpret_cast<HWND>(winId());
+        SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
+                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
+                     SWP_NOACTIVATE | SWP_FRAMECHANGED);
+        customFrameInitialized_ = true;
+    }
+#endif
+}
+
 // ── 창 크기 조절 ──────────────────────────────────────────────────
 int MainWindow::getResizeEdge(const QPoint& pos) const {
     int m = RESIZE_MARGIN, w = width(), h = height();
@@ -1757,20 +1789,61 @@ bool MainWindow::nativeEvent(const QByteArray& type, void* msg, qintptr* result)
             }
         }
 
-        if (m->message == WM_NCHITTEST) {
-            // WM_NCHITTEST lParam은 물리 픽셀(스크린 좌표)이므로
-            // DPI 스케일로 나눠서 논리 픽셀으로 변환
-            const double dpr = devicePixelRatio();
-            int screenX = GET_X_LPARAM(m->lParam);
-            int screenY = GET_Y_LPARAM(m->lParam);
-            QPoint logicalGlobal(qRound(screenX / dpr), qRound(screenY / dpr));
-            QPoint pos = mapFromGlobal(logicalGlobal);
+        // 표준 창 스타일은 유지하되, 클라이언트 영역을 창 전체로 확장한다.
+        // 따라서 Windows Snap·Aero Snap·최대화·키보드 스냅은 표준 최상위 창으로
+        // 처리되고, 화면에는 Qt 커스텀 타이틀바만 표시된다.
+        if (m->message == WM_NCCALCSIZE && m->wParam == TRUE) {
+            *result = 0;
+            return true;
+        }
 
-            int edge = getResizeEdge(pos);
+        if (m->message == WM_NCHITTEST) {
+            // Microsoft 권고에 따라 custom frame hit test 전에 DWM을 먼저 호출한다.
+            // 표준 caption 영역으로 처리된 경우에는 Windows가 Snap Layout과 시스템
+            // 버튼 동작을 직접 담당한다.
+            LRESULT dwmResult = 0;
+            const bool dwmHandled = DwmDefWindowProc(
+                m->hwnd, m->message, m->wParam, m->lParam, &dwmResult);
+
+            // lParam은 물리 스크린 좌표다. ScreenToClient로 현재 창의 물리
+            // 클라이언트 좌표로 변환한 뒤 Qt 논리 좌표로 바꿔 Per-Monitor DPI와
+            // 음수 다중 모니터 좌표를 안전하게 처리한다.
+            POINT clientPoint{GET_X_LPARAM(m->lParam), GET_Y_LPARAM(m->lParam)};
+            ScreenToClient(m->hwnd, &clientPoint);
+            const double dpr = devicePixelRatio();
+            const QPoint pos(qRound(clientPoint.x / dpr), qRound(clientPoint.y / dpr));
+
+            // 리사이즈 가장자리는 최우선이다. WM_NCCALCSIZE로 표준 프레임을
+            // 숨겼어도 HT* 반환값으로 Windows가 크기 조절과 가장자리 Snap을 처리한다.
+            const int edge = getResizeEdge(pos);
             if (edge > 0) {
-                static const LRESULT edges[] = {0,HTLEFT,HTRIGHT,HTTOP,HTBOTTOM,
-                    HTTOPLEFT,HTTOPRIGHT,HTBOTTOMLEFT,HTBOTTOMRIGHT};
+                static const LRESULT edges[] = {0, HTLEFT, HTRIGHT, HTTOP, HTBOTTOM,
+                    HTTOPLEFT, HTTOPRIGHT, HTBOTTOMLEFT, HTBOTTOMRIGHT};
                 *result = edges[edge];
+                return true;
+            }
+
+            if (titleBar_ && titleBar_->geometry().contains(pos)) {
+                const QPoint titlePos = titleBar_->mapFrom(this, pos);
+                // Windows 11 Snap Layout은 사용자 정의 최대화 버튼에 HTMAXBUTTON을
+                // 반환해야 표시된다. 다른 실제 버튼은 Qt가 클릭을 받도록 HTCLIENT다.
+                if (titleBar_->isMaximizeControlAt(titlePos)) {
+                    *result = HTMAXBUTTON;
+                    return true;
+                }
+                if (titleBar_->isInteractiveControlAt(titlePos)) {
+                    *result = HTCLIENT;
+                    return true;
+                }
+                // 버튼이 아닌 커스텀 타이틀바는 표준 캡션으로 처리되어 시스템
+                // 드래그·화면 위 최대화·좌우 가장자리 분할 배치를 제공한다.
+                *result = HTCAPTION;
+                return true;
+            }
+
+            // 소리누리 타이틀바·리사이즈 테두리 밖은 DWM이 처리한 결과를 사용한다.
+            if (dwmHandled) {
+                *result = dwmResult;
                 return true;
             }
         }

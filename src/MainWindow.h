@@ -11,6 +11,7 @@
 #include <QMouseEvent>
 #include <QCloseEvent>
 #include <QResizeEvent>
+#include <QShowEvent>
 #include <QProgressDialog>
 #include <QStackedWidget>
 #include <QPushButton>
@@ -72,6 +73,7 @@ protected:
     void mouseMoveEvent(QMouseEvent* e) override;
     void mouseReleaseEvent(QMouseEvent* e) override;
     void resizeEvent(QResizeEvent* e) override;
+    void showEvent(QShowEvent* e) override;
     bool eventFilter(QObject* obj, QEvent* event) override;
 
 private slots:
@@ -235,4 +237,8 @@ private:
     // 절전 복귀·HDMI 장치 변경이 연속 도착해도 한 번만 오디오 출력을 복구한다.
     void scheduleAudioOutputRecovery(int delayMs);
     QTimer* audioOutputRecoveryTimer_ = nullptr;
+
+    // Windows: 표준 Snap 창 스타일을 유지한 상태에서 비클라이언트 영역만
+    // 클라이언트로 확장한다. 초기 표시 뒤 한 번만 프레임 재계산을 요청한다.
+    bool customFrameInitialized_ = false;
 };

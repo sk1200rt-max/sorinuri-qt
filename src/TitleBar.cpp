@@ -109,6 +109,21 @@ TitleBar::TitleBar(QWidget* parent) : QWidget(parent) {
     connect(btnClose_,      &QPushButton::clicked, this, &TitleBar::closeClicked);
 }
 
+bool TitleBar::isInteractiveControlAt(const QPoint& localPos) const {
+    const QWidget* const controls[] = {
+        btnPin_, btnMin_, btnMax_, btnFullscreen_, btnClose_
+    };
+    for (const QWidget* control : controls) {
+        if (control && control->geometry().contains(localPos))
+            return true;
+    }
+    return false;
+}
+
+bool TitleBar::isMaximizeControlAt(const QPoint& localPos) const {
+    return btnMax_ && btnMax_->geometry().contains(localPos);
+}
+
 void TitleBar::setAlwaysOnTop(bool pinned) {
     // 외부에서 상태 설정 (시그널 발생 없이)
     btnPin_->blockSignals(true);

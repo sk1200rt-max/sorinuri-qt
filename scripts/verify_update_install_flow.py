@@ -40,8 +40,14 @@ quit_index = dialog.find("QApplication::quit();", launch_index)
 if launch_index < 0 or failure_index < launch_index or quit_index < failure_index:
     errors.append("설치 실행 실패 시 앱을 유지하는 종료 순서가 보장되지 않습니다.")
 
-if 'Parameters: "--register-file-associations"' in installer:
-    errors.append("설치 완료 뒤 기본 앱 설정 화면을 자동 실행하는 경로가 남아 있습니다.")
+# 파일 연결 체크를 선택한 사용자에게만 기본 앱 설정 화면을 열어 Windows UserChoice를
+# 한 번에 확정하게 한다. 이는 UpdateDialog의 설치 파일 실행과 독립된 [Run] 경로다.
+association_settings_run = (
+    'Parameters: "--register-file-associations"; '
+    'Flags: nowait skipifsilent runasoriginaluser; Tasks: fileassoc'
+)
+if association_settings_run not in installer:
+    errors.append("선택된 파일 연결 작업 뒤 원래 사용자 컨텍스트의 기본 앱 설정 경로가 누락됐습니다.")
 
 if errors:
     print("업데이트 설치 흐름 검증 실패:", file=sys.stderr)
@@ -49,4 +55,4 @@ if errors:
         print(f"- {error}", file=sys.stderr)
     raise SystemExit(1)
 
-print("업데이트 설치 흐름 검증 통과: 로컬 절대 경로·작업 폴더·실행 실패 복구·설치 후 설정 화면 미자동 실행 확인")
+print("업데이트 설치 흐름 검증 통과: 로컬 절대 경로·작업 폴더·실행 실패 복구·선택형 파일 연결 기본 앱 화면 확인")

@@ -1,5 +1,5 @@
 {
-  "version": "6.20.0",
-  "domain": "ui",
-  "purpose": "무테 창 시스템 프레임 회귀 복구 및 상단·하단 가장자리 UI 노출"
+  "version": "6.20.1",
+  "domain": "ui,renderer,installer",
+  "purpose": "무테 UI를 보존한 Windows Snap 복구와 전체 지원 파일 형식 연결 등록"
 }
