@@ -1,5 +1,5 @@
 {
-  "version": "6.19.7",
-  "domain": "ui,renderer,audio",
-  "purpose": "Windows Snap·유휴 반응성 개선"
+  "version": "6.19.8",
+  "domain": "installer",
+  "purpose": "실장비 사전 테스트 배포 절차 도입"
 }

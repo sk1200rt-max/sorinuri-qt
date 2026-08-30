@@ -1,5 +1,14 @@
 [
   {
+    "version": "6.19.8",
+    "date": "2026-08-30",
+    "title": "실장비 사전 테스트 배포 절차",
+    "desc": "정식 자동 업데이트 전에 자체 서버 테스트 전용 경로에서 설치파일과 포터블을 검증할 수 있도록 개선했습니다.",
+    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.19.8.exe",
+    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.19.8-Portable.zip",
+    "tags": []
+  },
+  {
     "version": "6.19.7",
     "date": "2026-08-29",
     "title": "Windows 창 배치 및 유휴 반응성 개선",

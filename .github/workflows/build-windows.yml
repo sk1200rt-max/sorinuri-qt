@@ -51,6 +51,11 @@ jobs:
         shell: bash
         run: PYTHONUTF8=1 python3 scripts/verify_release_gate.py
 
+      # ── 사전 테스트 배포·production 격리 검증 ───────────────────────
+      - name: Verify pre-production test release isolation
+        shell: bash
+        run: PYTHONUTF8=1 python3 scripts/verify_preproduction_test_release.py
+
       # ── 오디오 출력 정책 회귀 검증 ──────────────────────────────────
       - name: Verify multichannel audio policy
         shell: bash
@@ -446,7 +451,7 @@ jobs:
 
       - name: Generate version-staging.json
         env:
-          APP_VERSION: "6.19.7"
+          APP_VERSION: "6.19.8"
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
         run: python3 scripts/make_version_json.py "$APP_VERSION" "$DEPLOY_HOST" staging
 
@@ -456,7 +461,7 @@ jobs:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
-          APP_VERSION: "6.19.7"
+          APP_VERSION: "6.19.8"
         run: |
           if [ -z "$SSH_KEY" ] || [ -z "$DEPLOY_HOST" ]; then
             echo "배포 Secrets 미설정 - 건너뜀"

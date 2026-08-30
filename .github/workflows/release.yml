@@ -65,6 +65,11 @@ jobs:
         shell: bash
         run: PYTHONUTF8=1 python3 scripts/verify_release_gate.py
 
+      # ── 사전 테스트 배포·production 격리 검증 ───────────────────────
+      - name: Verify pre-production test release isolation
+        shell: bash
+        run: PYTHONUTF8=1 python3 scripts/verify_preproduction_test_release.py
+
       # ── 멀티채널 출력 정책 회귀 검증 ──────────────────────────────
       - name: Verify multichannel audio policy
         shell: bash
@@ -356,15 +361,94 @@ jobs:
           files: |
             dist/Sorinuri-Qt-${{ steps.version.outputs.version }}-Portable.zip
             dist/Sorinuri-Setup-${{ steps.version.outputs.version }}.exe
-          draft: false
-          prerelease: false
+          # 실장비 테스트가 끝나기 전에는 GitHub 릴리즈도 공개하지 않는다.
+          draft: true
+          prerelease: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 
-  # ── 자체 서버 게시: 사용자 다운로드와 자동 업데이트는 sorinuri.com만 사용 ──
-  publish-to-sorinuri:
+  # ── 사전 테스트 게시: 정식 다운로드·자동 업데이트와 완전히 분리 ───────────
+  publish-test-to-sorinuri:
     needs: release
+    runs-on: ubuntu-24.04
+    # 여기에는 production 환경 승인이 없다. /testing/<version>/ 만 원자적으로 갱신한다.
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout release source
+        uses: actions/checkout@v4
+
+      - name: Determine test version
+        id: test_version
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ github.event.inputs.version_tag }}"
+          if [ -z "$TAG" ]; then TAG="$GITHUB_REF_NAME"; fi
+          TAG="${TAG#refs/tags/}"
+          VERSION="${TAG#v}"
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare secure SSH publishing
+        shell: bash
+        env:
+          SORINURI_KNOWN_HOSTS: ${{ secrets.SORINURI_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$SORINURI_KNOWN_HOSTS"
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq sshpass
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SORINURI_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Download draft release assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.test_version.outputs.version }}"
+          mkdir -p release-assets
+          gh release download "v${VERSION}" --repo "$GITHUB_REPOSITORY" \
+            --pattern "Sorinuri-Setup-${VERSION}.exe" \
+            --pattern "Sorinuri-Qt-${VERSION}-Portable.zip" \
+            --dir release-assets
+          awk "/^## \[v${VERSION}\]/{found=1; next} found && /^## \[v/{exit} found{print}" CHANGELOG.md \
+            > release-assets/release-notes.txt
+          test -s release-assets/release-notes.txt || echo "소리누리 v${VERSION} 사전 테스트" > release-assets/release-notes.txt
+
+      - name: Publish pre-production test package
+        shell: bash
+        env:
+          SORINURI_DEPLOY_HOST: ${{ secrets.SORINURI_DEPLOY_HOST }}
+          SORINURI_DEPLOY_USER: ${{ secrets.SORINURI_DEPLOY_USER }}
+          SORINURI_DEPLOY_PASSWORD: ${{ secrets.SORINURI_DEPLOY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.test_version.outputs.version }}"
+          chmod +x scripts/publish_self_hosted_test_release.sh
+          scripts/publish_self_hosted_test_release.sh "$VERSION" release-assets release-assets/release-notes.txt
+
+      - name: Verify isolated test package
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.test_version.outputs.version }}"
+          BASE="https://sorinuri.com/downloads/testing/${VERSION}"
+          curl --fail --silent --show-error --location --range 0-0 \
+            -o /dev/null "$BASE/Sorinuri-Setup-${VERSION}.exe"
+          curl --fail --silent --show-error --location --range 0-0 \
+            -o /dev/null "$BASE/Sorinuri-Qt-${VERSION}-Portable.zip"
+          test "$(curl --fail --silent --show-error "$BASE/TESTING-ONLY.txt" | wc -c)" -gt 0
+
+
+  # ── 정식 게시: 사전 테스트 성공 뒤 사용자 production 승인 시에만 실행 ───────
+  publish-to-sorinuri:
+    needs: [release, publish-test-to-sorinuri]
     runs-on: ubuntu-24.04
     # 승인 전에는 설치파일·자동 업데이트 메타데이터를 운영 서버에 게시하지 않는다.
     environment:
