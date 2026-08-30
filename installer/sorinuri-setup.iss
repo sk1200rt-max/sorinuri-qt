@@ -3,7 +3,7 @@
 
 #define MyAppName "소리누리"
 #define MyAppNameEn "Sorinuri"
-#define MyAppVersion "6.20.5"
+#define MyAppVersion "6.20.6"
 #define MyAppPublisher "Gaon Communication"
 #define MyAppURL "https://sorinuri.com"
 #define MyAppExeName "Sorinuri.exe"
@@ -71,10 +71,18 @@ Source: "..\dist\ffmpeg.exe"; DestDir: "{app}"; Flags: ignoreversion skipifsourc
 Source: "..\dist\vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: ignoreversion skipifsourcedoesntexist deleteafterinstall
 
 [Icons]
-Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Comment: "{#MyAppDescription}"
-Name: "{group}\{#MyAppName} 제거"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Comment: "{#MyAppDescription}"; Tasks: desktopicon
-Name: "{userappdata}\Microsoft\Internet Explorer\Quick Launch\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: quicklaunchicon
+; 시작 메뉴·바탕화면 바로가기에 실행 파일의 다중 해상도 브랜드 아이콘을 명시한다.
+; Windows가 .lnk 대상의 일반 파일 아이콘으로 폴백하지 않도록 작업 폴더도 함께 지정한다.
+Name: "{group}\소리누리 실행"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\{#MyAppExeName}"; IconIndex: 0; Comment: "{#MyAppDescription}"
+Name: "{group}\소리누리 제거"; Filename: "{uninstallexe}"; WorkingDir: "{app}"; IconFilename: "{app}\{#MyAppExeName}"; IconIndex: 0; Comment: "소리누리를 제거합니다."
+Name: "{autodesktop}\소리누리"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\{#MyAppExeName}"; IconIndex: 0; Comment: "{#MyAppDescription}"; Tasks: desktopicon
+Name: "{userappdata}\Microsoft\Internet Explorer\Quick Launch\소리누리"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\{#MyAppExeName}"; IconIndex: 0; Tasks: quicklaunchicon
+
+; 이전 버전의 일반 이름 바로가기를 정리한 뒤 명시적 아이콘 바로가기를 다시 만든다.
+; 사용자 고정 항목은 건드리지 않고 이 설치 프로그램이 만든 구형 .lnk만 대상으로 한다.
+[InstallDelete]
+Type: files; Name: "{group}\소리누리.lnk"
+Type: files; Name: "{group}\소리누리 제거.lnk"
 
 [Run]
 ; Visual C++ 런타임 자동 설치 (이미 설치되어 있으면 건너뜀)

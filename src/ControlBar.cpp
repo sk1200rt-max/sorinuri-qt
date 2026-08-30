@@ -40,15 +40,17 @@ QPushButton* ControlBar::makeModeBtn(const QString& text, const QString& tip) {
 }
 
 ControlBar::ControlBar(QWidget* parent) : QWidget(parent) {
-    // 재생 제어와 트랙 선택을 분리해 250% 배율에서도 라벨·버튼이 겹치지 않게 한다.
-    setFixedHeight(96);
+    // 시간축·재생 제어·트랙 선택을 독립된 계층으로 분리한다. 고배율과 넓은
+    // 프로젝터 화면에서도 한 줄에 모든 요소를 밀어 넣지 않는다.
+    setMinimumHeight(118);
+    setMaximumHeight(132);
+    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     setStyleSheet(QString("background: %1; border-top: 1px solid %2;")
                   .arg(SorinuriUi::SurfaceAlt, SorinuriUi::Border));
 
     auto* mainLayout = new QVBoxLayout(this);
-    // 상단 여백 5px: 타임라인 슬라이더 핸들이 영상 영역에 겹치지 않도록
-    mainLayout->setContentsMargins(12, 7, 12, 6);
-    mainLayout->setSpacing(4);
+    mainLayout->setContentsMargins(14, 8, 14, 8);
+    mainLayout->setSpacing(7);
 
     // 시크 바 행
     auto* seekRow = new QHBoxLayout();
@@ -81,9 +83,16 @@ ControlBar::ControlBar(QWidget* parent) : QWidget(parent) {
     seekRow->addWidget(timeLabel_);
     mainLayout->addLayout(seekRow);
 
-    // 버튼 행
-    btnRow_ = new QHBoxLayout();
-    btnRow_->setSpacing(2);
+    // 재생 제어 행: 아이콘 제어와 출력 상태를 하나의 낮은 대비 카드에 묶어
+    // 영상 위 오버레이에서도 정보가 서로 충돌하지 않게 한다.
+    auto* transportCard = new QWidget(this);
+    transportCard->setObjectName("transportCard");
+    transportCard->setStyleSheet(QString(
+        "QWidget#transportCard { background: %1; border: 1px solid %2; border-radius: 10px; }")
+        .arg(SorinuriUi::SurfaceRaised, SorinuriUi::BorderSoft));
+    btnRow_ = new QHBoxLayout(transportCard);
+    btnRow_->setContentsMargins(7, 3, 7, 3);
+    btnRow_->setSpacing(3);
 
     btnOpen_ = makeBtn(":/icons/open.svg",   "파일 열기 (Ctrl+O)");
     btnPrev_ = makeBtn(":/icons/prev.svg",   "이전");
@@ -122,6 +131,10 @@ ControlBar::ControlBar(QWidget* parent) : QWidget(parent) {
         "color: #A3B1B0; font-size: 10px; font-family: 'Cascadia Mono', 'Consolas', monospace;"
         "background: #151F20; border: 1px solid #2B3B3C; border-radius: 7px; padding: 2px 8px;");
     audioInfoLabel_->setTextFormat(Qt::RichText);
+    audioInfoLabel_->setMinimumWidth(180);
+    audioInfoLabel_->setMaximumWidth(460);
+    // 실제 코덱·출력 형식이 확인되기 전에는 '협상 중' 배지를 노출하지 않는다.
+    audioInfoLabel_->hide();
 
     // 모드 버튼
     btnPlayerMode_ = makeModeBtn("파일", "파일 플레이어 모드");
@@ -150,18 +163,23 @@ ControlBar::ControlBar(QWidget* parent) : QWidget(parent) {
     btnRow_->addWidget(audioInfoLabel_, 1);
     btnRow_->addStretch(1);
     btnRow_->addWidget(btnSettings_);
-    mainLayout->addLayout(btnRow_);
+    mainLayout->addWidget(transportCard);
 
-    // 트랙 선택은 재생 제어와 독립 행으로 배치한다. 짧은 노트북 폭과 250% DPI에서도
-    // 출력 상태·오디오·자막·모드 버튼이 서로 밀거나 잘리지 않는다.
-    trackRow_ = new QHBoxLayout();
-    trackRow_->setSpacing(4);
-    trackRow_->setContentsMargins(0, 0, 0, 0);
+    // 트랙 선택은 별도 카드로 배치한다. 짧은 노트북 폭과 250% DPI에서도 출력 상태,
+    // 오디오, 자막, 모드 버튼이 재생 제어 영역을 밀거나 잘리지 않는다.
+    auto* trackCard = new QWidget(this);
+    trackCard->setObjectName("trackCard");
+    trackCard->setStyleSheet(QString(
+        "QWidget#trackCard { background: %1; border: 1px solid %2; border-radius: 10px; }")
+        .arg(SorinuriUi::Surface, SorinuriUi::BorderSoft));
+    trackRow_ = new QHBoxLayout(trackCard);
+    trackRow_->setSpacing(6);
+    trackRow_->setContentsMargins(8, 3, 8, 3);
     trackRow_->addStretch(1);  // TrackSelector는 embedTrackSelector()에서 앞에 삽입
     trackRow_->addWidget(btnPlayerMode_);
     trackRow_->addSpacing(2);
     trackRow_->addWidget(btnOttMode_);
-    mainLayout->addLayout(trackRow_);
+    mainLayout->addWidget(trackCard);
 }
 
 void ControlBar::embedTrackSelector(TrackSelector* selector) {
@@ -179,6 +197,14 @@ void ControlBar::connectMpv(MpvCore* core) {
 
 void ControlBar::onAudioFormatChanged(const QString& codec, int channels,
                                        int sampleRate, const QString& output) {
+    // 파일을 열기 전 또는 출력 장치가 아직 확정되지 않은 순간에는 빈 상태를
+    // 강조하지 않는다. 실제 형식이 잡힌 뒤에만 상태 카드를 표시한다.
+    if (codec.trimmed().isEmpty() || output.trimmed().isEmpty()) {
+        audioInfoLabel_->clear();
+        audioInfoLabel_->hide();
+        return;
+    }
+    audioInfoLabel_->show();
     const bool isPassthrough = output == QStringLiteral("BITSTREAM");
     const QString mode = isPassthrough ? QStringLiteral("THRU") : QStringLiteral("PCM");
     const QString modeColor = isPassthrough ? SorinuriUi::Mint : QStringLiteral("#F5B942");
@@ -199,6 +225,7 @@ void ControlBar::onVideoInfoChanged(int, int, double, const QString&) {}
 
 void ControlBar::onPlaybackStopped() {
     audioInfoLabel_->clear();
+    audioInfoLabel_->hide();
 }
 
 void ControlBar::setPlaying(bool playing) {

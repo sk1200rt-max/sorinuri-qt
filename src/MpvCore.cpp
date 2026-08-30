@@ -373,10 +373,10 @@ bool MpvCore::initialize(WId windowId) {
     // mpv/WASAPI 협상 단계로 전달한다. PCM 2.0 폴백 시에도 LFE 혼합 차이를
     // 만드는 코덱별 다운믹스 경로를 사용하지 않는다.
     check_error(mpv_set_property_string(mpv_, "ad-lavc-downmix", "no"));
-    // 실제로 서라운드 → stereo 변환이 필요한 장치에서만 레벨을 정규화해
-    // 다운믹스 클리핑과 과도한 저역 체감을 방지한다. 정상 5.1/7.1 및
-    // 비트스트림 경로에는 적용되지 않는다.
-    check_error(mpv_set_property_string(mpv_, "audio-normalize-downmix", "yes"));
+    // mpv 기본값(no)을 유지한다. 이 옵션을 강제로 yes로 바꾸면 실제 stereo
+    // 폴백 경로에서 레벨 행렬이 달라져 리시버의 저음 관리와 겹칠 수 있다.
+    // 정상 5.1/7.1·비트스트림 정책에는 영향을 주지 않는다.
+    check_error(mpv_set_property_string(mpv_, "audio-normalize-downmix", "no"));
 
     // 자막 우선순위: 언어 메타데이터가 있는 경우 한국어를 먼저 선택한다.
     // 메타데이터가 없는 외부 SMI/SRT는 sub-auto=fuzzy가 파일명 기준으로 탐색한다.
@@ -914,7 +914,8 @@ void MpvCore::restoreAudioOutputAfterDeviceChange() {
     mpv_set_property_string(mpv_, "audio-exclusive", exclusive ? "yes" : "no");
     mpv_set_property_string(mpv_, "audio-channels", "auto");
     mpv_set_property_string(mpv_, "ad-lavc-downmix", "no");
-    mpv_set_property_string(mpv_, "audio-normalize-downmix", "yes");
+    // 초기 정책과 동일하게 mpv 기본 다운믹스 정규화(no)를 유지한다.
+    mpv_set_property_string(mpv_, "audio-normalize-downmix", "no");
     spdifCodecs_ = codecs.join(',');
     passthroughEnabled_ = passthrough;
     mpv_set_property_string(mpv_, "audio-spdif",

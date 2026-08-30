@@ -17,7 +17,7 @@ required = {
     "DD+ E-AC3 코덱": 'codecs << QStringLiteral("eac3")',
     "원본 우선 자동 채널 협상": 'mpv_set_property_string(mpv_, "audio-channels", "auto")',
     "디코더 선행 다운믹스 차단": 'mpv_set_property_string(mpv_, "ad-lavc-downmix", "no")',
-    "스테레오 다운믹스 정규화": 'mpv_set_property_string(mpv_, "audio-normalize-downmix", "yes")',
+    "스테레오 다운믹스 기본 정규화 정책": 'mpv_set_property_string(mpv_, "audio-normalize-downmix", "no")',
     "실제 출력 endpoint 감지": '"audio-out-detected-device"',
     "HDMI/AVR 패스스루 보존": 'const bool passthroughCapable = deviceLikelySupportsPassthrough()',
 }
@@ -43,6 +43,12 @@ if 'mpv_set_property_string(mpv_, "audio-channels", "7.1,5.1,stereo")' in text:
     print("오디오 정책 검증 실패: 고정 채널 화이트리스트가 남아 있습니다.", file=sys.stderr)
     sys.exit(1)
 
+# 스테레오 폴백에서는 mpv 기본 정규화 정책을 유지한다. 강제 yes는
+# 리시버의 저음 관리와 겹쳐 저역 체감을 바꿀 수 있으므로 허용하지 않는다.
+if 'mpv_set_property_string(mpv_, "audio-normalize-downmix", "yes")' in text:
+    print("오디오 정책 검증 실패: 스테레오 다운믹스 정규화를 강제 활성화하면 안 됩니다.", file=sys.stderr)
+    sys.exit(1)
+
 # HDMI/AVR로 추정되는 출력에서 워치독·AO 실패 복구가 audio-spdif를 무조건 지우면 안 된다.
 for marker in ('워치독: 재생 멈춤', 'AO 초기화 실패 감지'):
     start = text.find(marker)
@@ -54,4 +60,4 @@ for marker in ('워치독: 재생 멈춤', 'AO 초기화 실패 감지'):
         print(f"오디오 정책 검증 실패: {marker} 경로가 HDMI 패스스루를 보호하지 않습니다.", file=sys.stderr)
         sys.exit(1)
 
-print("오디오 정책 검증 통과: 초기 WASAPI HDMI 협상, DD+ 패스스루, 원본 다채널, HDMI 복구 보호 확인")
+print("오디오 정책 검증 통과: 초기 WASAPI HDMI 협상, DD+ 패스스루, 원본 다채널, 스테레오 저음 보정, HDMI 복구 보호 확인")

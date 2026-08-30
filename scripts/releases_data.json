@@ -1,5 +1,14 @@
 [
   {
+    "version": "6.20.6",
+    "date": "2026-08-30",
+    "title": "스테레오 음질 및 제어 화면 정리",
+    "desc": "PCM 2.0 스테레오 다운믹스 정규화 기본값을 복원하고, 하단 재생 컨트롤·시작 메뉴 바로가기를 정리했습니다.",
+    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.20.6.exe",
+    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.20.6-Portable.zip",
+    "tags": []
+  },
+  {
     "version": "6.20.5",
     "date": "2026-08-30",
     "title": "통합 UI·반응성 사전 테스트",

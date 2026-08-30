@@ -64,6 +64,10 @@ def main() -> int:
     require(music, "btnCompact_->setFocusPolicy(Qt::NoFocus);", "컴팩트 버튼 NoFocus", errors)
     require(music, "btnSettings_->setFocusPolicy(Qt::NoFocus);", "설정 버튼 NoFocus", errors)
     require(pro, "setFixedHeight(124)", "HiDPI 여유를 둔 전문 기능 패널", errors)
+    require(controls, "setMinimumHeight(118)", "계층형 하단 컨트롤 최소 높이", errors)
+    require(controls, "transportCard", "재생 제어 카드", errors)
+    require(controls, "trackCard", "트랙 선택 카드", errors)
+    require(controls, "audioInfoLabel_->hide();", "빈 출력 상태 숨김", errors)
 
     for name, source in {
         "SettingsDialog.cpp": settings,
@@ -79,7 +83,7 @@ def main() -> int:
             print(f" - {error}", file=sys.stderr)
         return 1
 
-    print("UI 디자인 시스템 검증 통과: 공통 민트 토큰·버튼 포커스·HiDPI 여유·구형 파란색 제거 확인")
+    print("UI 디자인 시스템 검증 통과: 공통 민트 토큰·계층형 하단 제어·버튼 포커스·HiDPI 여유·구형 파란색 제거 확인")
     return 0
 
 

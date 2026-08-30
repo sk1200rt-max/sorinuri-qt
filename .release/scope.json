@@ -1,5 +1,5 @@
 {
-  "version": "6.20.5",
-  "domain": "ui",
-  "purpose": "민트 기반 통합 UI 재설계와 재생 화면 시각적 일관성 강화"
+  "version": "6.20.6",
+  "domain": "audio,ui,installer",
+  "purpose": "스테레오 저음 보정과 하단 UI·시작 메뉴 바로가기 정리"
 }

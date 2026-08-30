@@ -16,7 +16,7 @@ for needle in [
     "void MpvCore::restoreAudioOutputAfterDeviceChange()",
     'mpv_set_property_string(mpv_, "audio-channels", "auto")',
     'mpv_set_property_string(mpv_, "ad-lavc-downmix", "no")',
-    'mpv_set_property_string(mpv_, "audio-normalize-downmix", "yes")',
+    'mpv_set_property_string(mpv_, "audio-normalize-downmix", "no")',
     'mpv_set_property_string(mpv_, "audio-spdif",',
     'const char* reloadArgs[] = { "ao-reload", nullptr };',
 ]:

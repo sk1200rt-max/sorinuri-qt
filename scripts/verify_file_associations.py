@@ -51,6 +51,11 @@ required_installer = [
     'Flags: nowait skipifsilent runasoriginaluser; Tasks: fileassoc',
     'Compression=lzma2/normal',
     'SolidCompression=no',
+    'Name: "{group}\\소리누리 실행"; Filename: "{app}\\{#MyAppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\\{#MyAppExeName}"; IconIndex: 0',
+    'Name: "{group}\\소리누리 제거"; Filename: "{uninstallexe}"; WorkingDir: "{app}"; IconFilename: "{app}\\{#MyAppExeName}"; IconIndex: 0',
+    '[InstallDelete]',
+    'Type: files; Name: "{group}\\소리누리.lnk"',
+    'Type: files; Name: "{group}\\소리누리 제거.lnk"',
 ]
 for needle in required_installer:
     if needle not in installer:
@@ -79,5 +84,5 @@ if errors:
 
 print(
     f"파일 연결 정책 검증 통과: {len(extensions)}개 형식, HKLM64 ProgID·Open With·Capabilities·"
-    "더블클릭 실행·사용자 선택형 Windows 기본 앱 화면 확인"
+    "더블클릭 실행·사용자 선택형 Windows 기본 앱 화면·시작 메뉴 브랜드 바로가기 확인"
 )
