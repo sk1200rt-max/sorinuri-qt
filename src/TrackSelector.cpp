@@ -50,31 +50,33 @@ QString subtitleFormatName(const QString& codec) {
 TrackSelector::TrackSelector(QWidget* parent) : QWidget(parent) {
     QHBoxLayout* layout = new QHBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
-    layout->setSpacing(6);
+    layout->setSpacing(8);
 
     QLabel* audioLabel = new QLabel("오디오", this);
-    audioLabel->setStyleSheet("color: #8C9A99; font-size: 11px; font-weight: 600;");
+    audioLabel->setStyleSheet("color: #A3B1B0; font-size: 11px; font-weight: 700; padding-left: 2px;");
     layout->addWidget(audioLabel);
 
     audioCombo_ = new QComboBox(this);
-    audioCombo_->setMinimumWidth(180);
-    audioCombo_->setMaximumWidth(280);
+    audioCombo_->setMinimumWidth(190);
+    audioCombo_->setMaximumWidth(300);
     audioCombo_->setStyleSheet(SorinuriUi::comboBoxStyle());
+    audioCombo_->setFocusPolicy(Qt::NoFocus);
     layout->addWidget(audioCombo_);
 
     QLabel* subLabel = new QLabel("자막", this);
-    subLabel->setStyleSheet("color: #8C9A99; font-size: 11px; font-weight: 600;");
+    subLabel->setStyleSheet("color: #A3B1B0; font-size: 11px; font-weight: 700; padding-left: 4px;");
     layout->addWidget(subLabel);
 
     subCombo_ = new QComboBox(this);
     // 하단 컨트롤바는 좁은 창에서도 유지하고, 펼친 목록에서 전체 정보를 읽을 수 있게 한다.
-    subCombo_->setMinimumWidth(190);
-    subCombo_->setMaximumWidth(300);
+    subCombo_->setMinimumWidth(200);
+    subCombo_->setMaximumWidth(320);
     subCombo_->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
     subCombo_->setMinimumContentsLength(16);
     subCombo_->view()->setMinimumWidth(380);
     subCombo_->setToolTip("선택된 자막의 언어, 파일명 및 형식을 표시합니다.");
     subCombo_->setStyleSheet(SorinuriUi::comboBoxStyle());
+    subCombo_->setFocusPolicy(Qt::NoFocus);
     layout->addWidget(subCombo_);
 
     connect(audioCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged),

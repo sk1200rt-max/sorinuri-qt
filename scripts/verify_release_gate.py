@@ -32,7 +32,7 @@ DOMAINS: dict[str, tuple[str, ...]] = {
         "src/SettingsDialog.cpp", "src/SettingsDialog.h", "src/TrackSelector.cpp",
         "src/TrackSelector.h", "src/TitleBar.cpp", "src/TitleBar.h", "src/UiTheme.h",
         "src/MusicWidget.cpp", "src/MusicWidget.h", "src/CompactPlayerWidget.cpp",
-        "src/CompactPlayerWidget.h",
+        "src/CompactPlayerWidget.h", "src/ProFeaturesWidget.cpp", "src/ProFeaturesWidget.h",
     ),
     "playback": (
         "src/PlaybackQueue.cpp", "src/PlaybackQueue.h", "src/PlaylistWidget.cpp",

@@ -8,11 +8,12 @@
 #include <QFileDialog>
 #include <QProcess>
 #include <QCoreApplication>
+#include "UiTheme.h"
 
 static QLabel* makeSectionTitle(const QString& text, QWidget* parent) {
     auto* lbl = new QLabel(text, parent);
     lbl->setStyleSheet(
-        "color: #888; font-size: 9px; font-weight: 600; font-family: 'Consolas', monospace;"
+        "color: #A3B1B0; font-size: 9px; font-weight: 700; font-family: 'Cascadia Mono', 'Consolas', monospace;"
         "background: transparent; letter-spacing: 1px; padding: 0 4px 2px 0;");
     return lbl;
 }
@@ -23,11 +24,11 @@ static QPushButton* makeSmallBtn(const QString& text, const QString& tip, QWidge
     btn->setFocusPolicy(Qt::NoFocus);
     btn->setFixedHeight(22);
     btn->setStyleSheet(
-        "QPushButton { background: #1e1e1e; color: #ccc; border: 1px solid #2a2a2a;"
-        "border-radius: 3px; padding: 0 8px; font-size: 11px; }"
-        "QPushButton:hover { background: #2a2a2a; border-color: #4fc3f7; }"
-        "QPushButton:pressed { background: #1565c0; }"
-        "QPushButton:checked { background: #1565c0; border-color: #4fc3f7; color: #fff; }");
+        "QPushButton { background: #151F20; color: #F2F7F6; border: 1px solid #2B3B3C;"
+        "border-radius: 7px; padding: 0 9px; font-size: 11px; }"
+        "QPushButton:hover { background: #1C292A; border-color: #00D4B4; }"
+        "QPushButton:pressed { background: #233536; }"
+        "QPushButton:checked { background: #0A4940; border-color: #00D4B4; color: #F2F7F6; }");
     return btn;
 }
 
@@ -37,25 +38,27 @@ static QSlider* makeHSlider(int min, int max, int val, QWidget* parent = nullptr
     s->setValue(val);
     s->setFixedHeight(16);
     s->setStyleSheet(
-        "QSlider::groove:horizontal { height: 3px; background: #2a2a2a; border-radius: 1px; }"
+        "QSlider::groove:horizontal { height: 3px; background: #2B3B3C; border-radius: 1px; }"
         "QSlider::handle:horizontal { width: 10px; height: 10px; margin: -4px 0;"
-        "background: #4fc3f7; border-radius: 5px; }"
-        "QSlider::sub-page:horizontal { background: #1565c0; border-radius: 1px; }");
+        "background: #00D4B4; border-radius: 5px; }"
+        "QSlider::sub-page:horizontal { background: #0A4940; border-radius: 1px; }");
     return s;
 }
 
 ProFeaturesWidget::ProFeaturesWidget(QWidget* parent) : QWidget(parent) {
-    setFixedHeight(120);  // 탭 헤더(24px) + 내용(88px) + 여백
-    setStyleSheet("background: #060606; border-top: 1px solid #141414;");
+    setFixedHeight(124);  // 탭 헤더와 내용·조작 여백을 고배율에서도 안정적으로 확보
+    setStyleSheet(QString("background: %1; border-top: 1px solid %2;")
+                  .arg(SorinuriUi::SurfaceAlt, SorinuriUi::Border));
 
     // ── QTabWidget 생성 (this에 직접 붙임) ──────────────────────
     tabWidget_ = new QTabWidget(this);
     tabWidget_->setStyleSheet(
-        "QTabWidget::pane { border: none; background: #060606; }"
-        "QTabBar::tab { background: #0a0a0a; color: #888; padding: 2px 10px;"
-        "  border: 1px solid #1a1a1a; border-bottom: none; font-size: 10px; }"
-        "QTabBar::tab:selected { background: #060606; color: #00c8b4; border-color: #00c8b4; }"
-        "QTabBar::tab:hover { color: #ccc; }");
+        "QTabWidget::pane { border: none; background: #101718; }"
+        "QTabBar::tab { background: #0A0F10; color: #A3B1B0; padding: 4px 12px;"
+        "  border: 1px solid #2B3B3C; border-bottom: none; border-top-left-radius: 6px;"
+        "  border-top-right-radius: 6px; font-size: 10px; font-weight: 700; }"
+        "QTabBar::tab:selected { background: #101718; color: #00D4B4; border-color: #00D4B4; }"
+        "QTabBar::tab:hover { color: #F2F7F6; }");
     tabWidget_->setDocumentMode(true);
 
     // ── 패널 닫기 버튼 (탭바 오른쪽 코너) ────────────────────────
@@ -177,7 +180,7 @@ ProFeaturesWidget::ProFeaturesWidget(QWidget* parent) : QWidget(parent) {
 
         speedLabel_ = new QLabel("1.00x", sec);
         speedLabel_->setStyleSheet(
-            "color: #4fc3f7; font-size: 13px; font-weight: 700; font-family: 'Consolas', monospace;"
+            "color: #00D4B4; font-size: 13px; font-weight: 800; font-family: 'Cascadia Mono', 'Consolas', monospace;"
             "background: transparent;");
         speedLabel_->setAlignment(Qt::AlignCenter);
 
@@ -187,7 +190,7 @@ ProFeaturesWidget::ProFeaturesWidget(QWidget* parent) : QWidget(parent) {
             QString label = QString::number(sp, 'g', 3) + "x";
             auto* btn = makeSmallBtn(label, QString("재생속도 %1배").arg(sp), sec);
             if (sp == 1.0) btn->setStyleSheet(btn->styleSheet() +
-                "QPushButton { border-color: #1565c0; }");
+                "QPushButton { border-color: #00D4B4; }");
             connect(btn, &QPushButton::clicked, [this, sp]() { onSpeedPreset(sp); });
             row->addWidget(btn);
         }
@@ -208,7 +211,7 @@ ProFeaturesWidget::ProFeaturesWidget(QWidget* parent) : QWidget(parent) {
         audioDelaySlider_ = makeHSlider(-500, 500, 0, sec);
         audioDelayLabel_  = new QLabel("0 ms", sec);
         audioDelayLabel_->setStyleSheet(
-            "color: #888; font-size: 10px; font-family: 'Consolas', monospace;"
+            "color: #A3B1B0; font-size: 10px; font-family: 'Cascadia Mono', 'Consolas', monospace;"
             "background: transparent; min-width: 48px;");
         audioDelayLabel_->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
 
@@ -239,7 +242,7 @@ ProFeaturesWidget::ProFeaturesWidget(QWidget* parent) : QWidget(parent) {
         subDelaySlider_ = makeHSlider(-2000, 2000, 0, sec);
         subDelayLabel_  = new QLabel("0 ms", sec);
         subDelayLabel_->setStyleSheet(
-            "color: #888; font-size: 10px; font-family: 'Consolas', monospace;"
+            "color: #A3B1B0; font-size: 10px; font-family: 'Cascadia Mono', 'Consolas', monospace;"
             "background: transparent; min-width: 48px;");
         subDelayLabel_->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
 
@@ -270,7 +273,7 @@ ProFeaturesWidget::ProFeaturesWidget(QWidget* parent) : QWidget(parent) {
         auto makeFilterRow = [&](const QString& name, QSlider** slider, int min, int max) {
             auto* row = new QHBoxLayout();
             auto* lbl = new QLabel(name, sec);
-            lbl->setStyleSheet("color: #555; font-size: 9px; background: transparent; min-width: 24px;");
+            lbl->setStyleSheet("color: #A3B1B0; font-size: 9px; font-weight: 600; background: transparent; min-width: 28px;");
             *slider = makeHSlider(min, max, 0, sec);
             row->addWidget(lbl);
             row->addWidget(*slider, 1);

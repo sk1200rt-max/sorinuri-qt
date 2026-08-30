@@ -1,4 +1,5 @@
 #include "MusicWidget.h"
+#include "UiTheme.h"
 #include "LyricsWidget.h"
 #include "MpvCore.h"
 #include <QPainter>
@@ -70,25 +71,26 @@ const QVector<QVector<double>> EqPanel::kPresets={
 EqPanel::EqPanel(QWidget* parent):QWidget(parent){buildUI();}
 
 void EqPanel::buildUI(){
-    setStyleSheet("background:#141414;color:white;");
+    setStyleSheet("background:#101718;color:#F2F7F6;");
     auto* root=new QVBoxLayout(this);
     root->setContentsMargins(16,12,16,12);root->setSpacing(8);
     auto* hdr=new QHBoxLayout;
     auto* ttl=new QLabel("EQUALIZER",this);
-    ttl->setStyleSheet("font-size:13px;font-weight:bold;color:white;letter-spacing:2px;");
+    ttl->setStyleSheet("font-size:13px;font-weight:800;color:#F2F7F6;letter-spacing:1px;");
     hdr->addWidget(ttl);hdr->addStretch();
     auto* onOff=new QPushButton("ON",this);
-    onOff->setCheckable(true);onOff->setChecked(true);
-    onOff->setStyleSheet("QPushButton{background:#00c8b4;color:#0e0e0e;border-radius:10px;padding:2px 10px;font-size:11px;font-weight:bold;}"
-                         "QPushButton:!checked{background:#333;color:#888;}");
+    onOff->setCheckable(true);onOff->setChecked(true);onOff->setFocusPolicy(Qt::NoFocus);
+    onOff->setStyleSheet("QPushButton{background:#0A4940;color:#F2F7F6;border:1px solid #00D4B4;border-radius:10px;padding:2px 10px;font-size:11px;font-weight:700;}"
+                         "QPushButton:!checked{background:#151F20;color:#71807F;border-color:#2B3B3C;}");
     hdr->addWidget(onOff);root->addLayout(hdr);
     QStringList pnames={"Flat","Audiophile","Bass Boost","Vocal","Classical","Rock","Jazz"};
     auto* prow=new QHBoxLayout;prow->setSpacing(4);
     for(int i=0;i<pnames.size();++i){
         auto* btn=new QPushButton(pnames[i],this);
-        btn->setStyleSheet("QPushButton{background:#222;color:#aaa;border-radius:3px;padding:3px 8px;font-size:11px;border:1px solid #333;}"
-                           "QPushButton:hover{background:#2a2a2a;color:white;}"
-                           "QPushButton:checked{background:#00c8b4;color:#0e0e0e;border-color:#00c8b4;}");
+        btn->setFocusPolicy(Qt::NoFocus);
+        btn->setStyleSheet("QPushButton{background:#151F20;color:#A3B1B0;border-radius:7px;padding:3px 8px;font-size:11px;border:1px solid #2B3B3C;}"
+                           "QPushButton:hover{background:#1C292A;color:#F2F7F6;border-color:#00D4B4;}"
+                           "QPushButton:checked{background:#0A4940;color:#F2F7F6;border-color:#00D4B4;}");
         btn->setCheckable(true);if(i==0)btn->setChecked(true);
         connect(btn,&QPushButton::clicked,this,[this,i](){applyPreset(i);});
         prow->addWidget(btn);
@@ -98,15 +100,15 @@ void EqPanel::buildUI(){
     for(int i=0;i<10;++i){
         auto* col=new QVBoxLayout;col->setSpacing(2);col->setAlignment(Qt::AlignHCenter);
         auto* gl=new QLabel("0",this);gl->setAlignment(Qt::AlignCenter);
-        gl->setStyleSheet("font-size:10px;color:#00c8b4;font-family:'Consolas';");
+        gl->setStyleSheet("font-size:10px;color:#00D4B4;font-family:'Cascadia Mono','Consolas';font-weight:700;");
         gl->setFixedWidth(36);gainLabels_.append(gl);col->addWidget(gl);
         auto* sl=new QSlider(Qt::Vertical,this);
         sl->setRange(-120,120);sl->setValue(0);sl->setFixedWidth(24);sl->setMinimumHeight(100);
         sl->setFocusPolicy(Qt::NoFocus);  // HiDPI: EQ 슬라이더 클릭 후 단축키 유지
-        sl->setStyleSheet("QSlider::groove:vertical{background:#333;width:4px;border-radius:2px;}"
-                          "QSlider::handle:vertical{background:#00c8b4;width:14px;height:14px;margin:-5px -5px;border-radius:7px;}"
-                          "QSlider::add-page:vertical{background:#00c8b4;border-radius:2px;}"
-                          "QSlider::sub-page:vertical{background:#555;border-radius:2px;}");
+        sl->setStyleSheet("QSlider::groove:vertical{background:#2B3B3C;width:4px;border-radius:2px;}"
+                          "QSlider::handle:vertical{background:#00D4B4;width:14px;height:14px;margin:-5px -5px;border-radius:7px;}"
+                          "QSlider::add-page:vertical{background:#00D4B4;border-radius:2px;}"
+                          "QSlider::sub-page:vertical{background:#71807F;border-radius:2px;}");
         connect(sl,&QSlider::valueChanged,this,[this,i,gl](int v){
             double dB=v/10.0;
             gl->setText(dB>=0?QString("+%1").arg(dB,0,'f',1):QString("%1").arg(dB,0,'f',1));
@@ -116,16 +118,17 @@ void EqPanel::buildUI(){
         });
         sliders_.append(sl);col->addWidget(sl,1,Qt::AlignHCenter);
         auto* bl=new QLabel(kBands[i],this);bl->setAlignment(Qt::AlignCenter);
-        bl->setStyleSheet("font-size:9px;color:#666;");bl->setFixedWidth(36);col->addWidget(bl);
+        bl->setStyleSheet("font-size:9px;color:#71807F;");bl->setFixedWidth(36);col->addWidget(bl);
         srow->addLayout(col);
     }
     root->addLayout(srow,1);
-    auto* br=new QPushButton("Reset",this);
+    auto* br=new QPushButton("초기화",this);
     br->setFocusPolicy(Qt::NoFocus);  // HiDPI: 버튼 클릭 후 단축키 유지
-    br->setStyleSheet("QPushButton{background:#222;color:#aaa;border:1px solid #444;border-radius:4px;padding:4px 16px;font-size:12px;}"
-                      "QPushButton:hover{background:#2a2a2a;color:white;}");
+    br->setStyleSheet("QPushButton{background:#151F20;color:#A3B1B0;border:1px solid #2B3B3C;border-radius:8px;padding:4px 16px;font-size:12px;}"
+                      "QPushButton:hover{background:#1C292A;color:#F2F7F6;border-color:#00D4B4;}");
     connect(br,&QPushButton::clicked,this,[this](){applyPreset(0);});
     auto* saveBtn=new QPushButton("프리셋 저장",this);
+    saveBtn->setFocusPolicy(Qt::NoFocus);
     saveBtn->setStyleSheet(br->styleSheet());
     connect(saveBtn,&QPushButton::clicked,this,[this,saveBtn](){
         QSettings s("Sorinuri","SorinuriPlayer");
@@ -136,6 +139,7 @@ void EqPanel::buildUI(){
         QTimer::singleShot(1500,saveBtn,[saveBtn](){saveBtn->setText("프리셋 저장");});
     });
     auto* loadBtn=new QPushButton("저장된 프리셋",this);
+    loadBtn->setFocusPolicy(Qt::NoFocus);
     loadBtn->setStyleSheet(br->styleSheet());
     connect(loadBtn,&QPushButton::clicked,this,[this](){
         QSettings s("Sorinuri","SorinuriPlayer");
@@ -156,14 +160,14 @@ void EqPanel::applyPreset(int idx){
 
 // PlaylistPanel
 PlaylistPanel::PlaylistPanel(QWidget* parent):QWidget(parent){
-    setStyleSheet("background:#141414;color:white;");
+    setStyleSheet("background:#101718;color:#F2F7F6;");
     auto* root=new QVBoxLayout(this);root->setContentsMargins(12,10,12,10);root->setSpacing(6);
     auto* hdr=new QHBoxLayout;
     auto* ttl=new QLabel("PLAYLIST",this);
-    ttl->setStyleSheet("font-size:13px;font-weight:bold;color:white;letter-spacing:2px;");
+    ttl->setStyleSheet("font-size:13px;font-weight:800;color:#F2F7F6;letter-spacing:1px;");
     hdr->addWidget(ttl);hdr->addStretch();root->addLayout(hdr);
     searchEdit_=new QLineEdit(this);searchEdit_->setPlaceholderText("곡 검색...");
-    searchEdit_->setStyleSheet("QLineEdit{background:#1e1e1e;border:1px solid #333;border-radius:4px;color:white;padding:4px 8px;font-size:12px;}");
+    searchEdit_->setStyleSheet("QLineEdit{background:#151F20;border:1px solid #2B3B3C;border-radius:8px;color:#F2F7F6;padding:5px 9px;font-size:12px;}QLineEdit:focus{border-color:#00D4B4;}");
     root->addWidget(searchEdit_);
     listWidget_=new QListWidget(this);
     listWidget_->setStyleSheet("QListWidget{background:#141414;border:none;color:white;}"
@@ -226,11 +230,7 @@ void MusicWidget::mouseMoveEvent(QMouseEvent* e) {
 
 void MusicWidget::contextMenuEvent(QContextMenuEvent* e) {
     QMenu menu(this);
-    menu.setStyleSheet(
-        "QMenu{background:#1e1e1e;border:1px solid #333;color:white;padding:4px 0;}"
-        "QMenu::item{padding:6px 20px;font-size:13px;}"
-        "QMenu::item:selected{background:#2a2a2a;color:#00c8b4;}"
-        "QMenu::separator{height:1px;background:#333;margin:4px 0;}");
+    menu.setStyleSheet(SorinuriUi::menuStyle());
 
     auto* actPlay = menu.addAction(isPlaying_ ? "⏸  일시정지" : "▶  재생");
     connect(actPlay, &QAction::triggered, this, &MusicWidget::playPauseRequested);
@@ -318,17 +318,17 @@ void MusicWidget::setupUI(){
     auto* artSpacer=new QWidget(this);artSpacer->setFixedSize(280,280);artSpacer->setAttribute(Qt::WA_TransparentForMouseEvents);
     leftPanel->addWidget(artSpacer,0,Qt::AlignHCenter);leftPanel->addSpacing(12);
     titleLabel_=new QLabel("트랙 제목",this);titleLabel_->setAlignment(Qt::AlignCenter);
-    titleLabel_->setStyleSheet("font-size:20px;font-weight:bold;color:white;");titleLabel_->setWordWrap(true);
+    titleLabel_->setStyleSheet("font-size:22px;font-weight:800;color:#F2F7F6;");titleLabel_->setWordWrap(true);
     leftPanel->addWidget(titleLabel_);
     artistLabel_=new QLabel("아티스트",this);artistLabel_->setAlignment(Qt::AlignCenter);
-    artistLabel_->setStyleSheet("font-size:14px;color:#aaa;");leftPanel->addWidget(artistLabel_);
+    artistLabel_->setStyleSheet("font-size:14px;font-weight:600;color:#A3B1B0;");leftPanel->addWidget(artistLabel_);
     albumLabel_=new QLabel("",this);albumLabel_->setAlignment(Qt::AlignCenter);
-    albumLabel_->setStyleSheet("font-size:12px;color:#666;");leftPanel->addWidget(albumLabel_);
+    albumLabel_->setStyleSheet("font-size:12px;color:#71807F;");leftPanel->addWidget(albumLabel_);
     badgeRow_=new QWidget(this);badgeRow_->setStyleSheet("background:transparent;");
     auto* bl=new QHBoxLayout(badgeRow_);bl->setContentsMargins(0,4,0,4);bl->setSpacing(4);bl->setAlignment(Qt::AlignCenter);
-    codecBadge_=makeBadge("FLAC","#00c8b4",badgeRow_);bitBadge_=makeBadge("24bit","#4488ff",badgeRow_);
-    rateBadge_=makeBadge("192kHz","#aa44ff",badgeRow_);chBadge_=makeBadge("Stereo","#888",badgeRow_);
-    bpBadge_=makeBadge("BIT-PERFECT","#00cc44",badgeRow_);
+    codecBadge_=makeBadge("FLAC","#00D4B4",badgeRow_);bitBadge_=makeBadge("24bit","#A3B1B0",badgeRow_);
+    rateBadge_=makeBadge("192kHz","#A3B1B0",badgeRow_);chBadge_=makeBadge("Stereo","#A3B1B0",badgeRow_);
+    bpBadge_=makeBadge("BIT-PERFECT","#00D4B4",badgeRow_);
     bl->addWidget(codecBadge_);bl->addWidget(bitBadge_);bl->addWidget(rateBadge_);bl->addWidget(chBadge_);bl->addWidget(bpBadge_);
     leftPanel->addWidget(badgeRow_);
     auto* specSpacer=new QWidget(this);specSpacer->setFixedHeight(60);specSpacer->setAttribute(Qt::WA_TransparentForMouseEvents);
@@ -338,10 +338,11 @@ void MusicWidget::setupUI(){
     auto* ctrlRow=new QHBoxLayout;ctrlRow->setSpacing(12);ctrlRow->setAlignment(Qt::AlignHCenter);
     auto makeCtrlBtn=[&](const QString& text,bool big=false){
         auto* btn=new QPushButton(text,this);int sz=big?48:32;btn->setFixedSize(sz,sz);
-        if(big) btn->setStyleSheet(QString("QPushButton{background:#00c8b4;color:#0e0e0e;border-radius:%1px;font-size:18px;font-weight:bold;border:none;}"
-                                           "QPushButton:hover{background:#00e0cc;}").arg(sz/2));
-        else btn->setStyleSheet("QPushButton{background:transparent;color:#aaa;border:none;font-size:16px;}"
-                                "QPushButton:hover{color:white;}");
+        btn->setFocusPolicy(Qt::NoFocus);
+        if(big) btn->setStyleSheet(QString("QPushButton{background:#0A4940;color:#F2F7F6;border-radius:%1px;font-size:18px;font-weight:800;border:1px solid #00D4B4;}"
+                                           "QPushButton:hover{background:#0F6256;}QPushButton:pressed{background:#233536;}").arg(sz/2));
+        else btn->setStyleSheet("QPushButton{background:transparent;color:#A3B1B0;border:1px solid transparent;border-radius:8px;font-size:16px;}"
+                                "QPushButton:hover{color:#F2F7F6;background:#1C292A;border-color:#2B3B3C;}");
         return btn;
     };
     btnShuffle_=makeCtrlBtn("⇌"); btnShuffle_->setToolTip("셔플 (S)");
@@ -355,9 +356,9 @@ void MusicWidget::setupUI(){
     btnAbRepeat_->setFixedSize(36,28);
     btnAbRepeat_->setToolTip("A-B 구간 반복\n첫 클릭: A 지점 설정\n두 번째 클릭: B 지점 설정 후 반복 시작\n세 번째 클릭: 해제");
     btnAbRepeat_->setStyleSheet(
-        "QPushButton{background:transparent;color:#666;border:1px solid #444;border-radius:4px;"
-        "font-size:11px;font-weight:bold;font-family:'Consolas';}"
-        "QPushButton:hover{color:#aaa;border-color:#666;}");
+        "QPushButton{background:#151F20;color:#A3B1B0;border:1px solid #2B3B3C;border-radius:7px;"
+        "font-size:11px;font-weight:700;font-family:'Cascadia Mono','Consolas';}"
+        "QPushButton:hover{color:#F2F7F6;border-color:#00D4B4;background:#1C292A;}");
 
     ctrlRow->addWidget(btnShuffle_);ctrlRow->addWidget(btnPrev_);ctrlRow->addWidget(btnPlay_);
     ctrlRow->addWidget(btnNext_);ctrlRow->addWidget(btnRepeat_);ctrlRow->addSpacing(8);
@@ -369,9 +370,10 @@ void MusicWidget::setupUI(){
     auto* tabRow=new QHBoxLayout;tabRow->setSpacing(0);tabRow->setContentsMargins(0,0,0,0);
     auto makeTabBtn=[&](const QString& text){
         auto* btn=new QPushButton(text,this);btn->setCheckable(true);
-        btn->setStyleSheet("QPushButton{background:#1a1a1a;color:#666;border:none;padding:6px 16px;font-size:12px;border-bottom:2px solid transparent;}"
-                           "QPushButton:checked{color:#00c8b4;border-bottom:2px solid #00c8b4;}"
-                           "QPushButton:hover{color:#aaa;}");
+        btn->setFocusPolicy(Qt::NoFocus);
+        btn->setStyleSheet("QPushButton{background:transparent;color:#71807F;border:none;padding:7px 14px;font-size:12px;font-weight:700;border-bottom:2px solid transparent;}"
+                           "QPushButton:checked{color:#00D4B4;border-bottom:2px solid #00D4B4;}"
+                           "QPushButton:hover{color:#F2F7F6;background:#151F20;}");
         return btn;
     };
     btnShowLyrics_=makeTabBtn("가사");btnShowEq_=makeTabBtn("EQ");btnShowPlaylist_=makeTabBtn("재생목록");
@@ -380,14 +382,14 @@ void MusicWidget::setupUI(){
     tabRow->addStretch();
     // ── LRC 싱크 오프셋 +/- 버튼 ────────────────────────────────────────
     auto* lblOffset = new QLabel("싱크:", this);
-    lblOffset->setStyleSheet("color:#555; font-size:10px;");
+    lblOffset->setStyleSheet("color:#71807F; font-size:10px; font-weight:600;");
     auto makeSyncBtn = [this](const QString& text) -> QPushButton* {
         auto* btn = new QPushButton(text, this);
         btn->setFixedSize(22, 22);
         btn->setStyleSheet(
-            "QPushButton{background:#1e1e1e;color:#888;border:1px solid #333;"
-            "border-radius:3px;font-size:10px;font-weight:700;padding:0;}"
-            "QPushButton:hover{background:#2a2a2a;color:#00c8b4;border-color:#00c8b4;}"
+            "QPushButton{background:#151F20;color:#A3B1B0;border:1px solid #2B3B3C;"
+            "border-radius:6px;font-size:10px;font-weight:700;padding:0;}"
+            "QPushButton:hover{background:#1C292A;color:#F2F7F6;border-color:#00D4B4;}"
         );
         btn->setFocusPolicy(Qt::NoFocus);
         return btn;
@@ -419,7 +421,7 @@ void MusicWidget::setupUI(){
         lyricsWidget_->saveSyncOffset(currentMeta_.filePath);
     });
     rightPanel->addLayout(tabRow);
-    rightStack_=new QStackedWidget(this);rightStack_->setStyleSheet("background:#141414;border-radius:8px;");
+    rightStack_=new QStackedWidget(this);rightStack_->setStyleSheet("background:#101718;border:1px solid #1C292A;border-radius:10px;");
     lyricsWidget_=new LyricsWidget(this);eqPanel_=new EqPanel(this);playlistPanel_=new PlaylistPanel(this);
     rightStack_->addWidget(lyricsWidget_);rightStack_->addWidget(eqPanel_);rightStack_->addWidget(playlistPanel_);
     rightStack_->setCurrentIndex(0);rightPanel->addWidget(rightStack_,1);
@@ -429,23 +431,24 @@ void MusicWidget::setupUI(){
     // ── 시크바 행 (볼륨 인라인 배치) ────────────────────────────────
     auto* seekRow=new QHBoxLayout;seekRow->setContentsMargins(20,0,20,4);seekRow->setSpacing(8);
     timeCurrent_=new QLabel("00:00",this);
-    timeCurrent_->setStyleSheet("font-size:12px;color:#888;font-family:'Consolas';");
+    timeCurrent_->setStyleSheet("font-size:12px;color:#A3B1B0;font-family:'Cascadia Mono','Consolas';font-weight:600;");
     timeCurrent_->setFixedWidth(42);
     seekSlider_=new ClickSeekSlider(Qt::Horizontal,this);seekSlider_->setRange(0,1000);
     seekSlider_->setStyleSheet(
-        "QSlider::groove:horizontal{background:#2a2a2a;height:4px;border-radius:2px;}"
-        "QSlider::handle:horizontal{background:#00c8b4;width:12px;height:12px;margin:-4px 0;border-radius:6px;}"
-        "QSlider::sub-page:horizontal{background:#00c8b4;border-radius:2px;}");
+        "QSlider::groove:horizontal{background:#1C292A;height:5px;border-radius:2px;}"
+        "QSlider::handle:horizontal{background:#00D4B4;width:12px;height:12px;margin:-4px 0;border:2px solid #0A0F10;border-radius:6px;}"
+        "QSlider::sub-page:horizontal{background:#0A4940;border-radius:2px;}");
     timeDuration_=new QLabel("00:00",this);
-    timeDuration_->setStyleSheet("font-size:12px;color:#888;font-family:'Consolas';");
+    timeDuration_->setStyleSheet("font-size:12px;color:#A3B1B0;font-family:'Cascadia Mono','Consolas';font-weight:600;");
     timeDuration_->setFixedWidth(42);timeDuration_->setAlignment(Qt::AlignRight);
 
     // 볼륨 버튼 + 슬라이더 (시크바 우측 인라인)
-    btnVolume_=new QPushButton("🔊",this);btnVolume_->setFixedSize(28,28);
+    btnVolume_=new QPushButton("볼륨",this);btnVolume_->setFixedSize(48,28);
+    btnVolume_->setFocusPolicy(Qt::NoFocus);
     btnVolume_->setToolTip("음소거 (M)");
     btnVolume_->setStyleSheet(
-        "QPushButton{background:transparent;border:none;font-size:14px;color:#888;}"
-        "QPushButton:hover{color:white;}");
+        "QPushButton{background:transparent;border:1px solid transparent;border-radius:7px;font-size:11px;color:#A3B1B0;font-weight:700;}"
+        "QPushButton:hover{color:#F2F7F6;background:#1C292A;border-color:#2B3B3C;}");
     volSlider_=new QSlider(Qt::Horizontal,this);
     volSlider_->setRange(0,100);volSlider_->setValue(100);volSlider_->setFixedWidth(90);
     volSlider_->setToolTip("볼륨");
@@ -466,23 +469,26 @@ void MusicWidget::setupUI(){
     // ── 하단 컨트롤바 ───────────────────────────────────────────────
     auto* bottomRow=new QHBoxLayout;bottomRow->setContentsMargins(20,4,20,8);bottomRow->setSpacing(8);
     speedLabel_=new QLabel("1.0x",this);
-    speedLabel_->setStyleSheet("font-size:12px;color:#666;font-family:'Consolas';");
-    btnMini_=new QPushButton("⊟",this);btnMini_->setFixedSize(28,28);
+    speedLabel_->setStyleSheet("font-size:12px;color:#A3B1B0;font-family:'Cascadia Mono','Consolas';font-weight:600;");
+    btnMini_=new QPushButton("미니",this);btnMini_->setFixedSize(42,28);
+    btnMini_->setFocusPolicy(Qt::NoFocus);
     btnMini_->setToolTip("미니 플레이어 (M)");
-    btnMini_->setStyleSheet("QPushButton{background:transparent;border:none;font-size:14px;color:#888;}QPushButton:hover{color:white;}");
-    btnCompact_=new QPushButton("⬜",this);btnCompact_->setFixedSize(28,28);
+    btnMini_->setStyleSheet("QPushButton{background:transparent;border:1px solid transparent;border-radius:7px;font-size:11px;color:#A3B1B0;font-weight:700;}QPushButton:hover{color:#F2F7F6;background:#1C292A;border-color:#2B3B3C;}");
+    btnCompact_=new QPushButton("컴팩트",this);btnCompact_->setFixedSize(58,28);
+    btnCompact_->setFocusPolicy(Qt::NoFocus);
     btnCompact_->setToolTip("소형 모드 전환");
-    btnCompact_->setStyleSheet("QPushButton{background:transparent;border:none;font-size:11px;color:#888;font-family:'Segoe UI';}QPushButton:hover{color:#00c8b4;}");
-    btnSettings_=new QPushButton("⚙",this);btnSettings_->setFixedSize(28,28);
+    btnCompact_->setStyleSheet("QPushButton{background:transparent;border:1px solid transparent;border-radius:7px;font-size:11px;color:#A3B1B0;font-family:'Segoe UI';font-weight:700;}QPushButton:hover{color:#F2F7F6;background:#1C292A;border-color:#2B3B3C;}");
+    btnSettings_=new QPushButton("설정",this);btnSettings_->setFixedSize(42,28);
+    btnSettings_->setFocusPolicy(Qt::NoFocus);
     btnSettings_->setToolTip("설정");
-    btnSettings_->setStyleSheet("QPushButton{background:transparent;border:none;font-size:14px;color:#888;}QPushButton:hover{color:white;}");
+    btnSettings_->setStyleSheet("QPushButton{background:transparent;border:1px solid transparent;border-radius:7px;font-size:11px;color:#A3B1B0;font-weight:700;}QPushButton:hover{color:#F2F7F6;background:#1C292A;border-color:#2B3B3C;}");
     bottomRow->addWidget(speedLabel_);bottomRow->addStretch();
     bottomRow->addWidget(btnCompact_);bottomRow->addWidget(btnMini_);bottomRow->addWidget(btnSettings_);
     root->addLayout(bottomRow);
 
     statusBar_=new QLabel("FLAC  ·  DECODE  ·  2.0  ·  192kHz  ·  24bit  ·  BIT-PERFECT",this);
     statusBar_->setAlignment(Qt::AlignCenter);
-    statusBar_->setStyleSheet("font-size:10px;color:#555;font-family:'Consolas';background:#0a0a0a;padding:4px 0;");
+    statusBar_->setStyleSheet("font-size:10px;color:#71807F;font-family:'Cascadia Mono','Consolas';background:#0A0F10;border-top:1px solid #1C292A;padding:5px 0;");
     root->addWidget(statusBar_);
 }
 

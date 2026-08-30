@@ -90,6 +90,11 @@ jobs:
         shell: bash
         run: PYTHONUTF8=1 python3 scripts/verify_window_snap_responsiveness.py
 
+      # ── 통합 디자인 시스템·HiDPI 버튼 포커스 검증 ─────────────────────
+      - name: Verify unified UI design system
+        shell: bash
+        run: PYTHONUTF8=1 python3 scripts/verify_ui_design_system.py
+
       # ── 파일 연결·Windows 기본 앱 등록 검증 ──────────────────────────
       - name: Verify file association policy
         shell: bash

@@ -2,19 +2,19 @@
 #include "UiTheme.h"
 
 static const char* SEEK_STYLE =
-    "QSlider::groove:horizontal { height: 4px; background: #2a2a2a; border-radius: 2px; }"
+    "QSlider::groove:horizontal { height: 5px; background: #1C292A; border-radius: 2px; }"
     "QSlider::handle:horizontal { width: 12px; height: 12px; margin: -4px 0;"
-    "  background: #00D4B4; border-radius: 6px; }"
+    "  background: #00D4B4; border: 2px solid #0A0F10; border-radius: 6px; }"
     "QSlider::handle:horizontal:hover { width: 16px; height: 16px; margin: -6px 0;"
-    "  background: #20E0C3; border-radius: 8px; }"
-    "QSlider::sub-page:horizontal { background: #063B35; border-radius: 2px; }"
+    "  background: #2AE2C5; border-radius: 8px; }"
+    "QSlider::sub-page:horizontal { background: #0A4940; border-radius: 2px; }"
     "QSlider::sub-page:horizontal:hover { background: #00D4B4; }";
 static const char* VOL_STYLE =
-    "QSlider::groove:horizontal { height: 3px; background: #2a2a2a; border-radius: 1px; }"
-    "QSlider::handle:horizontal { width: 10px; height: 10px; margin: -4px 0;"
-    "  background: #aaa; border-radius: 5px; }"
-    "QSlider::handle:horizontal:hover { background: #fff; }"
-    "QSlider::sub-page:horizontal { background: #666; border-radius: 1px; }";
+    "QSlider::groove:horizontal { height: 4px; background: #2B3B3C; border-radius: 2px; }"
+    "QSlider::handle:horizontal { width: 10px; height: 10px; margin: -3px 0;"
+    "  background: #A3B1B0; border-radius: 5px; }"
+    "QSlider::handle:horizontal:hover { background: #F2F7F6; }"
+    "QSlider::sub-page:horizontal { background: #71807F; border-radius: 2px; }";
 
 QPushButton* ControlBar::makeBtn(const QString& svg, const QString& tip, int size) {
     auto* btn = new QPushButton();
@@ -41,14 +41,14 @@ QPushButton* ControlBar::makeModeBtn(const QString& text, const QString& tip) {
 
 ControlBar::ControlBar(QWidget* parent) : QWidget(parent) {
     // 재생 제어와 트랙 선택을 분리해 250% 배율에서도 라벨·버튼이 겹치지 않게 한다.
-    setFixedHeight(94);
+    setFixedHeight(96);
     setStyleSheet(QString("background: %1; border-top: 1px solid %2;")
-                  .arg(SorinuriUi::Surface, SorinuriUi::BorderSoft));
+                  .arg(SorinuriUi::SurfaceAlt, SorinuriUi::Border));
 
     auto* mainLayout = new QVBoxLayout(this);
     // 상단 여백 5px: 타임라인 슬라이더 핸들이 영상 영역에 겹치지 않도록
-    mainLayout->setContentsMargins(8, 5, 8, 4);
-    mainLayout->setSpacing(2);
+    mainLayout->setContentsMargins(12, 7, 12, 6);
+    mainLayout->setSpacing(4);
 
     // 시크 바 행
     auto* seekRow = new QHBoxLayout();
@@ -73,7 +73,7 @@ ControlBar::ControlBar(QWidget* parent) : QWidget(parent) {
     });
     timeLabel_ = new QLabel("00:00 / 00:00", this);
     timeLabel_->setStyleSheet(
-        "color: #8C9A99; font-size: 11px; font-family: 'Consolas', monospace;"
+        "color: #A3B1B0; font-size: 11px; font-weight: 600; font-family: 'Cascadia Mono', 'Consolas', monospace;"
         "min-width: 110px; background: transparent;");
     timeLabel_->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
 
@@ -113,22 +113,22 @@ ControlBar::ControlBar(QWidget* parent) : QWidget(parent) {
 
     volLabel_ = new QLabel("100%", this);
     volLabel_->setStyleSheet(
-        "color: #444; font-size: 10px; font-family: 'Consolas', monospace;"
+        "color: #A3B1B0; font-size: 10px; font-family: 'Cascadia Mono', 'Consolas', monospace;"
         "min-width: 34px; background: transparent;");
 
     // 인라인 오디오 정보 (AudioInfoBar 대체)
     audioInfoLabel_ = new QLabel(this);
     audioInfoLabel_->setStyleSheet(
-        "color: #8C9A99; font-size: 10px; font-family: 'Consolas', monospace;"
-        "background: transparent; padding: 0 8px;");
+        "color: #A3B1B0; font-size: 10px; font-family: 'Cascadia Mono', 'Consolas', monospace;"
+        "background: #151F20; border: 1px solid #2B3B3C; border-radius: 7px; padding: 2px 8px;");
     audioInfoLabel_->setTextFormat(Qt::RichText);
 
     // 모드 버튼
-    btnPlayerMode_ = makeModeBtn("▶  파일", "파일 플레이어 모드");
+    btnPlayerMode_ = makeModeBtn("파일", "파일 플레이어 모드");
     btnPlayerMode_->setProperty("active", true);
     btnPlayerMode_->style()->unpolish(btnPlayerMode_);
     btnPlayerMode_->style()->polish(btnPlayerMode_);
-    btnOttMode_    = makeModeBtn("🌐  OTT", "OTT 스트리밍 (Netflix · Disney+ · YouTube)");
+    btnOttMode_    = makeModeBtn("OTT", "OTT 스트리밍 (Netflix · Disney+ · YouTube)");
 
     connect(btnPlayerMode_, &QPushButton::clicked, this, &ControlBar::playerModeClicked);
     connect(btnOttMode_,    &QPushButton::clicked, this, &ControlBar::ottModeClicked);
@@ -188,9 +188,9 @@ void ControlBar::onAudioFormatChanged(const QString& codec, int channels,
     const QString actualOutput = output.isEmpty() ? QStringLiteral("출력 협상 중") : output;
 
     audioInfoLabel_->setText(
-        QString("<span style='color:%1;font-weight:700;'>%2</span>"
-                "<span style='color:#8C9A99;'>  %3%4%5</span>"
-                "<span style='color:#00D4B4;'>  → %6</span>")
+        QString("<span style='color:%1;font-weight:800;'>%2</span>"
+                "<span style='color:#A3B1B0;'>  %3%4%5</span>"
+                "<span style='color:#00D4B4;font-weight:700;'>  → %6</span>")
         .arg(modeColor, mode, codecStr,
              ch.isEmpty() ? QString() : "  " + ch, sr, actualOutput));
 }

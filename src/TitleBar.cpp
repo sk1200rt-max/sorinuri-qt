@@ -8,34 +8,36 @@ QPushButton* TitleBar::makeIconBtn(const QString& svgPath, const QString& toolti
                                     const QString& hoverBg, int w) {
     auto* btn = new QPushButton();
     btn->setToolTip(tooltip);
-    btn->setFixedSize(w, 36);
+    btn->setFixedSize(w, 40);
     btn->setFlat(true);
     btn->setCursor(Qt::ArrowCursor);
     btn->setFocusPolicy(Qt::NoFocus);  // HiDPI: 버튼 클릭 후 포커스가 MainWindow에 유지되도록
     btn->setIcon(QIcon(svgPath));
     btn->setIconSize(QSize(16, 16));
     btn->setStyleSheet(QString(
-        "QPushButton { background: transparent; border: none; border-radius: 0; }"
-        "QPushButton:hover { background: %1; }").arg(hoverBg));
+        "QPushButton { background: transparent; border: 1px solid transparent; border-radius: 8px; }"
+        "QPushButton:hover { background: %1; border-color: %2; }"
+        "QPushButton:pressed { background: %3; }")
+        .arg(hoverBg, SorinuriUi::Border, SorinuriUi::SurfacePress));
     return btn;
 }
 
 TitleBar::TitleBar(QWidget* parent) : QWidget(parent) {
-    setFixedHeight(40);
+    setFixedHeight(44);
     setStyleSheet(QString("background: %1; border-bottom: 1px solid %2;")
-                  .arg(SorinuriUi::Surface, SorinuriUi::BorderSoft));
+                  .arg(SorinuriUi::Surface, SorinuriUi::Border));
 
     auto* layout = new QHBoxLayout(this);
-    layout->setContentsMargins(10, 0, 0, 0);
+    layout->setContentsMargins(12, 0, 4, 0);
     layout->setSpacing(0);
 
     // ── 소리누리 로고 아이콘 ──────────────────────────────────────
     auto* logoIcon = new QLabel(this);
-    logoIcon->setFixedSize(26, 26);
+    logoIcon->setFixedSize(28, 28);
     logoIcon->setStyleSheet("background: transparent; border: none;");
     QPixmap logoPixmap(":/sorinuri-app.png");
     if (!logoPixmap.isNull()) {
-        logoIcon->setPixmap(logoPixmap.scaled(26, 26,
+        logoIcon->setPixmap(logoPixmap.scaled(28, 28,
             Qt::KeepAspectRatio, Qt::SmoothTransformation));
     }
     layout->addWidget(logoIcon);
@@ -52,7 +54,7 @@ TitleBar::TitleBar(QWidget* parent) : QWidget(parent) {
     // 파일명
     titleLabel_ = new QLabel(this);
     titleLabel_->setStyleSheet(
-        "color: #8C9A99; font-size: 12px; font-family: 'Segoe UI', sans-serif;"
+        "color: #A3B1B0; font-size: 12px; font-weight: 600; font-family: 'Segoe UI', 'Malgun Gothic', sans-serif;"
         "background: transparent; border: none;");
     layout->addWidget(titleLabel_);
     layout->addStretch();
@@ -60,7 +62,7 @@ TitleBar::TitleBar(QWidget* parent) : QWidget(parent) {
     // ── 항상 위에 고정 버튼 (핀) ─────────────────────────────────
     btnPin_ = new QPushButton(this);
     btnPin_->setToolTip("항상 위에 고정");
-    btnPin_->setFixedSize(38, 36);
+    btnPin_->setFixedSize(40, 40);
     btnPin_->setFlat(true);
     btnPin_->setCursor(Qt::ArrowCursor);
     btnPin_->setFocusPolicy(Qt::NoFocus);  // HiDPI: 버튼 클릭 후 포커스가 MainWindow에 유지되도록
@@ -69,25 +71,25 @@ TitleBar::TitleBar(QWidget* parent) : QWidget(parent) {
     btnPin_->setIconSize(QSize(18, 18));
     btnPin_->setStyleSheet(
         "QPushButton {"
-        "  background: transparent; border: none; border-radius: 0;"
-        "  color: #555;"
+        "  background: transparent; border: 1px solid transparent; border-radius: 8px;"
+        "  color: #A3B1B0;"
         "}"
         "QPushButton:hover {"
-        "  background: #1A2526;"
+        "  background: #1C292A; border-color: #2B3B3C;"
         "}"
         "QPushButton:checked {"
-        "  background: #063B35;"
-        "  border-bottom: 2px solid #00D4B4;"
+        "  background: #0A4940;"
+        "  border-color: #00D4B4;"
         "}"
         "QPushButton:checked:hover {"
-        "  background: #0B564B;"
+        "  background: #233536;"
         "}");
 
     // ── 창 버튼 ───────────────────────────────────────────────────
     btnMin_        = makeIconBtn(":/icons/minimize.svg",   "최소화",     "#1A2526");
     btnMax_        = makeIconBtn(":/icons/maximize.svg",   "화면 채우기", "#1A2526");
     btnFullscreen_ = makeIconBtn(":/icons/expand.svg",     "전체화면",   "#063B35");
-    btnClose_      = makeIconBtn(":/icons/close.svg",      "닫기",       "#D94D45", 48);
+    btnClose_      = makeIconBtn(":/icons/close.svg",      "닫기",       SorinuriUi::Danger, 48);
 
     layout->addWidget(btnPin_);
     layout->addWidget(btnMin_);

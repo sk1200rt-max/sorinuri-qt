@@ -1,5 +1,14 @@
 [
   {
+    "version": "6.20.5",
+    "date": "2026-08-30",
+    "title": "통합 UI·반응성 사전 테스트",
+    "desc": "핵심 화면의 디자인 토큰, 버튼 상태, HiDPI 여백 및 유휴 반응성 보호를 통합했습니다.",
+    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.20.5.exe",
+    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.20.5-Portable.zip",
+    "tags": []
+  },
+  {
     "version": "6.20.4",
     "date": "2026-08-30",
     "title": "종료 후 오디오 장치 해제 안정화",

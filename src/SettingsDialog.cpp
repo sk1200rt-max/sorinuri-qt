@@ -1,5 +1,6 @@
 #include "SettingsDialog.h"
 #include "ScrobbleManager.h"
+#include "UiTheme.h"
 #include <QFileDialog>
 #include <QTimer>
 #include <QDesktopServices>
@@ -12,96 +13,7 @@
 #include <QScreen>
 #include <QDebug>
 
-static const QString DIALOG_STYLE = R"(
-QDialog {
-    background: #1a1a1a;
-    color: #e0e0e0;
-    font-family: 'Segoe UI', 'Malgun Gothic', sans-serif;
-    font-size: 13px;
-}
-QTabWidget::pane {
-    border: 1px solid #2a2a2a;
-    background: #1a1a1a;
-}
-QTabBar::tab {
-    background: #141414;
-    color: #888;
-    padding: 8px 20px;
-    border: none;
-    border-bottom: 2px solid transparent;
-}
-QTabBar::tab:selected {
-    color: #4fc3f7;
-    border-bottom: 2px solid #4fc3f7;
-}
-QTabBar::tab:hover { color: #ccc; }
-QGroupBox {
-    border: 1px solid #2a2a2a;
-    border-radius: 4px;
-    margin-top: 12px;
-    padding-top: 8px;
-    color: #888;
-    font-size: 11px;
-}
-QGroupBox::title {
-    subcontrol-origin: margin;
-    left: 8px;
-    padding: 0 4px;
-}
-QComboBox {
-    background: #252525;
-    border: 1px solid #333;
-    border-radius: 3px;
-    padding: 4px 8px;
-    color: #e0e0e0;
-    min-width: 200px;
-}
-QComboBox::drop-down { border: none; }
-QComboBox QAbstractItemView {
-    background: #252525;
-    color: #e0e0e0;
-    selection-background-color: #1a3a5c;
-}
-QCheckBox { color: #e0e0e0; spacing: 6px; }
-QCheckBox::indicator {
-    width: 16px; height: 16px;
-    border: 1px solid #444;
-    border-radius: 3px;
-    background: #252525;
-}
-QCheckBox::indicator:checked {
-    background: #4fc3f7;
-    border-color: #4fc3f7;
-}
-QSlider::groove:horizontal {
-    height: 4px; background: #333; border-radius: 2px;
-}
-QSlider::sub-page:horizontal {
-    background: #4fc3f7; border-radius: 2px;
-}
-QSlider::handle:horizontal {
-    width: 14px; height: 14px; margin: -5px 0;
-    background: #fff; border-radius: 7px;
-}
-QPushButton {
-    background: #252525;
-    border: 1px solid #333;
-    border-radius: 3px;
-    padding: 6px 16px;
-    color: #e0e0e0;
-}
-QPushButton:hover { background: #2a2a2a; }
-QPushButton#btnApply, QPushButton#btnOk {
-    background: #1a3a5c;
-    border-color: #4fc3f7;
-    color: #4fc3f7;
-}
-QPushButton#btnApply:hover, QPushButton#btnOk:hover {
-    background: #1e4a6e;
-}
-QLabel { color: #e0e0e0; }
-QLabel.hint { color: #666; font-size: 11px; }
-)";
+static const QString DIALOG_STYLE = SorinuriUi::dialogStyle();
 
 SettingsDialog::SettingsDialog(MpvCore* mpv, QWidget* parent)
     : QDialog(parent), mpv_(mpv), settings_("Sorinuri", "SorinuriPlayer")
@@ -164,15 +76,17 @@ SettingsDialog::SettingsDialog(MpvCore* mpv, QWidget* parent)
     btnWidget->setMinimumHeight(60);
     btnWidget->setMaximumHeight(60);
     btnWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    btnWidget->setStyleSheet(
-        "QWidget { background: #141414; border-top: 1px solid #2a2a2a; }"
-        // 버튼은 btnWidget 자식으로 설정하여 스타일시트 상속이 정상 적용됨
-        "QPushButton { background: #252525; border: 1px solid #333; border-radius: 3px;"
-        "  padding: 6px 16px; color: #e0e0e0; min-height: 28px; }"
-        "QPushButton:hover { background: #2a2a2a; }"
+    btnWidget->setStyleSheet(QString(
+        "QWidget { background: %1; border-top: 1px solid %2; }"
+        "QPushButton { background: %3; border: 1px solid %2; border-radius: 8px;"
+        "  padding: 7px 16px; color: %4; min-height: 28px; }"
+        "QPushButton:hover { background: %5; border-color: %6; }"
         "QPushButton#btnApply, QPushButton#btnOk {"
-        "  background: #1a3a5c; border-color: #4fc3f7; color: #4fc3f7; }"
-        "QPushButton#btnApply:hover, QPushButton#btnOk:hover { background: #1e4a6e; }");
+        "  background: %7; border-color: %6; color: %6; font-weight: 700; }"
+        "QPushButton#btnApply:hover, QPushButton#btnOk:hover { background: %8; color: %4; }")
+        .arg(SorinuriUi::SurfaceAlt, SorinuriUi::Border, SorinuriUi::SurfaceRaised,
+             SorinuriUi::Text, SorinuriUi::SurfaceHover, SorinuriUi::Mint,
+             SorinuriUi::MintDark, SorinuriUi::SurfacePress));
     QHBoxLayout* btnLayout = new QHBoxLayout(btnWidget);
     // 위아래 여백 10px으로 버튼 외경선이 잠히지 않도록
     btnLayout->setContentsMargins(12, 10, 12, 10);
@@ -184,6 +98,9 @@ SettingsDialog::SettingsDialog(MpvCore* mpv, QWidget* parent)
     QPushButton* btnCancel= new QPushButton("취소", btnWidget);
     btnApply->setObjectName("btnApply");
     btnOk->setObjectName("btnOk");
+    btnApply->setFocusPolicy(Qt::NoFocus);
+    btnOk->setFocusPolicy(Qt::NoFocus);
+    btnCancel->setFocusPolicy(Qt::NoFocus);
 
     btnLayout->addStretch();
     btnLayout->addWidget(btnApply);
@@ -587,7 +504,7 @@ void SettingsDialog::setupSubtitleTab(QTabWidget* tabs) {
     apiLay->setSpacing(6);
 
     auto* apiDesc = new QLabel(
-        "<a href='https://www.opensubtitles.com/consumers' style='color:#4fc3f7;'>"
+        "<a href='https://www.opensubtitles.com/consumers' style='color:#00D4B4;'>"
         "OpenSubtitles.com</a>에서 API 키를 발급받아 입력하세요."
         "<br><small style='color:#666;'>로그인 → 프로필 → API 섹션 → Consumer Key</small>",
         page);
@@ -605,7 +522,7 @@ void SettingsDialog::setupSubtitleTab(QTabWidget* tabs) {
     subApiKeyEdit_->setStyleSheet(
         "QLineEdit { background:#252525; color:#ddd; border:1px solid #333;"
         "border-radius:3px; padding:4px 8px; }"
-        "QLineEdit:focus { border-color:#4fc3f7; }");
+        "QLineEdit:focus { border-color:#00D4B4; }");
     auto* showKeyBtn = new QPushButton("표시", page);
     showKeyBtn->setFixedWidth(44);
     showKeyBtn->setCheckable(true);
@@ -637,7 +554,7 @@ void SettingsDialog::setupSubtitleTab(QTabWidget* tabs) {
     deeplApiKeyEdit_->setStyleSheet(
         "QLineEdit { background:#1a1a1a; border:1px solid #2a2a2a; border-radius:3px;"
         "  padding:4px 8px; color:#e0e0e0; }"
-        "QLineEdit:focus { border-color:#4fc3f7; }");
+        "QLineEdit:focus { border-color:#00D4B4; }");
     transForm->addRow("DeepL API Key:", deeplApiKeyEdit_);
 
     papagoClientIdEdit_ = new QLineEdit(page);

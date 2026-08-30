@@ -76,6 +76,11 @@ jobs:
         shell: bash
         run: PYTHONUTF8=1 python3 scripts/verify_window_snap_responsiveness.py
 
+      # ── 통합 디자인 시스템·HiDPI 버튼 포커스 검증 ─────────────────────
+      - name: Verify unified UI design system
+        shell: bash
+        run: PYTHONUTF8=1 python3 scripts/verify_ui_design_system.py
+
       # ── 파일 연결·Windows 기본 앱 등록 검증 ──────────────────────────
       - name: Verify file association policy
         shell: bash
@@ -451,7 +456,7 @@ jobs:
 
       - name: Generate version-staging.json
         env:
-          APP_VERSION: "6.20.4"
+          APP_VERSION: "6.20.5"
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
         run: python3 scripts/make_version_json.py "$APP_VERSION" "$DEPLOY_HOST" staging
 
@@ -461,7 +466,7 @@ jobs:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
-          APP_VERSION: "6.20.4"
+          APP_VERSION: "6.20.5"
         run: |
           if [ -z "$SSH_KEY" ] || [ -z "$DEPLOY_HOST" ]; then
             echo "배포 Secrets 미설정 - 건너뜀"
