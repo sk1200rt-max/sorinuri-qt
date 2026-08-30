@@ -1,5 +1,5 @@
 {
-  "version": "6.19.8",
+  "version": "6.19.9",
   "domain": "installer",
-  "purpose": "실장비 사전 테스트 배포 절차 도입"
+  "purpose": "사전 테스트 패키지 전달 안정화"
 }

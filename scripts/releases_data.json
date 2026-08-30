@@ -1,5 +1,14 @@
 [
   {
+    "version": "6.19.9",
+    "date": "2026-08-30",
+    "title": "실장비 사전 테스트 패키지 안정화",
+    "desc": "테스트 전용 패키지를 워크플로우 산출물로 안전하게 전달하고 자체 서버 테스트 경로에서 먼저 검증하도록 개선했습니다.",
+    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.19.9.exe",
+    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.19.9-Portable.zip",
+    "tags": []
+  },
+  {
     "version": "6.19.8",
     "date": "2026-08-30",
     "title": "실장비 사전 테스트 배포 절차",
