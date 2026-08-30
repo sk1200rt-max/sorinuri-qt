@@ -1085,6 +1085,11 @@ void MainWindow::toggleFullscreen() {
 void MainWindow::closeEvent(QCloseEvent* e)  {
     saveResumePosition();  // 이어보기: 종료 시 현재 위치 저장
     saveSettings();
+
+    // QApplication 종료 전에 OpenGL render context와 libmpv를 동기 종료한다.
+    // 이 경로가 완료된 뒤 창을 닫아 WASAPI 독점 핸들이 게임·브라우저를 막지 않게 한다.
+    if (mpvWidget_) mpvWidget_->shutdown();
+
     e->accept();
 }
 

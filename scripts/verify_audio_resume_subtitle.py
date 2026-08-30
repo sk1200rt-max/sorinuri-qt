@@ -49,6 +49,27 @@ for needle in [
 if 'core->command({"ao-reload"})' in main:
     errors.append("MainWindow에 정책 복원 없는 직접 ao-reload 호출이 남아 있습니다.")
 
+# 종료 전 명시적 종료가 WASAPI 독점 핸들의 생명주기를 Qt 객체 소멸보다 앞서게 한다.
+for needle in [
+    "void MpvCore::shutdown()",
+    "mpv_set_wakeup_callback(mpv_, nullptr, nullptr)",
+    "mpv_terminate_destroy(mpv_)",
+    "mpv_ = nullptr",
+    "void MpvWidget::shutdown()",
+    "mpv_render_context_free(renderCtx_)",
+    "if (shutdownStarted_ || renderCtx_ || !context()) return;",
+    "core_->shutdown()",
+    "if (mpvWidget_) mpvWidget_->shutdown()",
+]:
+    if needle not in core + header + main + (ROOT / "src" / "MpvWidget.cpp").read_text(encoding="utf-8") + (ROOT / "src" / "MpvWidget.h").read_text(encoding="utf-8"):
+        errors.append(f"종료 뒤 외부 앱 오디오 해제 경로 누락: {needle}")
+
+close_start = main.find("void MainWindow::closeEvent")
+close_end = main.find("void MainWindow::dragEnterEvent", close_start)
+close_event = main[close_start:close_end] if close_start >= 0 and close_end > close_start else ""
+if "mpvWidget_->shutdown()" not in close_event or close_event.find("mpvWidget_->shutdown()") > close_event.find("e->accept()"):
+    errors.append("창 종료 승인 전에 MpvWidget 종료가 완료되지 않습니다.")
+
 for needle in [
     "void MpvCore::applyStoredSubtitleStyle()",
     'settings.value("subtitle/size", 36)',
@@ -71,4 +92,4 @@ if errors:
         print(f"- {error}", file=sys.stderr)
     raise SystemExit(1)
 
-print("절전 복귀 오디오·자막 수명주기 검증 통과: 원본 채널 재협상·패스스루 복원·새 파일 자막 스타일 재적용 확인")
+print("절전 복귀·종료 오디오·자막 수명주기 검증 통과: 원본 채널 재협상·WASAPI 동기 해제·새 파일 자막 스타일 재적용 확인")

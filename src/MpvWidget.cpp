@@ -52,12 +52,30 @@ MpvWidget::MpvWidget(QWidget* parent) : QOpenGLWidget(parent) {
 }
 
 MpvWidget::~MpvWidget() {
-    makeCurrent();
-    if (renderCtx_) {
-        mpv_render_context_free(renderCtx_);
+    shutdown();
+}
+
+void MpvWidget::shutdown() {
+    if (shutdownStarted_) return;
+    shutdownStarted_ = true;
+    mpvInitializationQueued_ = false;
+
+    // libmpv를 종료하기 전에 Qt OpenGL 컨텍스트에 묶인 render context를 먼저
+    // 해제한다. closeEvent에서 이 함수가 동기 완료되므로 WASAPI 독점 핸들이
+    // QApplication 종료·객체 소멸까지 남지 않는다.
+    if (context()) {
+        makeCurrent();
+        if (renderCtx_) {
+            mpv_render_context_set_update_callback(renderCtx_, nullptr, nullptr);
+            mpv_render_context_free(renderCtx_);
+            renderCtx_ = nullptr;
+        }
+        doneCurrent();
+    } else {
         renderCtx_ = nullptr;
     }
-    doneCurrent();
+
+    if (core_) core_->shutdown();
 }
 
 // ── OpenGL 컨텍스트 파괴 시 renderCtx_ 안전 해제 ───────────────────────────────────
@@ -97,14 +115,14 @@ void MpvWidget::initializeGL() {
 }
 
 void MpvWidget::queueDeferredMpvInitialization() {
-    if (mpvInitializationQueued_ || renderCtx_ || !context()) return;
+    if (shutdownStarted_ || mpvInitializationQueued_ || renderCtx_ || !context()) return;
     mpvInitializationQueued_ = true;
 
     // 첫 프레임이 화면에 반영될 시간을 보장한다. 이 지연 동안 파일 열기 요청은
     // MainWindow의 pendingStartupFiles_에 보관되며 mpvInitialized 이후 처리된다.
     QTimer::singleShot(80, this, [this]() {
         mpvInitializationQueued_ = false;
-        if (renderCtx_ || !context()) return;
+        if (shutdownStarted_ || renderCtx_ || !context()) return;
 
         makeCurrent();
         const bool ready = initializeMpvRenderContext();

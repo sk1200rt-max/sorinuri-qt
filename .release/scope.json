@@ -1,5 +1,5 @@
 {
-  "version": "6.20.3",
-  "domain": "ui",
-  "purpose": "영상 UI 자동 숨김 중 마우스 포인터 가시성 복구"
+  "version": "6.20.4",
+  "domain": "audio,renderer,ui",
+  "purpose": "소리누리 종료 뒤 외부 앱 오디오가 멈추는 WASAPI 해제 회귀 수정"
 }

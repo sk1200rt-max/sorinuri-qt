@@ -1,5 +1,14 @@
 [
   {
+    "version": "6.20.4",
+    "date": "2026-08-30",
+    "title": "종료 후 오디오 장치 해제 안정화",
+    "desc": "창을 닫기 전에 OpenGL 렌더 컨텍스트와 libmpv를 동기 종료해 WASAPI 독점 출력 장치가 게임과 다른 앱을 막지 않도록 개선했습니다.",
+    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.20.4.exe",
+    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.20.4-Portable.zip",
+    "tags": []
+  },
+  {
     "version": "6.20.3",
     "date": "2026-08-30",
     "title": "영상 조작 중 마우스 포인터 유지",

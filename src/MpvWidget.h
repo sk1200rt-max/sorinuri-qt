@@ -22,6 +22,10 @@ public:
     void setAiSubtitle(const QString& text, int confidence);
     void clearAiSubtitle();
 
+    // 메인 창 closeEvent에서 호출한다. OpenGL render context를 먼저 해제한 뒤
+    // MpvCore를 동기 종료하여 WASAPI 독점 핸들이 다른 앱을 막지 않게 한다.
+    void shutdown();
+
     // MPV 초기화 완료 여부 확인 (시작 파일 로드 타이밍 제어에 사용)
     bool isMpvInitialized() const;
 
@@ -55,6 +59,7 @@ private:
     MpvCore*             core_       = nullptr;
     mpv_render_context*  renderCtx_  = nullptr;
     bool mpvInitializationQueued_ = false;
+    bool  shutdownStarted_ = false;
     bool  screenChangedConnected_ = false;  // 멀티모니터 감지 연결 여부
     void  connectScreenChanged(QWindow* win);  // 멀티모니터 시그널 연결 헬퍼
 

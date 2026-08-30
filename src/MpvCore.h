@@ -32,6 +32,10 @@ public:
     // 초기화 (WID 설정 후 호출)
     bool initialize(WId windowId);
 
+    // 창 종료 전에 libmpv 코어를 동기 종료한다. WASAPI 독점 장치 핸들이
+    // Qt 객체 소멸 뒤까지 남지 않도록 mpv_terminate_destroy() 완료를 보장한다.
+    void shutdown();
+
     // 재생 제어
     void loadFile(const QString& path, bool append = false);
     void play();
@@ -158,6 +162,7 @@ private:
 
     mpv_handle* mpv_       = nullptr;
     bool        initialized_ = false;
+    bool        shuttingDown_ = false;
     bool        isLaptop_    = false;  // 노트북 감지 시 true → applyVideoSyncByFps에서 display-resample 차단
 
     // 오디오 설정 상태

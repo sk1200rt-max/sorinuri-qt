@@ -96,18 +96,30 @@ MpvCore::MpvCore(QObject* parent) : QObject(parent) {
 }
 
 MpvCore::~MpvCore() {
-    if (spectrumTimer_) { spectrumTimer_->stop(); }
-    if (frameDropTimer_) { frameDropTimer_->stop(); }
-    if (mpv_ && initialized_) {
-        // ── WASAPI 독점 모드 명시적 해제 ──
-        // 종료 시 audio-exclusive=no를 먼저 설정하지 않으면
-        // WASAPI가 오디오 장치를 점유한 상태로 종료되어
-        // 다른 앱(브라우저, VLC 등)에서 소리가 안 나오는 문제 발생
-        // 주의: mpv_terminate_destroy 전에 stop 명령을 보내면
-        // 종료 시퀀스 교란으로 충돌 발생 가능 → audio-exclusive만 해제
-        mpv_set_property_string(mpv_, "audio-exclusive", "no");
+    shutdown();
+}
+
+void MpvCore::shutdown() {
+    if (shuttingDown_) return;
+    shuttingDown_ = true;
+
+    if (spectrumTimer_) spectrumTimer_->stop();
+    if (frameDropTimer_) frameDropTimer_->stop();
+
+    if (!mpv_) {
+        initialized_ = false;
+        return;
     }
-    if (mpv_) mpv_terminate_destroy(mpv_);
+
+    // 종료 직전에 ao-reload·audio-exclusive 같은 비동기 재협상 요청을
+    // 추가하지 않는다. 비동기 요청은 종료와 실행 순서가 보장되지 않으므로,
+    // mpv_terminate_destroy()가 재생 코어·모든 client·WASAPI 출력 장치의
+    // 종료를 완료할 때까지 기다리는 단일 동기 경로로 사용한다.
+    mpv_set_wakeup_callback(mpv_, nullptr, nullptr);
+    mpv_terminate_destroy(mpv_);
+    mpv_ = nullptr;
+    initialized_ = false;
+    qInfo() << "[MPV] 종료 완료: libmpv/WASAPI 출력 장치 해제";
 }
 
 bool MpvCore::initialize(WId windowId) {
