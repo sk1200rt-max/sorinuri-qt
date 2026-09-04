@@ -70,6 +70,12 @@ def main() -> int:
     for required in (
         'build_store_msix:',
         "inputs.build_store_msix == true",
+        'Verify MSIX version derivation',
+        "$projectText = Get-Content 'CMakeLists.txt' -Raw",
+        "project\\(Sorinuri\\s+VERSION\\s+([0-9]+\\.[0-9]+\\.[0-9]+)",
+        '$msixVersion = "$($Matches[1]).0"',
+        '"MSIX_VERSION=$msixVersion" | Add-Content -Path $env:GITHUB_ENV -Encoding utf8',
+        '$msixVersion = $env:MSIX_VERSION',
         'MSIX_PACKAGE_IDENTITY_NAME',
         'MSIX_PACKAGE_PUBLISHER',
         'MSIX_PUBLISHER_DISPLAY_NAME',
@@ -81,9 +87,13 @@ def main() -> int:
     ):
         require(workflow, required, ".github/workflows/build-windows.yml")
 
+    if '$env:APP_VERSION.0' in workflow:
+        raise AssertionError('MSIX 버전은 누락될 수 있는 APP_VERSION 환경변수가 아니라 CMakeLists.txt의 실제 제품 버전에서 생성해야 합니다.')
+
     for required in (
         'build_local_test_msix:',
         "inputs.build_local_test_msix == true",
+        '$msixVersion = $env:MSIX_VERSION',
         'build_local_test_msix.ps1',
         'Upload local self-signed test package',
         'Sorinuri-LOCAL-TEST-NOT-FOR-DISTRIBUTION',

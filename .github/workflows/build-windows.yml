@@ -57,6 +57,22 @@ jobs:
           fi
           echo "버전 검증 통과: $CMAKE_VER"
 
+      # ── MSIX 버전 단일 원본 검증 ───────────────────────────────────
+      # 모든 MSIX 변형은 CMake의 제품 버전만 사용하며, 패키징 전에 네 자리 형식을 강제한다.
+      - name: Verify MSIX version derivation
+        shell: pwsh
+        run: |
+          $projectText = Get-Content 'CMakeLists.txt' -Raw
+          if ($projectText -notmatch 'project\(Sorinuri\s+VERSION\s+([0-9]+\.[0-9]+\.[0-9]+)') {
+            throw 'MSIX 버전 생성 중단: CMakeLists.txt에서 Sorinuri 제품 버전을 찾을 수 없습니다'
+          }
+          $msixVersion = "$($Matches[1]).0"
+          if ($msixVersion -notmatch '^\d+\.\d+\.\d+\.\d+$') {
+            throw "MSIX 버전 생성 중단: 유효하지 않은 네 자리 버전입니다: $msixVersion"
+          }
+          "MSIX_VERSION=$msixVersion" | Add-Content -Path $env:GITHUB_ENV -Encoding utf8
+          Write-Host "MSIX 버전 검증 통과: $msixVersion"
+
       # ── 릴리즈 변경 범위 게이트 ────────────────────────────────────
       - name: Verify declared release scope
         shell: bash
@@ -444,7 +460,10 @@ jobs:
           Remove-Item 'dist/Sorinuri-StorePayload/vc_redist.x64.exe' -Force -ErrorAction SilentlyContinue
           Remove-Item 'dist/Sorinuri-StorePayload/소리누리-디버그.bat' -Force -ErrorAction SilentlyContinue
 
-          $msixVersion = "$env:APP_VERSION.0"
+          $msixVersion = $env:MSIX_VERSION
+          if ([string]::IsNullOrWhiteSpace($msixVersion) -or $msixVersion -notmatch '^\d+\.\d+\.\d+\.\d+$') {
+            throw "Store MSIX 생성 중단: 검증된 MSIX_VERSION 환경값이 없습니다: $msixVersion"
+          }
           & .\scripts\build_store_msix.ps1 `
             -PackageIdentityName $env:MSIX_PACKAGE_IDENTITY_NAME `
             -PackagePublisher $env:MSIX_PACKAGE_PUBLISHER `
@@ -487,7 +506,10 @@ jobs:
           Remove-Item 'dist/Sorinuri-LocalTestPayload/vc_redist.x64.exe' -Force -ErrorAction SilentlyContinue
           Remove-Item 'dist/Sorinuri-LocalTestPayload/소리누리-디버그.bat' -Force -ErrorAction SilentlyContinue
 
-          $msixVersion = "$env:APP_VERSION.0"
+          $msixVersion = $env:MSIX_VERSION
+          if ([string]::IsNullOrWhiteSpace($msixVersion) -or $msixVersion -notmatch '^\d+\.\d+\.\d+\.\d+$') {
+            throw "Store MSIX 생성 중단: 검증된 MSIX_VERSION 환경값이 없습니다: $msixVersion"
+          }
           & .\scripts\build_local_test_msix.ps1 `
             -PackageVersion $msixVersion `
             -PayloadSource 'dist/Sorinuri-LocalTestPayload' `
