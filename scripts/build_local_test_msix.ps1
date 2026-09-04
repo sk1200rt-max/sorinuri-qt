@@ -43,7 +43,6 @@ function Get-SignToolPath {
 }
 
 $certificate = $null
-$runnerTrustedPeopleInstalled = $false
 try {
     $certificate = New-SelfSignedCertificate `
         -Type Custom `
@@ -74,7 +73,7 @@ try {
     $unsignedMsix = Join-Path $unsignedDirectory ("{0}-{1}-x64.msix" -f $testPrefix, $PackageVersion)
     if (-not (Test-Path -LiteralPath $unsignedMsix)) { throw "unsigned MSIX가 없습니다: $unsignedMsix" }
 
-    $signedMsix = Join-Path $absoluteOutput ("Sorinuri-LOCAL-TEST-NOT-FOR-DISTRIBUTION-{0}-x64.msix" -f $PackageVersion)
+    $signedMsix = Join-Path $absoluteOutput ("Sorinuri-LOCAL-TEST-NOT-FOR-DISTRIBUTION-{0}-x64.msix" -f $testPrefix, $PackageVersion)
     Move-Item -LiteralPath $unsignedMsix -Destination $signedMsix -Force
     Remove-Item -LiteralPath $unsignedDirectory -Recurse -Force -ErrorAction SilentlyContinue
 
@@ -86,16 +85,14 @@ try {
     $certificatePath = Join-Path $absoluteOutput 'Sorinuri-LOCAL-TEST-CERTIFICATE-ONLY.cer'
     Export-Certificate -Cert $certificate -FilePath $certificatePath -Force | Out-Null
 
-    # self-signed 인증서는 CI runner에서 자동 신뢰되지 않는다. 최종 설치 스크립트와
-    # 같은 Trusted People 범위에 현재 runner 사용자용으로만 임시 신뢰한 뒤 검증한다.
-    $existingRunnerTrust = Get-ChildItem 'Cert:\CurrentUser\TrustedPeople' |
-        Where-Object { $_.Thumbprint -eq $certificate.Thumbprint }
-    if (-not $existingRunnerTrust) {
-        Import-Certificate -FilePath $certificatePath -CertStoreLocation 'Cert:\CurrentUser\TrustedPeople' | Out-Null
-        $runnerTrustedPeopleInstalled = $true
-    }
-    & $signTool verify /pa /v $signedMsix
-    if ($LASTEXITCODE -ne 0) { throw '로컬 테스트 MSIX 서명 검증 실패' }
+    # self-signed 테스트 인증서는 공인 루트 체인이 아니다. CI에서 공인 체인을 요구하지 않고,
+    # 생성 직후 MSIX가 서명됐으며 내보낸 공개 인증서와 서명자가 정확히 같은지만 확인한다.
+    # 실제 PC에서는 Install-Sorinuri-LocalTest.ps1가 Trusted People 등록 후 Add-AppxPackage로
+    # Windows의 MSIX 서명·신뢰·무결성 검증을 수행한다.
+    $signature = Get-AuthenticodeSignature -FilePath $signedMsix
+    if (-not $signature.SignerCertificate) { throw '로컬 테스트 MSIX 서명자를 찾을 수 없습니다.' }
+    if ($signature.SignerCertificate.Subject -ne $testPublisher) { throw '로컬 테스트 MSIX 서명 주체가 예상값과 다릅니다.' }
+    if ($signature.SignerCertificate.Thumbprint -ne $certificate.Thumbprint) { throw '로컬 테스트 MSIX 서명 인증서가 내보낸 공개 인증서와 다릅니다.' }
 
     $installScript = Join-Path $repoRoot 'scripts/Install-Sorinuri-LocalTest.ps1'
     $removeScript = Join-Path $repoRoot 'scripts/Remove-Sorinuri-LocalTest.ps1'
@@ -132,9 +129,6 @@ Microsoft Store 제출용 또는 고객 다운로드 파일이 아닙니다.
     Write-Host '이 artifact는 고객·GitHub Release·sorinuri.com에 게시하지 마세요. Store 검증 후 Store 서명 package로 교체해야 합니다.'
 }
 finally {
-    if ($certificate -and $runnerTrustedPeopleInstalled) {
-        Remove-Item -LiteralPath ("Cert:\CurrentUser\TrustedPeople\{0}" -f $certificate.Thumbprint) -Force -ErrorAction SilentlyContinue
-    }
     if ($certificate) {
         Remove-Item -LiteralPath ("Cert:\CurrentUser\My\{0}" -f $certificate.Thumbprint) -Force -ErrorAction SilentlyContinue
     }
