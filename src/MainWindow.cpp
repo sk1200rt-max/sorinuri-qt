@@ -407,12 +407,8 @@ void MainWindow::setupConnections() {
     // ScrobbleManager 초기화 (Last.fm 스크로블링)
     scrobbleManager_ = new ScrobbleManager(this);
 
-    // CloudDriveManager 초기화
-    cloudDriveManager_ = new CloudDriveManager(this);
-    connect(cloudDriveManager_, &CloudDriveManager::downloadUrlReady,
-            this, [this](const QString& url, const QString& /*name*/) {
-        openFiles({url});
-    });
+    // CloudDriveManager는 클라우드 탭을 처음 열 때 생성한다. 일반 재생 시작에는
+    // 네트워크 관리자 생성·클라우드 토큰 설정 읽기가 필요하지 않다.
     QTimer::singleShot(1200, this, [this]() {
         if (smtcManager_->initialize(reinterpret_cast<void*>(winId()))) {
             qInfo() << "[MainWindow] SMTC 초기화 성공";
@@ -809,6 +805,13 @@ void MainWindow::revealUiForVideoEdge(const QPoint& videoPosition) {
 }
 
 void MainWindow::hideUI() {
+    // OTT는 외부 웹 콘텐츠가 전체 영역을 차지하므로 상단 앱 메뉴를 숨기면
+    // 일반 플레이어·오리지널 음악 경로가 단절된다. OTT 중에는 항상 유지한다.
+    if (isOttMode_) {
+        if (titleBar_) titleBar_->show();
+        uiVisible_ = true;
+        return;
+    }
     // 음악 모드에서는 타이틀바/커서를 절대 숨기지 않음
     if (isMusicMode_) return;
     // ── 팝업/메뉴가 열려 있으면 절대 숨기지 않음 ──────────────────────────
@@ -1668,7 +1671,14 @@ void MainWindow::toggleProFeatures() {
         }
         proFeatures_->addTab(voiceControlWidget_, "🎙 음성 제어");
 
-        // 클라우드 드라이브 UI 탭
+        // 클라우드 드라이브 UI 탭: 실제 사용 시점까지 QNetworkAccessManager·설정 읽기를 지연한다.
+        if (!cloudDriveManager_) {
+            cloudDriveManager_ = new CloudDriveManager(this);
+            connect(cloudDriveManager_, &CloudDriveManager::downloadUrlReady,
+                    this, [this](const QString& url, const QString& /*name*/) {
+                openFiles({url});
+            });
+        }
         if (!cloudDriveBrowserWidget_) {
             cloudDriveBrowserWidget_ = new CloudDriveBrowserWidget(cloudDriveManager_, proFeatures_);
             connect(cloudDriveBrowserWidget_, &CloudDriveBrowserWidget::fileRequested,
@@ -2257,6 +2267,8 @@ void MainWindow::showContextMenu(const QPoint& globalPos) {
 void MainWindow::switchToPlayerMode() {
     isOttMode_ = false;
     mainStack_->setCurrentIndex(0);
+    // OTT에서 돌아온 직후 플레이어 조작 UI를 즉시 보이게 한다.
+    showUI();
     controlBar_->playerModeBtn()->setProperty("active", true);
     controlBar_->ottModeBtn()->setProperty("active", false);
     controlBar_->playerModeBtn()->style()->unpolish(controlBar_->playerModeBtn());
@@ -2278,9 +2290,23 @@ void MainWindow::switchToOttMode() {
         connect(ottPage_, &OttWidget::titleChanged, this, [this](const QString& t) {
             if (isOttMode_) updateWindowTitle(t);
         });
+        // OTT 웹 방문 기록과 독립된 명시적 복귀 요청은 기존 플레이어 모드 전환만 사용한다.
+        // 재생 상태·오디오 엔진·WebView2 인스턴스는 유지한다.
+        connect(ottPage_, &OttWidget::returnToPlayerRequested,
+                this, &MainWindow::switchToPlayerMode);
+        connect(ottPage_, &OttWidget::originalsRequested, this, [this]() {
+            // 기존 OriginalsWidget과 PlaybackQueue를 재사용한다. OTT 전용 재생 경로나
+            // 별도 YouTube 처리를 만들지 않으므로 연속 재생·반복·저장 목록도 보존된다.
+            switchToPlayerMode();
+            if (!proFeatures_ || !proFeatures_->isVisible())
+                toggleProFeatures();
+            if (proFeatures_)
+                proFeatures_->setCurrentTabByName("ORIGINALS");
+        });
     }
-    mainStack_->setCurrentIndex(1);
-
+        mainStack_->setCurrentIndex(1);
+    // OTT에서도 창 상단 메뉴는 유지한다. WebView2 안으로 들어가도 앱 조작 경로를 잃지 않는다.
+    showTopUi();
     // OTT 모드 진입 시 광고 요청 (비동기, 광고 없으면 표시 안 함)
     if (adManager_)
         adManager_->fetchAd("ott");

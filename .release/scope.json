@@ -1,5 +1,5 @@
 {
-  "version": "6.20.7",
-  "domain": "audio,ui,installer,playback",
-  "purpose": "Microsoft Store MSIX private flight를 위한 Windows 앱 제어 차단 해소, 다중 인스턴스 오디오 안정화 및 오리지널 음악 탐색·재생 정규화"
+  "version": "6.20.8",
+  "domain": "ui,performance",
+  "purpose": "OTT 복귀·상단 접근성·오리지널 진입 UI 정리 및 비핵심 클라우드 초기화 지연"
 }

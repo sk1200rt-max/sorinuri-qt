@@ -1,5 +1,14 @@
 [
   {
+    "version": "6.20.8",
+    "date": "2026-09-04",
+    "title": "OTT 접근성·홈 UI 정리·시작 경량화",
+    "desc": "OTT에서 플레이어와 오리지널 음악으로 즉시 복귀하도록 접근 경로를 보완하고, 외곽선 없는 서비스 홈과 일관된 탐색 아이콘을 적용했습니다. 일반 재생 시작 시 불필요한 클라우드 초기화를 지연했습니다.",
+    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.20.8.exe",
+    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.20.8-Portable.zip",
+    "tags": []
+  },
+  {
     "version": "6.20.7",
     "date": "2026-09-04",
     "title": "Microsoft Store 사전 테스트 · 다중 오디오 · 오리지널 음악 정규화",

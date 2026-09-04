@@ -4,6 +4,8 @@
 #include <QScrollArea>
 #include <QGridLayout>
 #include <QFrame>
+#include <QShortcut>
+#include <QStyle>
 
 // ── 서비스 데이터 ──────────────────────────────────────────────────────────
 const QStringList OttWidget::SERVICE_NAMES = {
@@ -72,31 +74,60 @@ void OttWidget::setupUI() {
 
     // ── 툴바 ──────────────────────────────────────────────────────
     toolBar_ = new QWidget(this);
-    toolBar_->setFixedHeight(40);
-    toolBar_->setStyleSheet("background: #141414; border-bottom: 1px solid #222;");
+    toolBar_->setFixedHeight(44);
+    toolBar_->setStyleSheet("background: #101414;");
     auto* tbLayout = new QHBoxLayout(toolBar_);
-    tbLayout->setContentsMargins(8, 4, 8, 4);
+    tbLayout->setContentsMargins(10, 6, 10, 6);
     tbLayout->setSpacing(4);
 
-    QString btnStyle =
-        "QPushButton { background: #222; color: #ccc; border: 1px solid #333; "
-        "border-radius: 4px; padding: 3px 10px; font-size: 13px; min-width: 30px; }"
-        "QPushButton:hover { background: #2a2a2a; border-color: #4fc3f7; color: #fff; }"
-        "QPushButton:disabled { color: #444; border-color: #222; }";
+    const QString iconButtonStyle =
+        "QPushButton { background: transparent; color: #a8b5b3; border: none; "
+        "border-radius: 6px; padding: 4px; }"
+        "QPushButton:hover { background: #202827; color: #f3fbfa; }"
+        "QPushButton:disabled { color: #485452; }";
 
-    backBtn_   = new QPushButton("◀", toolBar_);
-    fwdBtn_    = new QPushButton("▶", toolBar_);
-    reloadBtn_ = new QPushButton("↻", toolBar_);
-    homeBtn_   = new QPushButton("⌂", toolBar_);
-    backBtn_->setStyleSheet(btnStyle);
-    fwdBtn_->setStyleSheet(btnStyle);
-    reloadBtn_->setStyleSheet(btnStyle);
-    homeBtn_->setStyleSheet(btnStyle);
-    backBtn_->setToolTip("뒤로");
-    fwdBtn_->setToolTip("앞으로");
-    reloadBtn_->setToolTip("새로고침");
-    homeBtn_->setToolTip("홈 (서비스 선택)");
+    // OTT 웹페이지의 방문 기록과 분리된 소리누리 복귀 동작을 첫 버튼으로 고정한다.
+    // Netflix 등 외부 페이지에서 뒤로가기만으로 플레이어를 찾을 수 없는 흐름을 방지한다.
+    returnBtn_ = new QPushButton("플레이어", toolBar_);
+    originalsBtn_ = new QPushButton("오리지널", toolBar_);
+    backBtn_   = new QPushButton(toolBar_);
+    fwdBtn_    = new QPushButton(toolBar_);
+    reloadBtn_ = new QPushButton(toolBar_);
+    homeBtn_   = new QPushButton(toolBar_);
+    const QString primaryNavStyle =
+        "QPushButton { background: #004d45; color: #e8fffb; border: 1px solid #00bfa5; "
+        "border-radius: 4px; padding: 3px 10px; font-size: 12px; font-weight: 600; }"
+        "QPushButton:hover { background: #006b60; border-color: #00d4b4; color: #ffffff; }";
+    returnBtn_->setStyleSheet(primaryNavStyle);
+    originalsBtn_->setStyleSheet(primaryNavStyle);
+    returnBtn_->setIcon(QIcon(":/icons/play.svg"));
+    originalsBtn_->setIcon(QIcon(":/icons/playlist.svg"));
+    returnBtn_->setIconSize(QSize(15, 15));
+    originalsBtn_->setIconSize(QSize(15, 15));
+    backBtn_->setIcon(style()->standardIcon(QStyle::SP_ArrowBack));
+    fwdBtn_->setIcon(style()->standardIcon(QStyle::SP_ArrowForward));
+    reloadBtn_->setIcon(style()->standardIcon(QStyle::SP_BrowserReload));
+    homeBtn_->setIcon(style()->standardIcon(QStyle::SP_DirHomeIcon));
+    for (QPushButton* button : {backBtn_, fwdBtn_, reloadBtn_, homeBtn_}) {
+        button->setStyleSheet(iconButtonStyle);
+        button->setFixedSize(30, 30);
+        button->setIconSize(QSize(16, 16));
+    }
+    returnBtn_->setFocusPolicy(Qt::NoFocus);
+    originalsBtn_->setFocusPolicy(Qt::NoFocus);
+    backBtn_->setFocusPolicy(Qt::NoFocus);
+    fwdBtn_->setFocusPolicy(Qt::NoFocus);
+    reloadBtn_->setFocusPolicy(Qt::NoFocus);
+    homeBtn_->setFocusPolicy(Qt::NoFocus);
+    returnBtn_->setToolTip("소리누리 플레이어로 돌아가기 (Ctrl+Shift+P)");
+    originalsBtn_->setToolTip("소리누리 오리지널 음악 (기존 재생목록/YouTube 재생)");
+    backBtn_->setToolTip("웹페이지 뒤로가기");
+    fwdBtn_->setToolTip("웹페이지 앞으로가기");
+    reloadBtn_->setToolTip("웹페이지 새로고침");
+    homeBtn_->setToolTip("OTT 서비스 선택으로 돌아가기");
 
+    tbLayout->addWidget(returnBtn_);
+    tbLayout->addWidget(originalsBtn_);
     tbLayout->addWidget(backBtn_);
     tbLayout->addWidget(fwdBtn_);
     tbLayout->addWidget(reloadBtn_);
@@ -106,27 +137,27 @@ void OttWidget::setupUI() {
     serviceBox_->addItems(SERVICE_NAMES);
     serviceBox_->setFixedWidth(130);
     serviceBox_->setStyleSheet(
-        "QComboBox { background: #1a1a1a; color: #ddd; border: 1px solid #333; "
-        "border-radius: 4px; padding: 3px 8px; font-size: 12px; }"
-        "QComboBox:hover { border-color: #4fc3f7; }"
+        "QComboBox { background: #1a2120; color: #dbe6e4; border: none; "
+        "border-radius: 6px; padding: 4px 8px; font-size: 12px; }"
+        "QComboBox:hover { background: #222c2b; }"
         "QComboBox::drop-down { border: none; }"
-        "QComboBox QAbstractItemView { background: #1a1a1a; color: #ddd; "
-        "selection-background-color: #2a2a2a; border: 1px solid #333; }");
+        "QComboBox QAbstractItemView { background: #171d1c; color: #dbe6e4; "
+        "selection-background-color: #263331; border: none; }");
     tbLayout->addWidget(serviceBox_);
 
     urlBar_ = new QLineEdit(toolBar_);
     urlBar_->setPlaceholderText("URL 입력 또는 서비스 선택...");
     urlBar_->setStyleSheet(
-        "QLineEdit { background: #111; color: #eee; border: 1px solid #333; "
-        "border-radius: 4px; padding: 4px 10px; font-size: 12px; }"
-        "QLineEdit:focus { border-color: #4fc3f7; }");
+        "QLineEdit { background: #0c1010; color: #e8f1ef; border: none; "
+        "border-radius: 6px; padding: 5px 10px; font-size: 12px; }"
+        "QLineEdit:focus { background: #111918; outline: none; }");
     tbLayout->addWidget(urlBar_, 1);
 
     auto* goBtn = new QPushButton("이동", toolBar_);
     goBtn->setStyleSheet(
-        "QPushButton { background: #1565c0; color: #fff; border: none; "
-        "border-radius: 4px; padding: 4px 14px; font-size: 12px; }"
-        "QPushButton:hover { background: #1976d2; }");
+        "QPushButton { background: #00a98f; color: #08110f; border: none; "
+        "border-radius: 6px; padding: 5px 13px; font-size: 12px; font-weight: 700; }"
+        "QPushButton:hover { background: #00c4a7; }");
     tbLayout->addWidget(goBtn);
 
     mainLayout->addWidget(toolBar_);
@@ -172,14 +203,22 @@ void OttWidget::setupUI() {
     sbLayout->addStretch();
     mainLayout->addWidget(statusBar);
 
-    connect(goBtn,      &QPushButton::clicked,    this, &OttWidget::onNavigateClicked);
-    connect(urlBar_,    &QLineEdit::returnPressed, this, &OttWidget::onNavigateClicked);
+    connect(returnBtn_,    &QPushButton::clicked,    this, &OttWidget::returnToPlayerRequested);
+    connect(originalsBtn_, &QPushButton::clicked,    this, &OttWidget::originalsRequested);
+    goBtn->setFocusPolicy(Qt::NoFocus);
+    connect(goBtn,         &QPushButton::clicked,    this, &OttWidget::onNavigateClicked);
+    connect(urlBar_,     &QLineEdit::returnPressed, this, &OttWidget::onNavigateClicked);
     connect(backBtn_,   &QPushButton::clicked,    this, &OttWidget::goBack);
     connect(fwdBtn_,    &QPushButton::clicked,    this, &OttWidget::goForward);
     connect(reloadBtn_, &QPushButton::clicked,    this, &OttWidget::reload);
     connect(homeBtn_,   &QPushButton::clicked,    this, &OttWidget::goHome);
     connect(serviceBox_, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &OttWidget::onServiceSelected);
+
+    // 네이티브 WebView2에 포커스가 있어도 창 단위에서 동작하도록 앱 단축키로 등록한다.
+    auto* returnShortcut = new QShortcut(QKeySequence("Ctrl+Shift+P"), this);
+    returnShortcut->setContext(Qt::ApplicationShortcut);
+    connect(returnShortcut, &QShortcut::activated, this, &OttWidget::returnToPlayerRequested);
 }
 
 // ── 홈 그리드 빌더 ─────────────────────────────────────────────────────────
@@ -188,25 +227,46 @@ QWidget* OttWidget::buildHomeGrid() {
     scroll->setWidgetResizable(true);
     scroll->setFrameShape(QFrame::NoFrame);
     scroll->setStyleSheet(
-        "QScrollArea { background: #0e0e0e; border: none; }"
-        "QScrollBar:vertical { background: #111; width: 6px; border-radius: 3px; }"
-        "QScrollBar::handle:vertical { background: #333; border-radius: 3px; }"
+        "QScrollArea { background: #0b0f0f; border: none; }"
+        "QScrollBar:vertical { background: transparent; width: 6px; }"
+        "QScrollBar::handle:vertical { background: #2c3836; border-radius: 3px; }"
         "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }");
 
     auto* container = new QWidget();
-    container->setStyleSheet("background: #0e0e0e;");
-    auto* gridLayout = new QGridLayout(container);
-    gridLayout->setContentsMargins(28, 24, 28, 24);
-    gridLayout->setSpacing(12);
-    // 3열 균등 분배
-    gridLayout->setColumnStretch(0, 1);
-    gridLayout->setColumnStretch(1, 1);
-    gridLayout->setColumnStretch(2, 1);
+    container->setStyleSheet("background: #0b0f0f;");
+    auto* pageLayout = new QVBoxLayout(container);
+    pageLayout->setContentsMargins(36, 32, 36, 40);
+    pageLayout->setSpacing(24);
 
-    for (int i = 0; i < SERVICES.size(); ++i) {
-        auto* card = buildServiceCard(SERVICES[i]);
-        gridLayout->addWidget(card, i / 3, i % 3);
-    }
+    // OTT 진입 목적을 먼저 보여 주고, 시각적 테두리 대신 여백과 명도 차이로 계층을 만든다.
+    auto* heading = new QWidget(container);
+    auto* headingLayout = new QVBoxLayout(heading);
+    headingLayout->setContentsMargins(0, 0, 0, 0);
+    headingLayout->setSpacing(5);
+    auto* eyebrow = new QLabel("OTT & STREAMING", heading);
+    eyebrow->setStyleSheet("color: #00b89c; font-size: 11px; font-weight: 700; letter-spacing: 1px; background: transparent;");
+    auto* title = new QLabel("보고 싶은 콘텐츠를 바로 선택하세요", heading);
+    title->setStyleSheet("color: #f2f7f6; font-size: 24px; font-weight: 700; background: transparent;");
+    auto* description = new QLabel("서비스를 선택하면 소리누리 안에서 해당 웹 플레이어를 엽니다.", heading);
+    description->setStyleSheet("color: #869390; font-size: 13px; background: transparent;");
+    headingLayout->addWidget(eyebrow);
+    headingLayout->addWidget(title);
+    headingLayout->addWidget(description);
+    pageLayout->addWidget(heading);
+
+    auto* gridHost = new QWidget(container);
+    gridHost->setStyleSheet("background: transparent;");
+    auto* gridLayout = new QGridLayout(gridHost);
+    gridLayout->setContentsMargins(0, 0, 0, 0);
+    gridLayout->setHorizontalSpacing(10);
+    gridLayout->setVerticalSpacing(10);
+    // 3열 구성은 250% 배율에서도 카드 이름·조작 영역을 충분히 확보한다.
+    for (int column = 0; column < 3; ++column)
+        gridLayout->setColumnStretch(column, 1);
+    for (int i = 0; i < SERVICES.size(); ++i)
+        gridLayout->addWidget(buildServiceCard(SERVICES[i]), i / 3, i % 3);
+    pageLayout->addWidget(gridHost);
+    pageLayout->addStretch(1);
 
     scroll->setWidget(container);
     return scroll;
@@ -214,79 +274,43 @@ QWidget* OttWidget::buildHomeGrid() {
 
 // ── 서비스 카드 빌더 ───────────────────────────────────────────────────────
 QWidget* OttWidget::buildServiceCard(const ServiceInfo& svc) {
-    // 카드 전체: QFrame (QPushButton 대신 클릭 감지용 이벤트 필터 사용)
+    // 카드 외곽선을 없애고, 배경 명도와 여백만으로 클릭 영역을 구분한다.
     auto* card = new QFrame();
-    card->setFixedHeight(90);
+    card->setFixedHeight(82);
     card->setCursor(Qt::PointingHandCursor);
     card->setStyleSheet(
-        "QFrame {"
-        "  background: #1a1a1a;"
-        "  border: 1px solid #2a2a2a;"
-        "  border-radius: 10px;"
-        "}"
-        "QFrame:hover {"
-        "  background: #222222;"
-        "  border-color: #3d3d3d;"
-        "}");
+        "QFrame { background: #151b1a; border: none; border-radius: 8px; }"
+        "QFrame:hover { background: #1d2826; }");
 
     auto* cardLayout = new QHBoxLayout(card);
-    cardLayout->setContentsMargins(16, 0, 16, 0);
-    cardLayout->setSpacing(16);
+    cardLayout->setContentsMargins(16, 0, 14, 0);
+    cardLayout->setSpacing(12);
 
-    // ── 로고 박스 (52×52 라운드 사각형) ─────────────────────────
-    auto* logoBox = new QLabel();
-    logoBox->setFixedSize(52, 52);
+    // 서비스별 색은 작은 식별자에만 사용해 화면 전체가 과하게 산만해지지 않게 한다.
+    auto* logoBox = new QLabel(card);
+    logoBox->setFixedSize(42, 42);
     logoBox->setAlignment(Qt::AlignCenter);
     logoBox->setStyleSheet(QString(
-        "background: %1;"
-        "border-radius: 10px;"
-        "color: %2;"
-        "font-size: 22px;"
-        "font-weight: 900;"
-        "font-family: 'Arial Black', 'Segoe UI Black', sans-serif;")
+        "background: %1; border: none; border-radius: 8px; color: %2; "
+        "font-size: 17px; font-weight: 800; font-family: 'Segoe UI', sans-serif;")
         .arg(svc.logoBg, svc.logoTextColor));
     logoBox->setText(svc.logoText);
     cardLayout->addWidget(logoBox);
 
-    // ── 텍스트 영역 ───────────────────────────────────────────────
-    auto* textBox  = new QWidget();
-    auto* textLayout = new QVBoxLayout(textBox);
-    textLayout->setContentsMargins(0, 0, 0, 0);
-    textLayout->setSpacing(6);
-
-    auto* nameLabel = new QLabel(svc.name);
+    auto* nameLabel = new QLabel(svc.name, card);
     nameLabel->setStyleSheet(
-        "color: #e0e0e0;"
-        "font-size: 15px;"
-        "font-weight: 600;"
-        "font-family: 'Malgun Gothic', 'Segoe UI', sans-serif;"
-        "background: transparent;");
+        "color: #edf4f2; font-size: 15px; font-weight: 600; "
+        "font-family: 'Malgun Gothic', 'Segoe UI', sans-serif; background: transparent;");
+    cardLayout->addWidget(nameLabel, 1);
 
-    // 오디오 배지
-    auto* badgeLabel = new QLabel(svc.audioLabel);
-    badgeLabel->setFixedHeight(20);
-    badgeLabel->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Fixed);
-    badgeLabel->setStyleSheet(QString(
-        "background: %1;"
-        "color: #fff;"
-        "font-size: 11px;"
-        "font-weight: 700;"
-        "font-family: 'Consolas', 'Courier New', monospace;"
-        "padding: 1px 8px;"
-        "border-radius: 4px;")
-        .arg(svc.audioBg));
-
-    textLayout->addStretch();
-    textLayout->addWidget(nameLabel);
-    textLayout->addWidget(badgeLabel);
-    textLayout->addStretch();
-    cardLayout->addWidget(textBox, 1);
+    auto* openHint = new QLabel("열기", card);
+    openHint->setStyleSheet(
+        "color: #00b89c; font-size: 12px; font-weight: 600; background: transparent;");
+    cardLayout->addWidget(openHint);
 
     // 클릭 이벤트: 마우스 릴리즈로 감지
-    QString url = svc.url;
     card->installEventFilter(this);
-    card->setProperty("serviceUrl", url);
-
+    card->setProperty("serviceUrl", svc.url);
     return card;
 }
 

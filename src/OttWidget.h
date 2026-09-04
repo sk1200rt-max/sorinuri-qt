@@ -60,6 +60,10 @@ public slots:
 signals:
     void titleChanged(const QString& title);
     void urlChanged(const QString& url);
+    // 웹페이지 방문 기록과 무관하게 MainWindow의 일반 플레이어 화면으로 복귀한다.
+    void returnToPlayerRequested();
+    // OTT 화면에서도 기존 OriginalsWidget·통합 재생 대기열로 진입한다.
+    void originalsRequested();
     void webView2Unavailable();
 
 protected:
@@ -87,6 +91,8 @@ private:
     QPushButton*    fwdBtn_        = nullptr;
     QPushButton*    reloadBtn_     = nullptr;
     QPushButton*    homeBtn_       = nullptr;
+    QPushButton*    returnBtn_     = nullptr;  // 웹 탐색과 분리된 플레이어 복귀
+    QPushButton*    originalsBtn_  = nullptr;  // 기존 OriginalsWidget 진입
     QComboBox*      serviceBox_    = nullptr;
 
     // 콘텐츠 스택: 0=홈 그리드, 1=WebView2
