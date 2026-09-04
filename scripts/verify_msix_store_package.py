@@ -2,7 +2,7 @@
 """Static release gate for the Microsoft Store MSIX variant.
 
 The Store package is intentionally built only through a manual workflow dispatch after
-Partner Center supplies the package identity.  This check protects the most important
+Partner Center supplies the package identity. This check protects the most important
 separation: the Store build must never invoke the self-hosted Inno updater, and its
 manifest must retain every file association declared by the established installer.
 """
@@ -110,20 +110,29 @@ def main() -> int:
         'Export-Certificate',
         'Remove-Item -LiteralPath ("Cert:\\CurrentUser\\My',
         'NOT-FOR-DISTRIBUTION',
+        'Get-AuthenticodeSignature',
+        '$signature.SignerCertificate.Thumbprint',
     ):
         require(local_packer, required, "scripts/build_local_test_msix.ps1")
     if 'Export-PfxCertificate' in local_packer or '.pfx' in local_packer.lower():
         raise AssertionError('로컬 테스트 빌드에 PFX/private key 내보내기 경로가 있어서는 안 됩니다.')
+    if 'verify /pa' in local_packer.lower():
+        raise AssertionError('self-signed 로컬 테스트 빌드에서 공인 루트 체인을 요구하는 SignTool /pa 검증을 사용해서는 안 됩니다.')
 
     for required in (
         "Cert:\\LocalMachine\\TrustedPeople",
         'Get-AuthenticodeSignature',
         'Add-AppxPackage',
         'CN=Gaon Communication Sorinuri Local Test',
+        '$signature.SignerCertificate.Thumbprint',
     ):
         require(local_installer, required, "scripts/Install-Sorinuri-LocalTest.ps1")
     if 'Cert:\\LocalMachine\\Root' in local_installer or 'TrustedRootCertificationAuthorities' in local_installer:
         raise AssertionError('로컬 테스트 인증서를 Trusted Root에 넣어서는 안 됩니다.')
+    if local_installer.index('Import-Certificate') > local_installer.index('$signature = Get-AuthenticodeSignature'):
+        raise AssertionError('로컬 테스트 설치 시 공개 인증서를 Trusted People에 신뢰하기 전에 MSIX 서명을 검사해서는 안 됩니다.')
+    if "if ($signature.Status -ne 'Valid')" in local_installer:
+        raise AssertionError('로컬 테스트 설치 스크립트가 self-signed 인증서에 공인 루트 체인을 요구해서는 안 됩니다.')
     for required in (
         'Remove-AppxPackage',
         "Cert:\\LocalMachine\\TrustedPeople",
