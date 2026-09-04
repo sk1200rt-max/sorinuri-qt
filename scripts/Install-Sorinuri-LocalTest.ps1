@@ -28,12 +28,6 @@ foreach ($path in @($PackagePath, $CertificatePath)) {
     if (-not (Test-Path -LiteralPath $path)) { throw "필수 로컬 테스트 파일이 없습니다: $path" }
 }
 
-$signature = Get-AuthenticodeSignature -FilePath $PackagePath
-if ($signature.Status -ne 'Valid') { throw "MSIX 서명 검증 실패: $($signature.Status)" }
-if ($signature.SignerCertificate.Subject -ne $expectedSubject) {
-    throw "잘못된 테스트 패키지 서명 주체입니다. 예상: $expectedSubject / 실제: $($signature.SignerCertificate.Subject)"
-}
-
 $certificate = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($CertificatePath)
 if ($certificate.Subject -ne $expectedSubject) {
     throw "인증서 주체가 로컬 테스트 패키지와 일치하지 않습니다."
@@ -46,6 +40,19 @@ $existing = Get-ChildItem 'Cert:\LocalMachine\TrustedPeople' |
 if (-not $existing) {
     Import-Certificate -FilePath $CertificatePath -CertStoreLocation 'Cert:\LocalMachine\TrustedPeople' | Out-Null
 }
+
+# Trusted People에 넣은 공개 인증서와 정확히 일치하는 self-signed MSIX만 허용한다.
+$signature = Get-AuthenticodeSignature -FilePath $PackagePath
+if (-not $signature.SignerCertificate) { throw 'MSIX 서명자를 찾을 수 없습니다.' }
+if ($signature.SignerCertificate.Subject -ne $expectedSubject) {
+    throw "잘못된 테스트 패키지 서명 주체입니다. 예상: $expectedSubject / 실제: $($signature.SignerCertificate.Subject)"
+}
+if ($signature.SignerCertificate.Thumbprint -ne $certificate.Thumbprint) {
+    throw 'MSIX 서명 인증서가 함께 제공된 로컬 테스트 공개 인증서와 일치하지 않습니다.'
+}
+# Get-AuthenticodeSignature의 공인 루트 체인 상태는 self-signed 테스트 인증서의
+# Trusted People 배포 모델과 다를 수 있다. 아래 Add-AppxPackage가 Windows의 실제
+# MSIX 서명·신뢰·무결성 검증을 수행하므로 그 결과를 설치 승인 기준으로 사용한다.
 
 if ($VclibsPath -and (Test-Path -LiteralPath $VclibsPath)) {
     try {
