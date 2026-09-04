@@ -1,5 +1,6 @@
 {
   "version": "6.20.8",
-  "domain": "ui,performance",
-  "purpose": "OTT 복귀·상단 접근성·오리지널 진입 UI 정리 및 비핵심 클라우드 초기화 지연"
+  "domain": "ui",
+  "purpose": "OTT 복귀·상단 접근성·오리지널 진입 UI 정리 및 비핵심 클라우드 초기화 지연",
+  "base_commit": "3a08ba1"
 }

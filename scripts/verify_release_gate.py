@@ -37,6 +37,7 @@ DOMAINS: dict[str, tuple[str, ...]] = {
         "src/TrackSelector.h", "src/TitleBar.cpp", "src/TitleBar.h", "src/UiTheme.h",
         "src/MusicWidget.cpp", "src/MusicWidget.h", "src/CompactPlayerWidget.cpp",
         "src/CompactPlayerWidget.h", "src/ProFeaturesWidget.cpp", "src/ProFeaturesWidget.h",
+        "src/OttWidget.cpp", "src/OttWidget.h",
     ),
     "playback": (
         "src/PlaybackQueue.cpp", "src/PlaybackQueue.h", "src/PlaylistWidget.cpp",
@@ -151,6 +152,7 @@ def main() -> int:
         # 연관된 여러 영역은 쉼표 구분 선언을 허용하되, 선언 밖 제품 변경은 계속 차단한다.
         domains = tuple(part.strip() for part in str(scope["domain"]).split(",") if part.strip())
         purpose = str(scope["purpose"]).strip()
+        base_commit = str(scope.get("base_commit", "")).strip()
     except (json.JSONDecodeError, KeyError, TypeError) as exc:
         print(f"릴리즈 게이트 실패: scope.json 형식 오류: {exc}", file=sys.stderr)
         return 1
@@ -161,8 +163,19 @@ def main() -> int:
     if not domains or any(domain not in DOMAINS for domain in domains) or not purpose:
         print("릴리즈 게이트 실패: 허용되지 않은 변경 영역 또는 빈 변경 목적입니다.", file=sys.stderr)
         return 1
+    if base_commit and not re.fullmatch(r"[0-9a-fA-F]{7,64}", base_commit):
+        print("릴리즈 게이트 실패: base_commit은 Git 커밋 SHA여야 합니다.", file=sys.stderr)
+        return 1
+    if base_commit:
+        try:
+            run("git", "merge-base", "--is-ancestor", base_commit, "HEAD")
+        except subprocess.CalledProcessError:
+            print("릴리즈 게이트 실패: base_commit이 현재 커밋의 조상이 아닙니다.", file=sys.stderr)
+            return 1
 
-    base = previous_tag(version)
+    # 태그가 누락된 과거 테스트 빌드가 있더라도 검증 기준을 모호하게 넓히지 않는다.
+    # 새 릴리즈는 scope.json에 직전 승인 커밋을 명시해 해당 이후 변경만 검사할 수 있다.
+    base = base_commit or previous_tag(version)
     unexpected: list[tuple[str, str]] = []
     for path in changed_files(base):
         if version_metadata_only(path, base):
