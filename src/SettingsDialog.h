@@ -58,6 +58,9 @@ private:
     MpvCore*        mpv_;
     QSettings       settings_;
     ScrobbleManager* scrobbleMgr_ = nullptr;
+    // 현재 실행 중인 다중 재생 세션에서는 shared PCM 정책이 coordinator에 의해
+    // 결정된다. 이 창에서 단일 고음질 선호 설정을 덮어쓰지 않도록 잠근다.
+    bool multiInstanceAudioLocked_ = false;
 
     // 오디오 탭
     QComboBox*  audioDeviceCombo_   = nullptr;

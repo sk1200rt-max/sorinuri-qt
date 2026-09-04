@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap uap10 rescap">
+
+  <!-- Partner Center가 계정 검증 후 제공하는 값만 build_store_msix.ps1에 전달한다. -->
+  <Identity Name="__PACKAGE_IDENTITY_NAME__"
+            Publisher="__PACKAGE_PUBLISHER__"
+            Version="__PACKAGE_VERSION__"
+            ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>__PACKAGE_DISPLAY_NAME__</DisplayName>
+    <PublisherDisplayName>__PUBLISHER_DISPLAY_NAME__</PublisherDisplayName>
+    <Description>__PACKAGE_DESCRIPTION__</Description>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+
+  <Resources>
+    <Resource Language="ko-kr" />
+  </Resources>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.26100.0" />
+    <!-- Store가 소리누리와 함께 제공하는 VC++ Desktop runtime dependency. -->
+    <PackageDependency Name="Microsoft.VCLibs.140.00.UWPDesktop"
+                       MinVersion="14.0.24217.0"
+                       Publisher="CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US" />
+  </Dependencies>
+
+  <Capabilities>
+    <Capability Name="internetClient" />
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+
+  <Applications>
+    <!-- full-trust packaged Win32: 기존 libmpv/WASAPI/Qt 실행 모델을 그대로 보존한다. -->
+    <Application Id="Sorinuri"
+                 Executable="Sorinuri.exe"
+                 uap10:RuntimeBehavior="packagedClassicApp"
+                 uap10:TrustLevel="mediumIL">
+      <uap:VisualElements DisplayName="__PACKAGE_DISPLAY_NAME__"
+                          Description="__PACKAGE_DESCRIPTION__"
+                          BackgroundColor="transparent"
+                          Square150x150Logo="Assets\Square150x150Logo.png"
+                          Square44x44Logo="Assets\Square44x44Logo.png">
+        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
+      </uap:VisualElements>
+      <Extensions>
+        <!-- Inno Setup의 OpenWith/Capabilities 후보를 package-time에 동일하게 주입한다. -->
+        <uap:Extension Category="windows.fileTypeAssociation"
+                       Executable="Sorinuri.exe"
+                       EntryPoint="Windows.FullTrustApplication"
+                       uap10:RuntimeBehavior="packagedClassicApp"
+                       uap10:TrustLevel="mediumIL">
+          <uap:FileTypeAssociation Name="sorinurimedia">
+            <uap:DisplayName>소리누리 미디어 파일</uap:DisplayName>
+            <uap:Logo>Assets\Square44x44Logo.png</uap:Logo>
+            <uap:SupportedFileTypes>
+__SUPPORTED_FILE_TYPES__
+            </uap:SupportedFileTypes>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+</Package>

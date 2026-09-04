@@ -188,7 +188,7 @@ bool MpvCore::initialize(WId windowId) {
         QString savedDevice = s.value("audio/device", "auto").toString().trimmed();
         if (savedDevice.isEmpty()) savedDevice = QStringLiteral("auto");
         const bool savedExclusive = s.value("audio/exclusive", true).toBool();
-        passthroughEnabled_ = s.value("audio/passthrough", true).toBool();
+        const bool savedPassthrough = s.value("audio/passthrough", true).toBool();
 
         QStringList codecs;
         if (s.value("audio/pt_ac3", true).toBool()) codecs << QStringLiteral("ac3");
@@ -198,17 +198,25 @@ bool MpvCore::initialize(WId windowId) {
         if (s.value("audio/pt_truehd", true).toBool()) codecs << QStringLiteral("truehd");
         spdifCodecs_ = codecs.join(',');
 
+        // MultiShared는 같은 WASAPI endpoint에 여러 창의 동시 출력을 보장하는
+        // 런타임 세션 정책이다. Windows Audio Engine은 non-PCM을 믹싱할 수 없으므로
+        // 반드시 shared PCM으로 시작하며, 사용자의 단일 고음질 선호 설정은 보존한다.
+        const bool multiShared = audioSessionPolicy_ == AudioSessionPolicy::MultiShared;
+        const bool effectiveExclusive = !multiShared && savedExclusive;
+        passthroughEnabled_ = !multiShared && savedPassthrough;
+
         check_error(mpv_set_option_string(mpv_, "ao", "wasapi"));
         check_error(mpv_set_option_string(mpv_, "audio-device",
             savedDevice.toUtf8().constData()));
         check_error(mpv_set_option_string(mpv_, "audio-exclusive",
-            savedExclusive ? "yes" : "no"));
+            effectiveExclusive ? "yes" : "no"));
         check_error(mpv_set_option_string(mpv_, "audio-spdif",
             passthroughEnabled_ ? spdifCodecs_.toUtf8().constData() : ""));
         qInfo() << "[MPV] WASAPI 초기 정책: device=" << savedDevice
-                << "exclusive=" << savedExclusive
+                << "exclusive=" << effectiveExclusive
                 << "passthrough=" << passthroughEnabled_
-                << "codecs=" << spdifCodecs_;
+                << "session=" << (multiShared ? "multi-shared-pcm" : "single-preferred")
+                << "codecs=" << (passthroughEnabled_ ? spdifCodecs_ : QString());
     }
 
     // ── mpv_initialize ────────────────────────────────────────────
@@ -896,11 +904,26 @@ void MpvCore::applyStoredSubtitleStyle() {
 
 void MpvCore::restoreAudioOutputAfterDeviceChange() {
     if (!initialized_) return;
+    // 절전·HDMI hot-plug 복구도 초기화와 동일한 세션 정책으로 통합한다.
+    // MultiShared 세션이 저장된 exclusive/bitstream 값으로 되돌아가는 것을 방지한다.
+    applyAudioSessionPolicy(true);
+}
+
+void MpvCore::setAudioSessionPolicy(AudioSessionPolicy policy, bool reloadOutput) {
+    if (audioSessionPolicy_ == policy) return;
+    audioSessionPolicy_ = policy;
+    if (initialized_) applyAudioSessionPolicy(reloadOutput);
+}
+
+void MpvCore::applyAudioSessionPolicy(bool reloadOutput) {
+    if (!mpv_) return;
 
     QSettings settings("Sorinuri", "SorinuriPlayer");
-    const QString device = settings.value("audio/device", "auto").toString();
-    const bool exclusive = settings.value("audio/exclusive", true).toBool();
-    const bool passthrough = settings.value("audio/passthrough", true).toBool();
+    QString device = settings.value("audio/device", "auto").toString().trimmed();
+    if (device.isEmpty()) device = QStringLiteral("auto");
+    const bool multiShared = audioSessionPolicy_ == AudioSessionPolicy::MultiShared;
+    const bool exclusive = !multiShared && settings.value("audio/exclusive", true).toBool();
+    const bool passthrough = !multiShared && settings.value("audio/passthrough", true).toBool();
     QStringList codecs;
     if (settings.value("audio/pt_ac3", true).toBool()) codecs << "ac3";
     if (settings.value("audio/pt_eac3", true).toBool()) codecs << "eac3";
@@ -908,25 +931,29 @@ void MpvCore::restoreAudioOutputAfterDeviceChange() {
     if (settings.value("audio/pt_dtshd", true).toBool()) codecs << "dts-hd";
     if (settings.value("audio/pt_truehd", true).toBool()) codecs << "truehd";
 
-    // ao-reload는 실험적 명령이므로, 호출 전 현재 사용자가 선택한 장치·독점 모드·
-    // 원본 채널 협상·패스스루 정책을 먼저 모두 복원한다.
+    // ao-reload 전 장치·채널·다운믹스·세션 역할을 한 번에 적용한다.
+    // shared mode의 출력 채널 수는 Windows endpoint mix format과 audio-channels=auto로 협상된다.
+    spdifCodecs_ = codecs.join(',');
+    passthroughEnabled_ = passthrough;
     mpv_set_property_string(mpv_, "audio-device", device.toUtf8().constData());
     mpv_set_property_string(mpv_, "audio-exclusive", exclusive ? "yes" : "no");
     mpv_set_property_string(mpv_, "audio-channels", "auto");
     mpv_set_property_string(mpv_, "ad-lavc-downmix", "no");
-    // 초기 정책과 동일하게 mpv 기본 다운믹스 정규화(no)를 유지한다.
     mpv_set_property_string(mpv_, "audio-normalize-downmix", "no");
-    spdifCodecs_ = codecs.join(',');
-    passthroughEnabled_ = passthrough;
     mpv_set_property_string(mpv_, "audio-spdif",
         passthrough ? spdifCodecs_.toUtf8().constData() : "");
 
-    const char* reloadArgs[] = { "ao-reload", nullptr };
-    mpv_command_async(mpv_, 0, reloadArgs);
-    appLog(QString("오디오 출력 복구: device=%1 exclusive=%2 channels=auto passthrough=%3 codecs=%4")
-               .arg(device).arg(exclusive).arg(passthrough).arg(spdifCodecs_));
-    qInfo() << "[MPV] 절전/장치 변경 후 오디오 정책 재협상:"
-            << device << "exclusive=" << exclusive << "passthrough=" << passthrough;
+    if (reloadOutput && initialized_) {
+        const char* reloadArgs[] = { "ao-reload", nullptr };
+        mpv_command_async(mpv_, 0, reloadArgs);
+    }
+    appLog(QString("오디오 세션 정책 적용: device=%1 exclusive=%2 channels=auto passthrough=%3 mode=%4 codecs=%5")
+               .arg(device).arg(exclusive).arg(passthrough)
+               .arg(multiShared ? "multi-shared-pcm" : "single-preferred")
+               .arg(passthrough ? spdifCodecs_ : QString()));
+    qInfo() << "[MPV] 오디오 세션 정책:"
+            << device << "exclusive=" << exclusive << "passthrough=" << passthrough
+            << "mode=" << (multiShared ? "multi-shared-pcm" : "single-preferred");
 }
 
 void MpvCore::setAudioDevice(const QString& device) {
@@ -936,26 +963,30 @@ void MpvCore::setAudioDevice(const QString& device) {
 
 void MpvCore::setAudioExclusive(bool exclusive) {
     if (!initialized_) return;
-    mpv_set_property_string(mpv_, "audio-exclusive",
-        exclusive ? "yes" : "no");
+    if (audioSessionPolicy_ == AudioSessionPolicy::MultiShared && exclusive) {
+        qInfo() << "[MPV] 다중 재생 세션에서 exclusive 전환 차단";
+        return;
+    }
+    mpv_set_property_string(mpv_, "audio-exclusive", exclusive ? "yes" : "no");
 }
 
 void MpvCore::setAudioPassthrough(bool passthrough) {
+    if (audioSessionPolicy_ == AudioSessionPolicy::MultiShared && passthrough) {
+        qInfo() << "[MPV] 다중 재생 세션에서 bitstream 패스스루 전환 차단";
+        passthroughEnabled_ = false;
+        if (initialized_) mpv_set_property_string(mpv_, "audio-spdif", "");
+        return;
+    }
     passthroughEnabled_ = passthrough;
     if (!initialized_) return;
-    if (passthrough) {
-        mpv_set_property_string(mpv_, "audio-spdif",
-            spdifCodecs_.toUtf8().constData());
-    } else {
-        mpv_set_property_string(mpv_, "audio-spdif", "");
-    }
+    mpv_set_property_string(mpv_, "audio-spdif",
+        passthrough ? spdifCodecs_.toUtf8().constData() : "");
 }
 
 void MpvCore::setSpdifCodecs(const QStringList& codecs) {
     spdifCodecs_ = codecs.join(',');
-    if (!initialized_) return;
-    mpv_set_property_string(mpv_, "audio-spdif",
-        spdifCodecs_.toUtf8().constData());
+    if (!initialized_ || audioSessionPolicy_ == AudioSessionPolicy::MultiShared) return;
+    mpv_set_property_string(mpv_, "audio-spdif", spdifCodecs_.toUtf8().constData());
 }
 
 void MpvCore::setHwdec(const QString& method) {

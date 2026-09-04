@@ -31,6 +31,8 @@
 #include <QActionGroup>
 #include <QCryptographicHash>
 #include <QDateTime>
+#include <QCoreApplication>
+#include <QProcess>
 #include <QTableWidget>
 #include <QHeaderView>
 #include <algorithm>
@@ -54,8 +56,10 @@ static const QStringList MEDIA_EXTS = {
     "aiff", "aif", "au", "amr", "tak", "tta", "mpc", "spx"
 };
 
-MainWindow::MainWindow(QWidget* parent)
-    : QMainWindow(parent), settings_("Sorinuri", "SorinuriPlayer")
+MainWindow::MainWindow(bool multiInstanceSharedAudio, QWidget* parent)
+    : QMainWindow(parent),
+      settings_("Sorinuri", "SorinuriPlayer"),
+      multiInstanceSharedAudio_(multiInstanceSharedAudio)
 {
     setWindowTitle("소리누리");
     // 실제 최소 크기는 loadSettings()에서 현재 논리 화면 크기에 맞춰 계산한다.
@@ -84,6 +88,12 @@ MainWindow::MainWindow(QWidget* parent)
     });
 
     setupUI();
+    // MpvWidget은 setupUI()에서 생성되지만 libmpv는 첫 화면 이후 지연 초기화된다.
+    // 따라서 coordinator가 전달한 세션 역할을 지금 설정하면 audio-exclusive/audio-spdif가
+    // MPV AO 생성 전에 올바르게 적용된다.
+    if (multiInstanceSharedAudio_ && mpvWidget_ && mpvWidget_->core()) {
+        mpvWidget_->core()->setAudioSessionPolicy(AudioSessionPolicy::MultiShared, false);
+    }
     setupConnections();
     loadSettings();
 
@@ -110,7 +120,9 @@ MainWindow::MainWindow(QWidget* parent)
         if (settings_.value("remote/enabled", false).toBool())
             startRemoteServer();
     });
-    // 자동 업데이트 체크 (앱 시작 5초 후 - 시작 직후 부하 방지)
+#if !defined(SORINURI_STORE_BUILD)
+    // 자체 서버/Inno Setup 버전만 설치 EXE 기반 업데이트를 확인한다.
+    // Microsoft Store MSIX 버전은 Store가 검증된 패키지 업데이트를 제공한다.
     QTimer::singleShot(5000, this, [this]() {
         auto* updater = new UpdateChecker(this);
         connect(updater, &UpdateChecker::updateAvailable,
@@ -121,9 +133,26 @@ MainWindow::MainWindow(QWidget* parent)
         });
         updater->checkForUpdates();
     });
+#endif
 }
 
 MainWindow::~MainWindow() { saveSettings(); }
+
+void MainWindow::enableMultiInstanceSharedAudio() {
+    if (multiInstanceSharedAudio_) return;
+    multiInstanceSharedAudio_ = true;
+    if (mpvWidget_ && mpvWidget_->core()) {
+        // 다중 세션으로 넘어갈 때는 모든 참여 창이 shared PCM으로 재협상한다.
+        // QSettings의 단일 고음질 선호 값은 수정하지 않으므로 다음 단일 실행에 보존된다.
+        mpvWidget_->core()->setAudioSessionPolicy(AudioSessionPolicy::MultiShared, true);
+    }
+    if (osdWidget_) {
+        osdWidget_->showInfo(
+            QStringLiteral("다중 재생: WASAPI 공유 PCM 모드 (DD+/DTS 비트스트림 일시 중지)"),
+            4200);
+    }
+    qInfo() << "[MainWindow] 다중 재생 shared PCM 세션 전환";
+}
 
 void MainWindow::scheduleAudioOutputRecovery(int delayMs) {
     if (!audioOutputRecoveryTimer_) return;
@@ -315,23 +344,23 @@ void MainWindow::setupConnections() {
     // window.show() 직후 openFiles() 호출 시 initialized_=false로 무시되던 문제 근본 해결
     // Qt::SingleShotConnection: 한 번만 실행 (initializeGL은 한 번만 호출됨)
     connect(mpvWidget_, &MpvWidget::mpvInitialized, this, [this]() {
-        // MPV 초기화 완료 후 오디오 설정 재적용
-        // loadSettings()는 생성자에서 호출되어 MPV 초기화 전에 실행됨
-        // initialized_=false로 setSpdifCodecs 등이 적용 안 됨 → 여기서 재적용
+        // MPV 초기화 완료 후 단일 고음질 설정만 다시 적용한다. 다중 세션에서는
+        // MpvCore의 MultiShared 정책이 initialize()부터 shared PCM을 고정하며,
+        // 여기서 저장된 exclusive/bitstream을 덮어쓰지 않는다.
         auto* core = mpvWidget_->core();
-        // WASAPI 독점 모드 재적용
-        if (settings_.value("audio/exclusive", true).toBool())
-            core->setAudioExclusive(true);
-        // 패스스루 코덱 재적용 (DD+/DTS/TrueHD)
-        if (settings_.value("audio/passthrough", true).toBool()) {
-            QStringList codecs;
-            if (settings_.value("audio/pt_ac3",    true).toBool()) codecs << "ac3";
-            if (settings_.value("audio/pt_eac3",   true).toBool()) codecs << "eac3";
-            if (settings_.value("audio/pt_dts",    true).toBool()) codecs << "dts";
-            if (settings_.value("audio/pt_dtshd",  true).toBool()) codecs << "dts-hd";
-            if (settings_.value("audio/pt_truehd", true).toBool()) codecs << "truehd";
-            core->setSpdifCodecs(codecs);
-            qInfo() << "[MainWindow] mpvInitialized: 패스스루 코덱 적용:" << codecs;
+        if (!multiInstanceSharedAudio_) {
+            if (settings_.value("audio/exclusive", true).toBool())
+                core->setAudioExclusive(true);
+            if (settings_.value("audio/passthrough", true).toBool()) {
+                QStringList codecs;
+                if (settings_.value("audio/pt_ac3",    true).toBool()) codecs << "ac3";
+                if (settings_.value("audio/pt_eac3",   true).toBool()) codecs << "eac3";
+                if (settings_.value("audio/pt_dts",    true).toBool()) codecs << "dts";
+                if (settings_.value("audio/pt_dtshd",  true).toBool()) codecs << "dts-hd";
+                if (settings_.value("audio/pt_truehd", true).toBool()) codecs << "truehd";
+                core->setSpdifCodecs(codecs);
+                qInfo() << "[MainWindow] mpvInitialized: 패스스루 코덱 적용:" << codecs;
+            }
         }
         // 통합 대기열의 반복 모드는 MPV 초기화가 끝난 뒤 적용한다.
         applyQueueRepeatMode();
@@ -1215,8 +1244,13 @@ void MainWindow::keyPressEvent(QKeyEvent* e) {
         // Ctrl+Shift+E: WASAPI 독점/공유 모드 즉시 전환
         if ((e->modifiers() & Qt::ControlModifier) && (e->modifiers() & Qt::ShiftModifier)) {
             if (core) {
-                const bool currentExclusive =
-                    core->getProperty("audio-exclusive").toString() == "yes";
+                if (multiInstanceSharedAudio_) {
+                    if (osdWidget_)
+                        osdWidget_->showInfo("다중 재생 중에는 공유 PCM 모드가 고정됩니다.");
+                    e->accept();
+                    return;
+                }
+                const bool currentExclusive = core->getProperty("audio-exclusive").toBool();
                 const bool newExclusive = !currentExclusive;
                 core->setAudioExclusive(newExclusive);
                 QSettings s("Sorinuri", "SorinuriPlayer");
@@ -1976,6 +2010,13 @@ void MainWindow::showContextMenu(const QPoint& globalPos) {
     actOpen->setShortcut(QKeySequence("Ctrl+O"));
     connect(actOpen, &QAction::triggered, this, &MainWindow::onOpenFile);
 
+    QAction* actNewWindow = menu.addAction("새 플레이어 창 열기 (공유 PCM 다중 재생)");
+    actNewWindow->setToolTip("현재 창을 포함한 모든 소리누리를 공유 PCM으로 전환해 동시에 재생합니다.");
+    connect(actNewWindow, &QAction::triggered, this, []() {
+        QProcess::startDetached(QCoreApplication::applicationFilePath(), {"--new-window"},
+                                QCoreApplication::applicationDirPath());
+    });
+
     // URL 열기 (유튜브, 트위치 등)
     QAction* actUrl = menu.addAction("URL 열기... (YouTube/스트리밍)");
     actUrl->setShortcut(QKeySequence("Ctrl+U"));
@@ -2414,24 +2455,20 @@ void MainWindow::loadSettings() {
     int vol = settings_.value("audio/volume", 100).toInt();
     mpvWidget_->core()->setVolume(vol);
     controlBar_->setVolume(vol);
-    // audio-exclusive: 노트북 기본값 false (공유 모드), 데스크톱 기본값 true (독점 모드)
-    // 노트북 내장 스피커는 WASAPI 독점 모드를 지원하지 않는 경우가 많음
-    // 실패 시 audio-fallback-to-null으로 영상 재생 보장
-    {
-        // WASAPI 독점 모드: 기본값 true (독점)
-        // 독점 모드 실패 시 ao-reload 자동복구가 공유 모드로 폴백 처리
-        // 노트북/데스크톱 구분 없이 동일하게 적용 (단순화)
+    // 다중 재생 세션은 런타임 shared PCM 정책이 최우선이다. 저장된 단일 고음질
+    // 선호 값은 다음 단일 실행을 위해 보존하되 현재 shared 세션에 재적용하지 않는다.
+    if (!multiInstanceSharedAudio_) {
         if (settings_.value("audio/exclusive", true).toBool())
             mpvWidget_->core()->setAudioExclusive(true);
-    }
-    if (settings_.value("audio/passthrough", true).toBool()) {
-        QStringList codecs;
-        if (settings_.value("audio/pt_ac3",    true).toBool()) codecs << "ac3";
-        if (settings_.value("audio/pt_eac3",   true).toBool()) codecs << "eac3";
-        if (settings_.value("audio/pt_dts",    true).toBool()) codecs << "dts";
-        if (settings_.value("audio/pt_dtshd",  true).toBool()) codecs << "dts-hd";
-        if (settings_.value("audio/pt_truehd", true).toBool()) codecs << "truehd";
-        mpvWidget_->core()->setSpdifCodecs(codecs);
+        if (settings_.value("audio/passthrough", true).toBool()) {
+            QStringList codecs;
+            if (settings_.value("audio/pt_ac3",    true).toBool()) codecs << "ac3";
+            if (settings_.value("audio/pt_eac3",   true).toBool()) codecs << "eac3";
+            if (settings_.value("audio/pt_dts",    true).toBool()) codecs << "dts";
+            if (settings_.value("audio/pt_dtshd",  true).toBool()) codecs << "dts-hd";
+            if (settings_.value("audio/pt_truehd", true).toBool()) codecs << "truehd";
+            mpvWidget_->core()->setSpdifCodecs(codecs);
+        }
     }
 }
 

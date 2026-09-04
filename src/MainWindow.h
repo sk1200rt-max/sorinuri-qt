@@ -59,9 +59,13 @@
 class MainWindow : public QMainWindow {
     Q_OBJECT
 public:
-    explicit MainWindow(QWidget* parent = nullptr);
+    explicit MainWindow(bool multiInstanceSharedAudio = false, QWidget* parent = nullptr);
     ~MainWindow() override;
     void openFiles(const QStringList& paths);
+    // coordinator가 명시적 새 창 요청을 수락했을 때 모든 기존 창을 shared PCM
+    // 세션으로 이동한다. 일반 단일 실행에서는 호출되지 않는다.
+    void enableMultiInstanceSharedAudio();
+    bool isMultiInstanceSharedAudio() const { return multiInstanceSharedAudio_; }
 
 protected:
     void closeEvent(QCloseEvent* e) override;
@@ -200,6 +204,9 @@ private:
     QString currentFilePath_;
     QSettings settings_;
     bool pendingQueueEndUiUpdate_ = false;
+    // QSettings와 분리된 런타임 세션 상태다. true이면 WASAPI exclusive/bitstream을
+    // 다시 켜지 않아 여러 플레이어 창의 동시 PCM 출력을 보장한다.
+    bool multiInstanceSharedAudio_ = false;
 
     // Windows 작업표시줄 진행률 표시 (ITaskbarList3)
     void* taskbarList_  = nullptr;  // ITaskbarList3* (void*로 선언하여 헤더 의존성 제거)

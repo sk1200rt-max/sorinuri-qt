@@ -23,6 +23,14 @@ enum class RenderProfile {
     HiEnd       // 최고화질 - 전문가용 (RTX 4080 / RX 7900 수준)
 };
 
+// 같은 WASAPI endpoint에서 여러 창을 동시에 재생하는 경우에는 Windows Audio Engine이
+// PCM만 믹싱할 수 있으므로 exclusive/bitstream을 사용하지 않는다. 이 값은 QSettings에
+// 저장하지 않는 런타임 세션 정책으로, 다음 단일 실행에서 사용자의 원래 고음질 설정을 보존한다.
+enum class AudioSessionPolicy {
+    SinglePreferred,
+    MultiShared,
+};
+
 class MpvCore : public QObject {
     Q_OBJECT
 public:
@@ -63,6 +71,13 @@ public:
     void setAudioExclusive(bool exclusive);
     void setAudioPassthrough(bool passthrough);
     void setSpdifCodecs(const QStringList& codecs);
+    // multi-session에서는 모든 창을 WASAPI shared PCM으로 고정한다. 이 함수는
+    // initialize() 전에도 호출할 수 있으며, 초기화 뒤에는 필요할 때만 ao-reload를 요청한다.
+    void setAudioSessionPolicy(AudioSessionPolicy policy, bool reloadOutput = true);
+    AudioSessionPolicy audioSessionPolicy() const { return audioSessionPolicy_; }
+    bool isMultiInstanceSharedSession() const {
+        return audioSessionPolicy_ == AudioSessionPolicy::MultiShared;
+    }
     // 절전 복귀·HDMI 재연결 뒤 WASAPI 출력 정책을 다시 협상한다.
     // ao-reload 전에 장치·독점·채널·패스스루 설정을 모두 복원해 2.0 폴백을 방지한다.
     void restoreAudioOutputAfterDeviceChange();
@@ -158,6 +173,7 @@ private:
     void handleEvent(mpv_event* event);
     void handlePropertyChange(mpv_event_property* prop);
     void applyStoredSubtitleStyle();
+    void applyAudioSessionPolicy(bool reloadOutput);
     static void wakeupCallback(void* ctx);
 
     mpv_handle* mpv_       = nullptr;
@@ -168,6 +184,7 @@ private:
     // 오디오 설정 상태
     bool    passthroughEnabled_ = true;
     QString spdifCodecs_ = QStringLiteral("ac3,eac3,dts,dts-hd,truehd");
+    AudioSessionPolicy audioSessionPolicy_ = AudioSessionPolicy::SinglePreferred;
 
     // GPU 렌더링 상태
     RenderProfile renderProfile_ = RenderProfile::Quality;

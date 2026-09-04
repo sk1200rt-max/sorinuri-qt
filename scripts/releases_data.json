@@ -1,5 +1,14 @@
 [
   {
+    "version": "6.20.7",
+    "date": "2026-09-04",
+    "title": "Microsoft Store 사전 테스트 · 다중 오디오 · 오리지널 음악 정규화",
+    "desc": "Store MSIX 경로 준비, 다중 인스턴스 공유 PCM 안전 정책, 오리지널 음악 장르·상황별 탐색 및 전체·선택 재생을 사전 테스트합니다.",
+    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.20.7.exe",
+    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.20.7-Portable.zip",
+    "tags": []
+  },
+  {
     "version": "6.20.6",
     "date": "2026-08-30",
     "title": "스테레오 음질 및 제어 화면 정리",

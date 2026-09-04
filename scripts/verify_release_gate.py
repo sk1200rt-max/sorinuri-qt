@@ -19,6 +19,10 @@ SCOPE_FILE = ROOT / ".release" / "scope.json"
 # 릴리즈별로 1개 제품 영역만 허용한다. 배포·버전·문서는 모든 영역에서 허용된다.
 DOMAINS: dict[str, tuple[str, ...]] = {
     "audio": (
+        # 다중 인스턴스 coordinator는 WASAPI exclusive/shared 세션 역할을
+        # 조정하는 오디오 안전 구성요소다. 파일 전달 IPC와 별개로 취급하면
+        # 오디오 릴리즈의 실제 변경 범위를 검증하지 못한다.
+        "src/InstanceCoordinator.cpp", "src/InstanceCoordinator.h",
         "src/MpvCore.cpp", "src/MpvCore.h", "src/AudioAdvancedWidget.cpp",
         "src/AudioAdvancedWidget.h", "src/HiFiEngine.cpp", "src/HiFiEngine.h",
         "src/AudioInfoBar.cpp", "src/AudioInfoBar.h",
@@ -40,7 +44,7 @@ DOMAINS: dict[str, tuple[str, ...]] = {
         "src/YtdlpManager.cpp", "src/YtdlpManager.h",
     ),
     "installer": (
-        "installer/", "resources/sorinuri.rc", "src/UpdateDialog.cpp", "src/UpdateDialog.h",
+        "installer/", "packaging/", "resources/sorinuri.rc", "src/UpdateDialog.cpp", "src/UpdateDialog.h",
     ),
 }
 

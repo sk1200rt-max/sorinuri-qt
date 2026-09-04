@@ -1,11 +1,15 @@
 cmake_minimum_required(VERSION 3.20)
-project(Sorinuri VERSION 6.20.6 LANGUAGES CXX)
+project(Sorinuri VERSION 6.20.7 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
+
+# Microsoft Store MSIX 빌드에서는 Store가 설치·업데이트를 담당한다.
+# 기본값 OFF는 기존 Inno Setup/자체 서버 빌드의 동작을 그대로 보존한다.
+option(SORINURI_STORE_BUILD "Build the Microsoft Store MSIX application variant" OFF)
 
 # Qt6 패키지
 find_package(Qt6 REQUIRED COMPONENTS
@@ -35,6 +39,8 @@ message(STATUS "MPV library: ${MPV_LIBRARY}")
 # 소스 파일
 set(SOURCES
     src/main.cpp
+    src/InstanceCoordinator.cpp
+    src/InstanceCoordinator.h
     src/MainWindow.cpp
     src/MainWindow.h
     src/MpvWidget.cpp
@@ -210,6 +216,12 @@ if(WIN32)
         WINVER=0x0A00
         _WIN32_WINNT=0x0A00
     )
+endif()
+
+# Store MSIX 버전은 자체 설치 EXE updater를 실행하지 않는다. 런타임 동작은
+# AppxManifest의 full-trust packagedClassicApp 선언과 Store 업데이트가 담당한다.
+if(SORINURI_STORE_BUILD)
+    target_compile_definitions(Sorinuri PRIVATE SORINURI_STORE_BUILD=1)
 endif()
 
 # Windows: DLL 복사

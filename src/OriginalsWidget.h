@@ -42,7 +42,10 @@ struct SongInfo {
     QString cover;        // 서버 상대 경로
     QString youtubeId;
     QString youtubeUrl;
+    QString audioUrl;     // 최근 songs.json의 audio_url, mp3보다 우선한다.
     QStringList categories;
+    QStringList genres;      // 정규화된 genre/genres를 우선 사용한다.
+    QStringList situations;  // 정규화된 situations를 우선 사용한다.
     QString mood;
     QStringList tags;
 };
@@ -101,10 +104,13 @@ private slots:
     void onFetchFinished(QNetworkReply* reply);
     void onThumbFinished(QNetworkReply* reply);
     void onSearchChanged(const QString& text);
+    void onBrowseModeClicked(int mode);
     void onCategoryClicked(const QString& category);
     void onSortChanged(int index);
+    void onSelectionChanged();
     void onItemDoubleClicked(QListWidgetItem* item);
     void onPlayAllClicked();
+    void onPlaySelectedClicked();
     void onYouTubeClicked();
     void onSavePlaylistClicked();
     void onLoadSavedPlaylistClicked();
@@ -112,11 +118,21 @@ private slots:
     void onRepeatModeClicked();
 
 private:
+    enum class BrowseMode : int { All = 0, Situation = 1, Genre = 2 };
+
     void setupUI();
     void applyFilter();
     void updateList();
+    void rebuildCategoryButtons();
+    void updateBrowseButtons();
+    void updatePlayButtons();
     void fetchThumbnail(const SongInfo& song);
+    QStringList situationsForSong(const SongInfo& song) const;
+    QStringList genresForSong(const SongInfo& song) const;
+    QString mediaUrlForSong(const SongInfo& song) const;
+    QString absoluteUrl(const QString& url) const;
     QList<PlaybackQueue::Entry> queueEntries(bool useYouTube) const;
+    QList<PlaybackQueue::Entry> selectedQueueEntries(bool useYouTube) const;
     void showToast(const QString& msg);
 
     QNetworkAccessManager* nam_          = nullptr;
@@ -133,6 +149,7 @@ private:
     int             lastSongCount_ = -1;
 
     QString   currentFile_;
+    BrowseMode browseMode_ = BrowseMode::All;
     QString   activeCategory_ = "전체";
     QString   searchText_;
     int       sortIndex_      = 0;
@@ -145,11 +162,12 @@ private:
     QLabel*              toastLabel_   = nullptr;
     QTimer*              toastTimer_   = nullptr;
     QWidget*             catBar_       = nullptr;
+    QList<QPushButton*>  browseBtns_;
     QList<QPushButton*>  catBtns_;
+    QPushButton*         playSelectedBtn_ = nullptr;
     SongItemDelegate*    delegate_     = nullptr;
     QComboBox*            savedPlaylistCombo_ = nullptr;
     QPushButton*          repeatBtn_   = nullptr;
     PlaybackQueue::RepeatMode repeatMode_ = PlaybackQueue::RepeatMode::Off;
 
-    static const QStringList CATEGORIES;
 };

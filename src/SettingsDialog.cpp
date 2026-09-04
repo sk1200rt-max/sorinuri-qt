@@ -18,6 +18,7 @@ static const QString DIALOG_STYLE = SorinuriUi::dialogStyle();
 SettingsDialog::SettingsDialog(MpvCore* mpv, QWidget* parent)
     : QDialog(parent), mpv_(mpv), settings_("Sorinuri", "SorinuriPlayer")
 {
+    multiInstanceAudioLocked_ = mpv_ && mpv_->isMultiInstanceSharedSession();
     setWindowTitle("소리누리 설정");
     setSizeGripEnabled(true);
     setStyleSheet(DIALOG_STYLE);
@@ -747,28 +748,52 @@ void SettingsDialog::loadSettings() {
     if (remoteEnabledCheck_) remoteEnabledCheck_->setChecked(settings_.value("remote/enabled", false).toBool());
     if (originalsApiUrlEdit_) originalsApiUrlEdit_->setText(settings_.value("originals/api_url",
         "https://sorinuri.com/api/songs.json").toString());
+
+    if (multiInstanceAudioLocked_) {
+        // 현재 세션은 coordinator가 전체 창에 적용한 shared PCM 정책이다.
+        // 사용자가 이 창에서 Apply를 눌러도 다음 단일 실행의 고음질 선호 값을
+        // shared 값으로 덮어쓰지 않도록 오디오 출력 제어는 읽기 전용으로 둔다.
+        audioDeviceCombo_->setEnabled(false);
+        exclusiveModeCheck_->setChecked(false);
+        exclusiveModeCheck_->setEnabled(false);
+        passthroughCheck_->setChecked(false);
+        passthroughCheck_->setEnabled(false);
+        ptAC3_->setEnabled(false);
+        ptEAC3_->setEnabled(false);
+        ptDTS_->setEnabled(false);
+        ptDTSHD_->setEnabled(false);
+        ptTrueHD_->setEnabled(false);
+        exclusiveHintLabel_->setVisible(false);
+        sharedHintLabel_->setText(
+            "다중 재생 세션: 모든 소리누리 창은 동시에 소리가 나도록 공유 PCM으로 고정됩니다.\n"
+            "Windows 출력 장치가 5.1 / 7.1로 구성된 경우 PCM 서라운드는 유지될 수 있습니다.\n"
+            "DD+ / DTS / TrueHD 비트스트림은 모든 창을 닫고 단일 고음질 모드로 재시작한 뒤 사용할 수 있습니다.");
+        sharedHintLabel_->setVisible(true);
+    }
 }
 
 void SettingsDialog::applyToMpv() {
     if (!mpv_) return;
 
-    // 오디오 설정
-    // 출력 장치 적용
-    const QString devName = audioDeviceCombo_->currentData().toString();
-    mpv_->setAudioDevice(devName.isEmpty() ? QStringLiteral("auto") : devName);
-    mpv_->setAudioExclusive(exclusiveModeCheck_->isChecked());
+    // 오디오 설정. 다중 재생 중 출력 장치·독점·비트스트림은 coordinator가
+    // 관리하므로 현재 세션과 영구 단일 고음질 선호 값을 모두 보존한다.
+    if (!multiInstanceAudioLocked_) {
+        const QString devName = audioDeviceCombo_->currentData().toString();
+        mpv_->setAudioDevice(devName.isEmpty() ? QStringLiteral("auto") : devName);
+        mpv_->setAudioExclusive(exclusiveModeCheck_->isChecked());
 
-    if (passthroughCheck_->isChecked()) {
-        QStringList codecs;
-        if (ptAC3_->isChecked())    codecs << "ac3";
-        if (ptEAC3_->isChecked())   codecs << "eac3";
-        if (ptDTS_->isChecked())    codecs << "dts";
-        if (ptDTSHD_->isChecked())  codecs << "dts-hd";
-        if (ptTrueHD_->isChecked()) codecs << "truehd";
-        mpv_->setSpdifCodecs(codecs);
-        mpv_->setAudioPassthrough(true);
-    } else {
-        mpv_->setAudioPassthrough(false);
+        if (passthroughCheck_->isChecked()) {
+            QStringList codecs;
+            if (ptAC3_->isChecked())    codecs << "ac3";
+            if (ptEAC3_->isChecked())   codecs << "eac3";
+            if (ptDTS_->isChecked())    codecs << "dts";
+            if (ptDTSHD_->isChecked())  codecs << "dts-hd";
+            if (ptTrueHD_->isChecked()) codecs << "truehd";
+            mpv_->setSpdifCodecs(codecs);
+            mpv_->setAudioPassthrough(true);
+        } else {
+            mpv_->setAudioPassthrough(false);
+        }
     }
 
     mpv_->setVolume(volumeSlider_->value());
@@ -831,15 +856,18 @@ void SettingsDialog::applyToMpv() {
 }
 
 void SettingsDialog::onApply() {
-    // 설정 저장
-    settings_.setValue("audio/device",      audioDeviceCombo_->currentData().toString());
-    settings_.setValue("audio/exclusive",   exclusiveModeCheck_->isChecked());
-    settings_.setValue("audio/passthrough", passthroughCheck_->isChecked());
-    settings_.setValue("audio/pt_ac3",      ptAC3_->isChecked());
-    settings_.setValue("audio/pt_eac3",     ptEAC3_->isChecked());
-    settings_.setValue("audio/pt_dts",      ptDTS_->isChecked());
-    settings_.setValue("audio/pt_dtshd",    ptDTSHD_->isChecked());
-    settings_.setValue("audio/pt_truehd",   ptTrueHD_->isChecked());
+    // 설정 저장. 다중 재생 세션에서는 현재 shared PCM 상태를 다음 단일 실행의
+    // 고음질 선호 값으로 저장하지 않는다. 볼륨 등 비출력 설정은 계속 저장한다.
+    if (!multiInstanceAudioLocked_) {
+        settings_.setValue("audio/device",      audioDeviceCombo_->currentData().toString());
+        settings_.setValue("audio/exclusive",   exclusiveModeCheck_->isChecked());
+        settings_.setValue("audio/passthrough", passthroughCheck_->isChecked());
+        settings_.setValue("audio/pt_ac3",      ptAC3_->isChecked());
+        settings_.setValue("audio/pt_eac3",     ptEAC3_->isChecked());
+        settings_.setValue("audio/pt_dts",      ptDTS_->isChecked());
+        settings_.setValue("audio/pt_dtshd",    ptDTSHD_->isChecked());
+        settings_.setValue("audio/pt_truehd",   ptTrueHD_->isChecked());
+    }
     settings_.setValue("audio/volume",      volumeSlider_->value());
     // GPU API 저장 (다음 실행 시 initialize()에서 적용)
     if (voCombo_) {
