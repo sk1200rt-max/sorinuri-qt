@@ -68,6 +68,10 @@ def main() -> int:
     require(controls, "transportCard", "재생 제어 카드", errors)
     require(controls, "trackCard", "트랙 선택 카드", errors)
     require(controls, "audioInfoLabel_->hide();", "빈 출력 상태 숨김", errors)
+    require(controls, 'makeModeBtn("플레이어"', "하단 플레이어 서비스 메뉴", errors)
+    require(controls, 'makeModeBtn("OTT"', "하단 OTT 서비스 메뉴", errors)
+    require(controls, 'makeModeBtn("오리지널"', "하단 오리지널 서비스 메뉴", errors)
+    require(controls, "originalsModeClicked", "오리지널 서비스 메뉴 신호", errors)
 
     for name, source in {
         "SettingsDialog.cpp": settings,
@@ -83,7 +87,7 @@ def main() -> int:
             print(f" - {error}", file=sys.stderr)
         return 1
 
-    print("UI 디자인 시스템 검증 통과: 공통 민트 토큰·계층형 하단 제어·버튼 포커스·HiDPI 여유·구형 파란색 제거 확인")
+    print("UI 디자인 시스템 검증 통과: 공통 민트 토큰·계층형 하단 제어·플레이어/OTT/오리지널 서비스 메뉴·버튼 포커스·HiDPI 여유·구형 파란색 제거 확인")
     return 0
 
 

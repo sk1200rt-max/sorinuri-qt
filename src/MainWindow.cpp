@@ -488,7 +488,8 @@ void MainWindow::setupConnections() {
 
     // 모드 전환 버튼 (ControlBar에 통합)
     connect(controlBar_, &ControlBar::playerModeClicked, this, &MainWindow::switchToPlayerMode);
-    connect(controlBar_, &ControlBar::ottModeClicked,    this, &MainWindow::switchToOttMode);
+    connect(controlBar_, &ControlBar::ottModeClicked, this, &MainWindow::switchToOttMode);
+    connect(controlBar_, &ControlBar::originalsModeClicked, this, &MainWindow::showOriginalsPage);
 
     // OTT 타이틀 변경 시 윈도우 타이틀 업데이트
     // OTT titleChanged 연결은 switchToOttMode에서 처리
@@ -632,12 +633,14 @@ void MainWindow::ensureOriginalsQueueOverlay() {
 
     originalsQueueCountLabel_ = new QLabel(originalsQueueOverlay_);
     originalsQueueCountLabel_->setObjectName(QStringLiteral("originalsQueueCount"));
-    auto* back = new QPushButton(QStringLiteral("목록으로"), originalsQueueOverlay_);
+    // YouTube 전체 듣기에서는 재생 화면 복귀가 우선이다. 오리지널 목록은 하단의
+    // 고정 ‘오리지널’ 메뉴에서 언제든 다시 열 수 있어 동선을 분명하게 유지한다.
+    auto* back = new QPushButton(QStringLiteral("플레이어"), originalsQueueOverlay_);
     back->setObjectName(QStringLiteral("originalsQueueBack"));
     back->setFocusPolicy(Qt::NoFocus);
     back->setCursor(Qt::PointingHandCursor);
-    back->setToolTip(QStringLiteral("소리누리 오리지널 목록으로 돌아가기"));
-    connect(back, &QPushButton::clicked, this, &MainWindow::showOriginalsPage);
+    back->setToolTip(QStringLiteral("일반 플레이어 화면으로 돌아가기"));
+    connect(back, &QPushButton::clicked, this, &MainWindow::switchToPlayerMode);
 
     row->addLayout(text, 1);
     row->addWidget(originalsQueueCountLabel_);
@@ -1520,12 +1523,7 @@ void MainWindow::ensureOriginalsPage() {
     backButton->setObjectName("originalsBack");
     backButton->setFocusPolicy(Qt::NoFocus);
     backButton->setToolTip(QStringLiteral("일반 플레이어 화면으로 돌아가기"));
-    connect(backButton, &QPushButton::clicked, this, [this]() {
-        const int lastPage = qMax(0, playerStack_->count() - 1);
-        playerStack_->setCurrentIndex(qBound(0, originalsReturnIndex_, lastPage));
-        showUI();
-        updateWindowTitle();
-    });
+    connect(backButton, &QPushButton::clicked, this, &MainWindow::switchToPlayerMode);
 
     headerLayout->addLayout(titleLayout);
     headerLayout->addStretch(1);
@@ -1585,12 +1583,13 @@ void MainWindow::showOriginalsPage() {
     playerStack_->setCurrentWidget(originalsPage_);
     originalsWidget_->setCurrentFile(currentFilePath_);
     showUI();
-    controlBar_->playerModeBtn()->setProperty("active", true);
+    controlBar_->playerModeBtn()->setProperty("active", false);
     controlBar_->ottModeBtn()->setProperty("active", false);
-    controlBar_->playerModeBtn()->style()->unpolish(controlBar_->playerModeBtn());
-    controlBar_->playerModeBtn()->style()->polish(controlBar_->playerModeBtn());
-    controlBar_->ottModeBtn()->style()->unpolish(controlBar_->ottModeBtn());
-    controlBar_->ottModeBtn()->style()->polish(controlBar_->ottModeBtn());
+    controlBar_->originalsModeBtn()->setProperty("active", true);
+    for (QPushButton* button : {controlBar_->playerModeBtn(), controlBar_->ottModeBtn(), controlBar_->originalsModeBtn()}) {
+        button->style()->unpolish(button);
+        button->style()->polish(button);
+    }
     updateWindowTitle(QStringLiteral("소리누리 오리지널"));
 }
 
@@ -2479,14 +2478,17 @@ void MainWindow::showContextMenu(const QPoint& globalPos) {
 void MainWindow::switchToPlayerMode() {
     isOttMode_ = false;
     mainStack_->setCurrentIndex(0);
-    // OTT에서 돌아온 직후 플레이어 조작 UI를 즉시 보이게 한다.
+    // 서비스 메뉴의 ‘플레이어’는 오리지널/OTT 컨텐츠가 아닌 실제 재생 화면으로
+    // 돌아간다. 재생 대기열과 MPV 세션은 유지하고 화면만 전환한다.
+    switchToVideoMode();
     showUI();
     controlBar_->playerModeBtn()->setProperty("active", true);
     controlBar_->ottModeBtn()->setProperty("active", false);
-    controlBar_->playerModeBtn()->style()->unpolish(controlBar_->playerModeBtn());
-    controlBar_->playerModeBtn()->style()->polish(controlBar_->playerModeBtn());
-    controlBar_->ottModeBtn()->style()->unpolish(controlBar_->ottModeBtn());
-    controlBar_->ottModeBtn()->style()->polish(controlBar_->ottModeBtn());
+    controlBar_->originalsModeBtn()->setProperty("active", false);
+    for (QPushButton* button : {controlBar_->playerModeBtn(), controlBar_->ottModeBtn(), controlBar_->originalsModeBtn()}) {
+        button->style()->unpolish(button);
+        button->style()->polish(button);
+    }
     updateWindowTitle();
 }
 
@@ -2518,10 +2520,11 @@ void MainWindow::switchToOttMode() {
 
     controlBar_->playerModeBtn()->setProperty("active", false);
     controlBar_->ottModeBtn()->setProperty("active", true);
-    controlBar_->playerModeBtn()->style()->unpolish(controlBar_->playerModeBtn());
-    controlBar_->playerModeBtn()->style()->polish(controlBar_->playerModeBtn());
-    controlBar_->ottModeBtn()->style()->unpolish(controlBar_->ottModeBtn());
-    controlBar_->ottModeBtn()->style()->polish(controlBar_->ottModeBtn());
+    controlBar_->originalsModeBtn()->setProperty("active", false);
+    for (QPushButton* button : {controlBar_->playerModeBtn(), controlBar_->ottModeBtn(), controlBar_->originalsModeBtn()}) {
+        button->style()->unpolish(button);
+        button->style()->polish(button);
+    }
     updateWindowTitle("소리누리 OTT");
 }
 

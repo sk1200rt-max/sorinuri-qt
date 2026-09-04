@@ -106,6 +106,7 @@ public:
     // 모드 버튼 접근자
     QPushButton* playerModeBtn() const { return btnPlayerMode_; }
     QPushButton* ottModeBtn()    const { return btnOttMode_; }
+    QPushButton* originalsModeBtn() const { return btnOriginalsMode_; }
 
 signals:
     void playPauseClicked();
@@ -119,6 +120,7 @@ signals:
     void settingsClicked();
     void playerModeClicked();
     void ottModeClicked();
+    void originalsModeClicked();
 
 public slots:
     // AudioInfoBar 대체 - 인라인 오디오 정보 업데이트
@@ -152,9 +154,10 @@ private:
     QHBoxLayout* btnRow_         = nullptr;  // 재생 제어·출력 상태 행
     QHBoxLayout* trackRow_       = nullptr;  // 오디오·자막 트랙 및 모드 선택 행
 
-    // 모드 버튼 (파일 플레이어 / OTT)
-    QPushButton* btnPlayerMode_  = nullptr;
-    QPushButton* btnOttMode_     = nullptr;
+    // 서비스 전환 버튼 (플레이어 / OTT / 소리누리 오리지널)
+    QPushButton* btnPlayerMode_    = nullptr;
+    QPushButton* btnOttMode_       = nullptr;
+    QPushButton* btnOriginalsMode_ = nullptr;
 
     // 인라인 오디오/비디오 정보 (AudioInfoBar 대체)
     QLabel*      audioInfoLabel_ = nullptr;
