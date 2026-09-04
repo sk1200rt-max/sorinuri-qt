@@ -972,16 +972,16 @@ void MpvCore::setAudioDevice(const QString& device) {
 
 void MpvCore::setAudioExclusive(bool exclusive) {
     if (!initialized_) return;
-    if (audioSessionPolicy_ == AudioSessionPolicy::MultiShared && exclusive) {
-        qInfo() << "[MPV] 다중 재생 세션에서 exclusive 전환 차단";
+    if (audioSessionPolicy_ != AudioSessionPolicy::SinglePreferred && exclusive) {
+        qInfo() << "[MPV] shared PCM 세션에서 exclusive 전환 차단";
         return;
     }
     mpv_set_property_string(mpv_, "audio-exclusive", exclusive ? "yes" : "no");
 }
 
 void MpvCore::setAudioPassthrough(bool passthrough) {
-    if (audioSessionPolicy_ == AudioSessionPolicy::MultiShared && passthrough) {
-        qInfo() << "[MPV] 다중 재생 세션에서 bitstream 패스스루 전환 차단";
+    if (audioSessionPolicy_ != AudioSessionPolicy::SinglePreferred && passthrough) {
+        qInfo() << "[MPV] shared PCM 세션에서 bitstream 패스스루 전환 차단";
         passthroughEnabled_ = false;
         if (initialized_) mpv_set_property_string(mpv_, "audio-spdif", "");
         return;
@@ -994,7 +994,7 @@ void MpvCore::setAudioPassthrough(bool passthrough) {
 
 void MpvCore::setSpdifCodecs(const QStringList& codecs) {
     spdifCodecs_ = codecs.join(',');
-    if (!initialized_ || audioSessionPolicy_ == AudioSessionPolicy::MultiShared) return;
+    if (!initialized_ || audioSessionPolicy_ != AudioSessionPolicy::SinglePreferred) return;
     mpv_set_property_string(mpv_, "audio-spdif", spdifCodecs_.toUtf8().constData());
 }
 
