@@ -104,6 +104,8 @@ private slots:
     void switchToPlayerMode();
     void switchToOttMode();
     void showOriginalsPage();  // 하단 전문 기능 패널이 아닌 플레이어 영역 전체의 오리지널 음악 화면
+    void ensureOriginalsQueueOverlay();
+    void updateOriginalsQueueOverlay();
     void switchToMusicMode();
     void switchToVideoMode();
 
@@ -184,6 +186,11 @@ private:
     SubtitleEditorWidget* subtitleEditor_      = nullptr;  // 자막 편집기
     QWidget*              statsWidget_          = nullptr;  // 재생 통계/최근 감상 화면
     OriginalsWidget*      originalsWidget_      = nullptr;  // SORINURI ORIGINALS 탭
+    // YouTube 전체 듣기 중에도 일반 영상 화면에 갑자기 고립되지 않도록 현재 곡·다음 곡·목록 복귀를 표시한다.
+    QWidget*               originalsQueueOverlay_ = nullptr;
+    QLabel*                originalsQueueNowLabel_ = nullptr;
+    QLabel*                originalsQueueNextLabel_ = nullptr;
+    QLabel*                originalsQueueCountLabel_ = nullptr;
     PlaybackQueue*        playbackQueue_        = nullptr;  // 오리지널·YouTube·로컬 통합 대기열
     AdManager*            adManager_            = nullptr;  // 광고 관리자
     SplashAdWidget*       splashAdWidget_       = nullptr;  // 시작 화면 광고

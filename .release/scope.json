@@ -1,6 +1,6 @@
 {
-  "version": "6.20.9",
-  "domain": "ui",
-  "purpose": "OTT 오리지널 독립 화면 전환 및 하단 패널 중첩 해소",
-  "base_commit": "e8405e18724def667d0d8e81f929f32175d8c4e6"
+  "version": "6.21.0",
+  "domain": "audio,ui,playback",
+  "purpose": "YouTube 선택·전체 재생, 종료 뒤 외부 앱 오디오 복구, 경량 UI 안정화",
+  "base_commit": "b0686bbff922867faa40261566bd77754bdbdc29"
 }

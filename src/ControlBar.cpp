@@ -21,7 +21,7 @@ QPushButton* ControlBar::makeBtn(const QString& svg, const QString& tip, int siz
     btn->setToolTip(tip);
     btn->setFixedSize(size, 30);
     btn->setFlat(true);
-    btn->setCursor(Qt::ArrowCursor);
+    btn->setCursor(Qt::PointingHandCursor);
     btn->setFocusPolicy(Qt::NoFocus);  // HiDPI: 버튼 클릭 후 포커스가 MainWindow에 유지되도록
     btn->setIcon(QIcon(svg));
     btn->setIconSize(QSize(size == 36 ? 20 : 16, size == 36 ? 20 : 16));
@@ -33,7 +33,7 @@ QPushButton* ControlBar::makeModeBtn(const QString& text, const QString& tip) {
     auto* btn = new QPushButton(text);
     btn->setToolTip(tip);
     btn->setFixedHeight(22);
-    btn->setCursor(Qt::ArrowCursor);
+    btn->setCursor(Qt::PointingHandCursor);
     btn->setFocusPolicy(Qt::NoFocus);  // HiDPI: 버튼 클릭 후 포커스가 MainWindow에 유지되도록
     btn->setStyleSheet(SorinuriUi::modeButtonStyle());
     return btn;
@@ -46,7 +46,7 @@ ControlBar::ControlBar(QWidget* parent) : QWidget(parent) {
     setMaximumHeight(132);
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     setStyleSheet(QString("background: %1; border-top: 1px solid %2;")
-                  .arg(SorinuriUi::SurfaceAlt, SorinuriUi::Border));
+                  .arg(SorinuriUi::SurfaceAlt, SorinuriUi::BorderSoft));
 
     auto* mainLayout = new QVBoxLayout(this);
     mainLayout->setContentsMargins(14, 8, 14, 8);
@@ -83,13 +83,13 @@ ControlBar::ControlBar(QWidget* parent) : QWidget(parent) {
     seekRow->addWidget(timeLabel_);
     mainLayout->addLayout(seekRow);
 
-    // 재생 제어 행: 아이콘 제어와 출력 상태를 하나의 낮은 대비 카드에 묶어
-    // 영상 위 오버레이에서도 정보가 서로 충돌하지 않게 한다.
+    // 재생 제어는 카드 외곽선으로 둘러싸지 않고, 낮은 대비의 단일 표면으로 정돈한다.
+    // 영상 위에서 테두리가 중첩돼 보이지 않으면서도 제어 영역은 명확히 구분된다.
     auto* transportCard = new QWidget(this);
     transportCard->setObjectName("transportCard");
     transportCard->setStyleSheet(QString(
-        "QWidget#transportCard { background: %1; border: 1px solid %2; border-radius: 10px; }")
-        .arg(SorinuriUi::SurfaceRaised, SorinuriUi::BorderSoft));
+        "QWidget#transportCard { background: %1; border: none; border-radius: 9px; }")
+        .arg(SorinuriUi::SurfaceRaised));
     btnRow_ = new QHBoxLayout(transportCard);
     btnRow_->setContentsMargins(7, 3, 7, 3);
     btnRow_->setSpacing(3);
@@ -165,13 +165,13 @@ ControlBar::ControlBar(QWidget* parent) : QWidget(parent) {
     btnRow_->addWidget(btnSettings_);
     mainLayout->addWidget(transportCard);
 
-    // 트랙 선택은 별도 카드로 배치한다. 짧은 노트북 폭과 250% DPI에서도 출력 상태,
-    // 오디오, 자막, 모드 버튼이 재생 제어 영역을 밀거나 잘리지 않는다.
+    // 트랙·모드 선택은 별도 테두리 카드 대신 얇은 구분선과 같은 표면으로 유지한다.
+    // 고배율 노트북 폭에서도 오디오·자막·모드 제어가 한 몸처럼 보이게 한다.
     auto* trackCard = new QWidget(this);
     trackCard->setObjectName("trackCard");
     trackCard->setStyleSheet(QString(
-        "QWidget#trackCard { background: %1; border: 1px solid %2; border-radius: 10px; }")
-        .arg(SorinuriUi::Surface, SorinuriUi::BorderSoft));
+        "QWidget#trackCard { background: %1; border: none; border-top: 1px solid %2; border-radius: 0; }")
+        .arg(SorinuriUi::SurfaceAlt, SorinuriUi::BorderSoft));
     trackRow_ = new QHBoxLayout(trackCard);
     trackRow_->setSpacing(6);
     trackRow_->setContentsMargins(8, 3, 8, 3);
