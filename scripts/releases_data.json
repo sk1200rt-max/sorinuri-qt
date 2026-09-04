@@ -1,5 +1,14 @@
 [
   {
+    "version": "6.21.0",
+    "date": "2026-09-04",
+    "title": "YouTube 선택 재생과 오디오 종료 안정화",
+    "desc": "오리지널 다중 선택·YouTube 대기열·종료 뒤 오디오 장치 해제를 안정화하고 재생 UI를 정돈한 테스트 후보",
+    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.21.0.exe",
+    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.21.0-Portable.zip",
+    "tags": []
+  },
+  {
     "version": "6.20.9",
     "date": "2026-09-04",
     "title": "OTT 오리지널 화면 전환 안정화",
