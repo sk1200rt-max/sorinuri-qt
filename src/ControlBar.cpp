@@ -136,15 +136,18 @@ ControlBar::ControlBar(QWidget* parent) : QWidget(parent) {
     // 실제 코덱·출력 형식이 확인되기 전에는 '협상 중' 배지를 노출하지 않는다.
     audioInfoLabel_->hide();
 
-    // 모드 버튼
-    btnPlayerMode_ = makeModeBtn("파일", "파일 플레이어 모드");
+    // 서비스 전환 메뉴: 하단 우측에서 플레이어·OTT·오리지널을 명확히 선택한다.
+    // ‘파일’은 재생 화면으로 돌아가는 동작을 충분히 설명하지 못해 ‘플레이어’로 명시한다.
+    btnPlayerMode_ = makeModeBtn("플레이어", "일반 플레이어 화면으로 돌아가기");
     btnPlayerMode_->setProperty("active", true);
     btnPlayerMode_->style()->unpolish(btnPlayerMode_);
     btnPlayerMode_->style()->polish(btnPlayerMode_);
-    btnOttMode_    = makeModeBtn("OTT", "OTT 스트리밍 (Netflix · Disney+ · YouTube)");
+    btnOttMode_ = makeModeBtn("OTT", "OTT 스트리밍 (Netflix · Disney+ · YouTube)");
+    btnOriginalsMode_ = makeModeBtn("오리지널", "소리누리 오리지널 음악으로 이동");
 
     connect(btnPlayerMode_, &QPushButton::clicked, this, &ControlBar::playerModeClicked);
-    connect(btnOttMode_,    &QPushButton::clicked, this, &ControlBar::ottModeClicked);
+    connect(btnOttMode_, &QPushButton::clicked, this, &ControlBar::ottModeClicked);
+    connect(btnOriginalsMode_, &QPushButton::clicked, this, &ControlBar::originalsModeClicked);
 
     btnSettings_ = makeBtn(":/icons/settings.svg", "설정");
     connect(btnSettings_, &QPushButton::clicked, this, &ControlBar::settingsClicked);
@@ -179,6 +182,8 @@ ControlBar::ControlBar(QWidget* parent) : QWidget(parent) {
     trackRow_->addWidget(btnPlayerMode_);
     trackRow_->addSpacing(2);
     trackRow_->addWidget(btnOttMode_);
+    trackRow_->addSpacing(2);
+    trackRow_->addWidget(btnOriginalsMode_);
     mainLayout->addWidget(trackCard);
 }
 
