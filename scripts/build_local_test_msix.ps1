@@ -53,6 +53,9 @@ try {
         -FriendlyName $certFriendlyName `
         -NotAfter (Get-Date).AddDays($CertificateValidityDays)
 
+    # build_store_msix.ps1는 repo root를 기준으로 OutputDirectory를 결합하므로,
+    # 여기서는 절대 경로를 다시 전달하지 않고 상대 경로만 전달한다.
+    $unsignedDirectoryRelative = Join-Path $OutputDirectory 'unsigned'
     $unsignedDirectory = Join-Path $absoluteOutput 'unsigned'
     New-Item -ItemType Directory -Path $unsignedDirectory -Force | Out-Null
     & (Join-Path $PSScriptRoot 'build_store_msix.ps1') `
@@ -63,7 +66,7 @@ try {
         -PackageDisplayName $testDisplayName `
         -PackageDescription $testDescription `
         -PayloadSource $PayloadSource `
-        -OutputDirectory $unsignedDirectory `
+        -OutputDirectory $unsignedDirectoryRelative `
         -PackageFilePrefix $testPrefix
     if ($LASTEXITCODE -ne 0) { throw '로컬 테스트 MSIX archive 생성 실패' }
 
