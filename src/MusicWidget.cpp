@@ -30,10 +30,10 @@ static QPixmap blurPixmap(const QPixmap& src, int) {
     if (src.isNull()) return src;
     // 픽셀 단위 다중 블러는 큰 앨범아트에서 UI 이벤트 루프를 길게 점유한다.
     // 축소 뒤 부드러운 확대는 배경 질감은 유지하면서 파일 전환을 즉시 끝낸다.
-    const QImage small = src.toImage().scaled(96, 96, Qt::IgnoreAspectRatio,
-                                               Qt::FastTransformation);
-    return QPixmap::fromImage(small.scaled(320, 320, Qt::IgnoreAspectRatio,
-                                            Qt::SmoothTransformation));
+    const QImage thumbnailImage = src.toImage().scaled(96, 96, Qt::IgnoreAspectRatio,
+                                                        Qt::FastTransformation);
+    return QPixmap::fromImage(thumbnailImage.scaled(320, 320, Qt::IgnoreAspectRatio,
+                                                     Qt::SmoothTransformation));
 }
 
 static QColor extractDominant(const QPixmap& src) {
