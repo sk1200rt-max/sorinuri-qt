@@ -43,6 +43,7 @@ function Get-SignToolPath {
 }
 
 $certificate = $null
+$runnerTrustedPeopleInstalled = $false
 try {
     $certificate = New-SelfSignedCertificate `
         -Type Custom `
@@ -81,12 +82,20 @@ try {
     & $signTool sign /fd SHA256 /sha1 $certificate.Thumbprint /s My $signedMsix
     if ($LASTEXITCODE -ne 0) { throw '로컬 테스트 MSIX 서명 실패' }
 
-    & $signTool verify /pa /v $signedMsix
-    if ($LASTEXITCODE -ne 0) { throw '로컬 테스트 MSIX 서명 검증 실패' }
-
     # .cer에는 공개 키만 들어 있으며, PFX/private key는 만든 PC/CI 밖으로 절대 내보내지 않는다.
     $certificatePath = Join-Path $absoluteOutput 'Sorinuri-LOCAL-TEST-CERTIFICATE-ONLY.cer'
     Export-Certificate -Cert $certificate -FilePath $certificatePath -Force | Out-Null
+
+    # self-signed 인증서는 CI runner에서 자동 신뢰되지 않는다. 최종 설치 스크립트와
+    # 같은 Trusted People 범위에 현재 runner 사용자용으로만 임시 신뢰한 뒤 검증한다.
+    $existingRunnerTrust = Get-ChildItem 'Cert:\CurrentUser\TrustedPeople' |
+        Where-Object { $_.Thumbprint -eq $certificate.Thumbprint }
+    if (-not $existingRunnerTrust) {
+        Import-Certificate -FilePath $certificatePath -CertStoreLocation 'Cert:\CurrentUser\TrustedPeople' | Out-Null
+        $runnerTrustedPeopleInstalled = $true
+    }
+    & $signTool verify /pa /v $signedMsix
+    if ($LASTEXITCODE -ne 0) { throw '로컬 테스트 MSIX 서명 검증 실패' }
 
     $installScript = Join-Path $repoRoot 'scripts/Install-Sorinuri-LocalTest.ps1'
     $removeScript = Join-Path $repoRoot 'scripts/Remove-Sorinuri-LocalTest.ps1'
@@ -123,6 +132,9 @@ Microsoft Store 제출용 또는 고객 다운로드 파일이 아닙니다.
     Write-Host '이 artifact는 고객·GitHub Release·sorinuri.com에 게시하지 마세요. Store 검증 후 Store 서명 package로 교체해야 합니다.'
 }
 finally {
+    if ($certificate -and $runnerTrustedPeopleInstalled) {
+        Remove-Item -LiteralPath ("Cert:\CurrentUser\TrustedPeople\{0}" -f $certificate.Thumbprint) -Force -ErrorAction SilentlyContinue
+    }
     if ($certificate) {
         Remove-Item -LiteralPath ("Cert:\CurrentUser\My\{0}" -f $certificate.Thumbprint) -Force -ErrorAction SilentlyContinue
     }
