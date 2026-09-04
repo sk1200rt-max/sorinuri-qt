@@ -1,5 +1,14 @@
 [
   {
+    "version": "6.21.2",
+    "date": "2026-09-04",
+    "title": "독립 감상 화면 재설계 및 파일 전환 안정화",
+    "desc": "승인 목업 기반의 영상 재생 선반, 독립 음악 감상 스테이지, OTT 탐색, 오리지널 카탈로그와 HiDPI·파일 전환 안정화를 적용한 테스트 후보",
+    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.21.2.exe",
+    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.21.2-Portable.zip",
+    "tags": []
+  },
+  {
     "version": "6.21.1",
     "date": "2026-09-04",
     "title": "v6.21.1 재설계 안정화 테스트",

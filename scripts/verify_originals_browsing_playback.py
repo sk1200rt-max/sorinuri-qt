@@ -48,7 +48,7 @@ def main() -> int:
         "BrowseMode::Situation",
         "BrowseMode::Genre",
         '"장르순", "상황순"',
-        '"▶  선택 재생 (0)"',
+        '"선택 재생 (0)"',
         "ROLE_GENRES",
         "ROLE_SITUATIONS",
         "장르: %1\\n상황: %2",
