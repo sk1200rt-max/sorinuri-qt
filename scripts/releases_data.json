@@ -1,5 +1,14 @@
 [
   {
+    "version": "6.21.1",
+    "date": "2026-09-04",
+    "title": "v6.21.1 재설계 안정화 테스트",
+    "desc": "공통 상단 서비스 전환, 재생 전용 하단 콘솔, 파일 전환 안정화 및 UI 회귀 검증",
+    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.21.1.exe",
+    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.21.1-Portable.zip",
+    "tags": []
+  },
+  {
     "version": "6.21.0",
     "date": "2026-09-04",
     "title": "YouTube 선택 재생과 오디오 종료 안정화",

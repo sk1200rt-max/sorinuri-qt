@@ -1,6 +1,6 @@
 {
-  "version": "6.21.0",
+  "version": "6.21.1",
   "domain": "audio,ui,playback",
-  "purpose": "YouTube 선택·전체 재생, 종료 뒤 외부 앱 오디오 복구, 경량 UI 안정화",
-  "base_commit": "b0686bbff922867faa40261566bd77754bdbdc29"
+  "purpose": "독립 감상 화면 재설계, 파일 열기 전환 안정화, YouTube·음악 재생 경로 정리",
+  "base_commit": "5cd83c6811f732a2adc5a04eeb9d7af1268b0855"
 }
