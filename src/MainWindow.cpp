@@ -515,9 +515,19 @@ void MainWindow::playQueue(const QList<PlaybackQueue::Entry>& entries, int start
     if (entries.isEmpty()) return;
     playbackQueue_->replace(entries, startIndex);
     applyQueueRepeatMode();
+    updateOriginalsQueueOverlay();
 
     const bool containsYouTube = std::any_of(entries.cbegin(), entries.cend(),
         [](const PlaybackQueue::Entry& entry) { return entry.source == QStringLiteral("youtube"); });
+    // 온라인 YouTube 재생은 Windows shared PCM으로 고정한다. 이로써 웹 스트림이
+    // WASAPI 독점·bitstream 장치를 잡아 게임·브라우저를 막지 않는다. 이후 로컬
+    // 파일 재생에서는 사용자의 single-instance HDMI 고음질 선호를 다시 적용한다.
+    auto* core = mpvWidget_->core();
+    if (!multiInstanceSharedAudio_) {
+        core->setAudioSessionPolicy(containsYouTube
+            ? AudioSessionPolicy::OnlineShared
+            : AudioSessionPolicy::SinglePreferred);
+    }
     if (containsYouTube && (!ytdlp_ || !ytdlp_->isAvailable())) {
         pendingYouTubeQueue_ = entries;
         pendingYouTubeQueueStartIndex_ = startIndex;
@@ -584,6 +594,86 @@ void MainWindow::applyQueueRepeatMode() {
         core->setProperty("loop-playlist", "no");
         break;
     }
+}
+
+void MainWindow::ensureOriginalsQueueOverlay() {
+    if (originalsQueueOverlay_ || !videoPage_) return;
+
+    originalsQueueOverlay_ = new QWidget(videoPage_);
+    originalsQueueOverlay_->setObjectName(QStringLiteral("originalsQueueOverlay"));
+    originalsQueueOverlay_->setAttribute(Qt::WA_StyledBackground, true);
+    originalsQueueOverlay_->setFixedWidth(460);
+    originalsQueueOverlay_->setStyleSheet(
+        "QWidget#originalsQueueOverlay { background: rgba(11, 16, 17, 228); border: none; border-radius: 12px; }"
+        "QLabel#originalsQueueKicker { color: #00D4B4; font-size: 10px; font-weight: 800; letter-spacing: 1px; background: transparent; }"
+        "QLabel#originalsQueueNow { color: #F2F7F6; font-size: 13px; font-weight: 700; background: transparent; }"
+        "QLabel#originalsQueueNext { color: #A3B1B0; font-size: 10px; background: transparent; }"
+        "QLabel#originalsQueueCount { color: #86A7A4; font-size: 10px; background: #152523; border-radius: 9px; padding: 3px 7px; }"
+        "QPushButton#originalsQueueBack { background: transparent; color: #B9D8D5; border: 1px solid #2A4A49; border-radius: 7px; padding: 5px 9px; font-size: 10px; font-weight: 700; }"
+        "QPushButton#originalsQueueBack:hover { background: #00D4B4; color: #06201C; border-color: #00D4B4; }");
+
+    auto* row = new QHBoxLayout(originalsQueueOverlay_);
+    row->setContentsMargins(13, 10, 11, 10);
+    row->setSpacing(10);
+    auto* text = new QVBoxLayout();
+    text->setContentsMargins(0, 0, 0, 0);
+    text->setSpacing(2);
+    auto* kicker = new QLabel(QStringLiteral("SORINURI ORIGINALS  ·  YOUTUBE 연속 재생"), originalsQueueOverlay_);
+    kicker->setObjectName(QStringLiteral("originalsQueueKicker"));
+    originalsQueueNowLabel_ = new QLabel(originalsQueueOverlay_);
+    originalsQueueNowLabel_->setObjectName(QStringLiteral("originalsQueueNow"));
+    originalsQueueNowLabel_->setWordWrap(false);
+    originalsQueueNextLabel_ = new QLabel(originalsQueueOverlay_);
+    originalsQueueNextLabel_->setObjectName(QStringLiteral("originalsQueueNext"));
+    originalsQueueNextLabel_->setWordWrap(false);
+    text->addWidget(kicker);
+    text->addWidget(originalsQueueNowLabel_);
+    text->addWidget(originalsQueueNextLabel_);
+
+    originalsQueueCountLabel_ = new QLabel(originalsQueueOverlay_);
+    originalsQueueCountLabel_->setObjectName(QStringLiteral("originalsQueueCount"));
+    auto* back = new QPushButton(QStringLiteral("목록으로"), originalsQueueOverlay_);
+    back->setObjectName(QStringLiteral("originalsQueueBack"));
+    back->setFocusPolicy(Qt::NoFocus);
+    back->setCursor(Qt::PointingHandCursor);
+    back->setToolTip(QStringLiteral("소리누리 오리지널 목록으로 돌아가기"));
+    connect(back, &QPushButton::clicked, this, &MainWindow::showOriginalsPage);
+
+    row->addLayout(text, 1);
+    row->addWidget(originalsQueueCountLabel_);
+    row->addWidget(back);
+    originalsQueueOverlay_->move(18, 16);
+    originalsQueueOverlay_->hide();
+}
+
+void MainWindow::updateOriginalsQueueOverlay() {
+    if (!playbackQueue_) return;
+    const PlaybackQueue::Entry current = playbackQueue_->currentEntry();
+    const bool isYouTubeQueue = !current.url.isEmpty() && current.source == QStringLiteral("youtube");
+    if (!isYouTubeQueue) {
+        if (originalsQueueOverlay_) originalsQueueOverlay_->hide();
+        return;
+    }
+
+    ensureOriginalsQueueOverlay();
+    if (!originalsQueueOverlay_) return;
+    const QList<PlaybackQueue::Entry> entries = playbackQueue_->entries();
+    const int count = entries.size();
+    const int currentIndex = qBound(0, playbackQueue_->currentIndex(), qMax(0, count - 1));
+    const int nextIndex = count > 1 ? ((currentIndex + 1) % count) : -1;
+    originalsQueueNowLabel_->setText(QStringLiteral("재생 중  ·  %1").arg(current.title));
+    originalsQueueNowLabel_->setToolTip(current.title);
+    originalsQueueCountLabel_->setText(QStringLiteral("%1 / %2").arg(currentIndex + 1).arg(count));
+    if (nextIndex >= 0 && nextIndex < count) {
+        const QString nextTitle = entries.at(nextIndex).title;
+        originalsQueueNextLabel_->setText(QStringLiteral("다음 곡  ·  %1").arg(nextTitle));
+        originalsQueueNextLabel_->setToolTip(nextTitle);
+    } else {
+        originalsQueueNextLabel_->setText(QStringLiteral("마지막 곡입니다"));
+        originalsQueueNextLabel_->setToolTip({});
+    }
+    originalsQueueOverlay_->show();
+    originalsQueueOverlay_->raise();
 }
 
 void MainWindow::switchToMusicMode() {
@@ -678,6 +768,7 @@ void MainWindow::onFileLoaded(const QString& path) {
     currentFilePath_ = path;
     if (playbackQueue_)
         playbackQueue_->setCurrentUrl(path);
+    updateOriginalsQueueOverlay();
     lastPosition_ = 0.0;
     updateWindowTitle(QFileInfo(path).fileName());
     addToRecentFiles(path);
@@ -1117,6 +1208,12 @@ void MainWindow::toggleFullscreen() {
 void MainWindow::closeEvent(QCloseEvent* e)  {
     saveResumePosition();  // 이어보기: 종료 시 현재 위치 저장
     saveSettings();
+
+    // Windows 미디어 컨트롤을 먼저 정지 상태로 확정해 백그라운드 미디어 세션이
+    // 재생 중으로 남지 않게 한다. 오디오 장치 해제는 MpvWidget::shutdown에서
+    // 동기적으로 완료될 때까지 창 닫기를 진행하지 않는다.
+    if (smtcManager_) smtcManager_->setStopped();
+    if (audioOutputRecoveryTimer_) audioOutputRecoveryTimer_->stop();
 
     // QApplication 종료 전에 OpenGL render context와 libmpv를 동기 종료한다.
     // 이 경로가 완료된 뒤 창을 닫아 WASAPI 독점 핸들이 게임·브라우저를 막지 않게 한다.

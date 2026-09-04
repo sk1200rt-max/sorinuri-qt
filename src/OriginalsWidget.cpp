@@ -112,6 +112,7 @@ static const int ROLE_DURATION = Qt::UserRole + 5;
 static const int ROLE_PLAYING  = Qt::UserRole + 6;
 static const int ROLE_GENRES   = Qt::UserRole + 7;
 static const int ROLE_SITUATIONS = Qt::UserRole + 8;
+static const int ROLE_SELECTION_MODE = Qt::UserRole + 9;
 
 // ════════════════════════════════════════════════════════════════════════════
 // SongItemDelegate — 썸네일 + 제목 + 아티스트 + 재생시간 렌더링
@@ -150,8 +151,21 @@ void SongItemDelegate::paint(QPainter* painter,
         painter->fillRect(QRect(r.left(), r.top() + 2, 3, r.height() - 4),
                           QColor(MINT));
 
-    // ── 썸네일 ────────────────────────────────────────────────────────────
+    // ── 선택 모드 체크 표시 + 썸네일 ──────────────────────────────────────
+    const bool selectionMode = index.data(ROLE_SELECTION_MODE).toBool();
     int leftPad = PAD + (isPlaying ? 5 : 2);
+    if (selectionMode) {
+        const QRect checkRect(r.left() + leftPad, r.top() + (r.height() - 18) / 2, 18, 18);
+        painter->setPen(QPen(QColor(isSelected ? MINT : TEXT2), 1.5));
+        painter->setBrush(isSelected ? QColor(MINT) : Qt::NoBrush);
+        painter->drawRoundedRect(checkRect, 5, 5);
+        if (isSelected) {
+            painter->setPen(QPen(QColor("#06201c"), 2));
+            painter->drawLine(checkRect.left() + 4, checkRect.center().y(), checkRect.left() + 8, checkRect.bottom() - 4);
+            painter->drawLine(checkRect.left() + 8, checkRect.bottom() - 4, checkRect.right() - 3, checkRect.top() + 4);
+        }
+        leftPad += 25;
+    }
     QRect thumbRect(r.left() + leftPad,
                     r.top() + (r.height() - THUMB_H) / 2,
                     THUMB_W, THUMB_H);
@@ -331,8 +345,15 @@ void OriginalsWidget::setupUI() {
     connect(sortCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &OriginalsWidget::onSortChanged);
 
+    selectModeBtn_ = new QPushButton(QStringLiteral("곡 선택"), searchBar);
+    selectModeBtn_->setFixedHeight(27);
+    selectModeBtn_->setCursor(Qt::PointingHandCursor);
+    selectModeBtn_->setFocusPolicy(Qt::NoFocus);
+    connect(selectModeBtn_, &QPushButton::clicked, this, &OriginalsWidget::onSelectionModeClicked);
+
     sRow->addWidget(searchEdit_, 1);
     sRow->addWidget(sortCombo_);
+    sRow->addWidget(selectModeBtn_);
     root->addWidget(searchBar);
 
     // ── 전체·상황별·장르별 탐색 모드 ────────────────────────────────────
@@ -387,7 +408,8 @@ void OriginalsWidget::setupUI() {
         "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }"
     ).arg(BG).arg(BG));
     listWidget_->setMouseTracking(true);
-    listWidget_->setSelectionMode(QAbstractItemView::ExtendedSelection);
+    // 기본 탐색에서는 한 곡만 선택하고, '곡 선택' 모드에서만 체크 기반 다중 선택을 제공한다.
+    listWidget_->setSelectionMode(QAbstractItemView::SingleSelection);
     listWidget_->setSpacing(0);
     listWidget_->setUniformItemSizes(true);
 
@@ -403,7 +425,7 @@ void OriginalsWidget::setupUI() {
 
     // ── 하단 재생·재생목록 바 ─────────────────────────────────────────────
     auto* actionBar = new QWidget(this);
-    actionBar->setFixedHeight(82);
+    actionBar->setFixedHeight(112);
     actionBar->setStyleSheet(QString("background: %1; border-top: 1px solid %2;")
                               .arg(BG2).arg(BORDER));
     auto* actionLayout = new QVBoxLayout(actionBar);
@@ -436,18 +458,29 @@ void OriginalsWidget::setupUI() {
         "QPushButton:disabled { color: #555; border-color: #292929; }")
         .arg(BG3).arg(TEXT).arg(BORDER).arg(MINT));
     connect(playSelectedBtn_, &QPushButton::clicked, this, &OriginalsWidget::onPlaySelectedClicked);
-    updatePlayButtons();
 
-    auto* ytBtn = new QPushButton("▶  YouTube 전체", actionBar);
-    ytBtn->setFixedHeight(30);
-    ytBtn->setCursor(Qt::PointingHandCursor);
-    ytBtn->setFocusPolicy(Qt::NoFocus);
-    ytBtn->setStyleSheet(
-        "QPushButton { background: #cc0000; color: #fff; border: none;"
-        "border-radius: 6px; padding: 0 12px; font-size: 11px; font-weight: 600; }"
-        "QPushButton:hover { background: #e00000; }"
-        "QPushButton:pressed { background: #aa0000; }");
-    connect(ytBtn, &QPushButton::clicked, this, &OriginalsWidget::onYouTubeClicked);
+    selectAllBtn_ = new QPushButton(QStringLiteral("전체 선택"), actionBar);
+    clearSelectionBtn_ = new QPushButton(QStringLiteral("선택 해제"), actionBar);
+    for (QPushButton* button : {selectAllBtn_, clearSelectionBtn_}) {
+        button->setFixedHeight(30);
+        button->setCursor(Qt::PointingHandCursor);
+        button->setFocusPolicy(Qt::NoFocus);
+        button->setStyleSheet(QString("QPushButton { background: transparent; color: %1; border: 1px solid %2; border-radius: 6px; padding: 0 9px; font-size: 10px; } QPushButton:hover:enabled { border-color: %3; color: %3; }")
+                              .arg(TEXT2).arg(BORDER).arg(MINT));
+    }
+    connect(selectAllBtn_, &QPushButton::clicked, this, &OriginalsWidget::onSelectAllClicked);
+    connect(clearSelectionBtn_, &QPushButton::clicked, this, &OriginalsWidget::onClearSelectionClicked);
+
+    youTubeBtn_ = new QPushButton("▶  YouTube 전체 듣기", actionBar);
+    youTubeBtn_->setFixedHeight(30);
+    youTubeBtn_->setCursor(Qt::PointingHandCursor);
+    youTubeBtn_->setFocusPolicy(Qt::NoFocus);
+    youTubeBtn_->setStyleSheet(
+        "QPushButton { background: #B92F2F; color: #fff; border: none;"
+        "border-radius: 6px; padding: 0 12px; font-size: 11px; font-weight: 700; }"
+        "QPushButton:hover { background: #D13A3A; }"
+        "QPushButton:pressed { background: #942424; }");
+    connect(youTubeBtn_, &QPushButton::clicked, this, &OriginalsWidget::onYouTubeClicked);
 
     repeatBtn_ = new QPushButton(actionBar);
     repeatBtn_->setFixedHeight(30);
@@ -493,7 +526,9 @@ void OriginalsWidget::setupUI() {
 
     playRow->addWidget(playAllBtn);
     playRow->addWidget(playSelectedBtn_);
-    playRow->addWidget(ytBtn);
+    playRow->addWidget(selectAllBtn_);
+    playRow->addWidget(clearSelectionBtn_);
+    playRow->addWidget(youTubeBtn_);
     playRow->addStretch();
     playRow->addWidget(repeatBtn_);
     listRow->addWidget(saveBtn);
@@ -750,10 +785,31 @@ void OriginalsWidget::rebuildCategoryButtons() {
 }
 
 void OriginalsWidget::updatePlayButtons() {
-    if (!playSelectedBtn_ || !listWidget_) return;
+    updateSelectionControls();
+}
+
+void OriginalsWidget::updateSelectionControls() {
+    if (!listWidget_) return;
     const int count = listWidget_->selectedItems().size();
-    playSelectedBtn_->setText(QStringLiteral("▶  선택 재생 (%1)").arg(count));
-    playSelectedBtn_->setEnabled(count > 0);
+    if (playSelectedBtn_) {
+        playSelectedBtn_->setText(QStringLiteral("▶  선택한 곡 재생 (%1)").arg(count));
+        playSelectedBtn_->setEnabled(count > 0);
+    }
+    if (youTubeBtn_) {
+        youTubeBtn_->setText(count > 0
+            ? QStringLiteral("▶  YouTube 선택 듣기 (%1)").arg(count)
+            : QStringLiteral("▶  YouTube 전체 듣기"));
+    }
+    const QString selectionStyle = selectionMode_
+        ? QString("QPushButton { background: %1; color: #06201c; border: none; border-radius: 6px; padding: 0 10px; font-size: 10px; font-weight: 800; }").arg(MINT)
+        : QString("QPushButton { background: %1; color: %2; border: 1px solid %3; border-radius: 6px; padding: 0 10px; font-size: 10px; font-weight: 700; } QPushButton:hover { border-color: %4; color: %4; }")
+              .arg(BG3).arg(TEXT2).arg(BORDER).arg(MINT);
+    if (selectModeBtn_) {
+        selectModeBtn_->setText(selectionMode_ ? QStringLiteral("선택 중") : QStringLiteral("곡 선택"));
+        selectModeBtn_->setStyleSheet(selectionStyle);
+    }
+    if (selectAllBtn_) selectAllBtn_->setEnabled(selectionMode_ && listWidget_->count() > 0);
+    if (clearSelectionBtn_) clearSelectionBtn_->setEnabled(selectionMode_ && count > 0);
 }
 
 // ── 필터 적용 ─────────────────────────────────────────────────────────────────
@@ -804,13 +860,20 @@ void OriginalsWidget::applyFilter() {
 }
 
 void OriginalsWidget::updateList() {
-    listWidget_->clear();
+    QSet<QString> selectedUrls;
+    if (listWidget_) {
+        for (QListWidgetItem* selected : listWidget_->selectedItems()) {
+            const QString url = selected->data(ROLE_URL).toString();
+            if (!url.isEmpty()) selectedUrls.insert(url);
+        }
+        listWidget_->clear();
+    }
 
     if (filtered_.isEmpty()) {
         auto* item = new QListWidgetItem("  선택한 조건에 재생 가능한 곡이 없습니다.");
         item->setForeground(QColor(TEXT2));
         listWidget_->addItem(item);
-        updatePlayButtons();
+        updateSelectionControls();
         return;
     }
 
@@ -830,6 +893,8 @@ void OriginalsWidget::updateList() {
         item->setData(ROLE_PLAYING, isPlaying);
         item->setData(ROLE_GENRES, genres.join(QStringLiteral(" · ")));
         item->setData(ROLE_SITUATIONS, situations.join(QStringLiteral(" · ")));
+        item->setData(ROLE_SELECTION_MODE, selectionMode_);
+        if (selectionMode_ && selectedUrls.contains(mediaUrl)) item->setSelected(true);
         item->setToolTip(QString("장르: %1\n상황: %2\n분위기: %3\n태그: %4")
             .arg(genres.isEmpty() ? QStringLiteral("미분류") : genres.join(QStringLiteral(", ")))
             .arg(situations.isEmpty() ? QStringLiteral("미분류") : situations.join(QStringLiteral(", ")))
@@ -839,7 +904,7 @@ void OriginalsWidget::updateList() {
     }
 
     delegate_->setCurrentUrl(currentFile_);
-    updatePlayButtons();
+    updateSelectionControls();
 }
 
 // ── 슬롯 ─────────────────────────────────────────────────────────────────────
@@ -869,7 +934,30 @@ void OriginalsWidget::onSortChanged(int index) {
 }
 
 void OriginalsWidget::onSelectionChanged() {
-    updatePlayButtons();
+    updateSelectionControls();
+    if (listWidget_) listWidget_->viewport()->update();
+}
+
+void OriginalsWidget::onSelectionModeClicked() {
+    if (!listWidget_) return;
+    selectionMode_ = !selectionMode_;
+    listWidget_->setSelectionMode(selectionMode_
+        ? QAbstractItemView::ExtendedSelection
+        : QAbstractItemView::SingleSelection);
+    if (!selectionMode_) listWidget_->clearSelection();
+    updateList();
+}
+
+void OriginalsWidget::onSelectAllClicked() {
+    if (!listWidget_ || !selectionMode_) return;
+    listWidget_->selectAll();
+    updateSelectionControls();
+}
+
+void OriginalsWidget::onClearSelectionClicked() {
+    if (!listWidget_) return;
+    listWidget_->clearSelection();
+    updateSelectionControls();
 }
 
 QList<PlaybackQueue::Entry> OriginalsWidget::queueEntries(bool useYouTube) const {
@@ -932,7 +1020,8 @@ void OriginalsWidget::onPlaySelectedClicked() {
 }
 
 void OriginalsWidget::onYouTubeClicked() {
-    const QList<PlaybackQueue::Entry> entries = queueEntries(true);
+    QList<PlaybackQueue::Entry> entries = selectedQueueEntries(true);
+    if (entries.isEmpty()) entries = queueEntries(true);
     if (entries.isEmpty()) {
         showToast("YouTube 연결 곡이 없습니다.");
         return;

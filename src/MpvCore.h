@@ -23,12 +23,13 @@ enum class RenderProfile {
     HiEnd       // 최고화질 - 전문가용 (RTX 4080 / RX 7900 수준)
 };
 
-// 같은 WASAPI endpoint에서 여러 창을 동시에 재생하는 경우에는 Windows Audio Engine이
-// PCM만 믹싱할 수 있으므로 exclusive/bitstream을 사용하지 않는다. 이 값은 QSettings에
-// 저장하지 않는 런타임 세션 정책으로, 다음 단일 실행에서 사용자의 원래 고음질 설정을 보존한다.
+// 동일 endpoint의 다중 창 또는 온라인 스트림은 Windows Audio Engine이 안정적으로
+// 믹싱할 수 있도록 shared PCM을 쓴다. 이 값은 QSettings에 저장하지 않는 런타임 정책이므로
+// 다음 로컬 HDMI 단일 재생에서 사용자의 exclusive/bitstream 선호를 그대로 복원한다.
 enum class AudioSessionPolicy {
     SinglePreferred,
     MultiShared,
+    OnlineShared,
 };
 
 class MpvCore : public QObject {
@@ -77,6 +78,9 @@ public:
     AudioSessionPolicy audioSessionPolicy() const { return audioSessionPolicy_; }
     bool isMultiInstanceSharedSession() const {
         return audioSessionPolicy_ == AudioSessionPolicy::MultiShared;
+    }
+    bool isOnlineSharedSession() const {
+        return audioSessionPolicy_ == AudioSessionPolicy::OnlineShared;
     }
     // 절전 복귀·HDMI 재연결 뒤 WASAPI 출력 정책을 다시 협상한다.
     // ao-reload 전에 장치·독점·채널·패스스루 설정을 모두 복원해 2.0 폴백을 방지한다.

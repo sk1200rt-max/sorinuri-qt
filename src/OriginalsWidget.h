@@ -108,6 +108,9 @@ private slots:
     void onCategoryClicked(const QString& category);
     void onSortChanged(int index);
     void onSelectionChanged();
+    void onSelectionModeClicked();
+    void onSelectAllClicked();
+    void onClearSelectionClicked();
     void onItemDoubleClicked(QListWidgetItem* item);
     void onPlayAllClicked();
     void onPlaySelectedClicked();
@@ -126,6 +129,7 @@ private:
     void rebuildCategoryButtons();
     void updateBrowseButtons();
     void updatePlayButtons();
+    void updateSelectionControls();
     void fetchThumbnail(const SongInfo& song);
     QStringList situationsForSong(const SongInfo& song) const;
     QStringList genresForSong(const SongInfo& song) const;
@@ -165,9 +169,14 @@ private:
     QList<QPushButton*>  browseBtns_;
     QList<QPushButton*>  catBtns_;
     QPushButton*         playSelectedBtn_ = nullptr;
+    QPushButton*         selectModeBtn_ = nullptr;
+    QPushButton*         selectAllBtn_ = nullptr;
+    QPushButton*         clearSelectionBtn_ = nullptr;
+    QPushButton*         youTubeBtn_ = nullptr;
     SongItemDelegate*    delegate_     = nullptr;
     QComboBox*            savedPlaylistCombo_ = nullptr;
     QPushButton*          repeatBtn_   = nullptr;
     PlaybackQueue::RepeatMode repeatMode_ = PlaybackQueue::RepeatMode::Off;
+    bool selectionMode_ = false;
 
 };
