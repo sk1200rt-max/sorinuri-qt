@@ -73,7 +73,7 @@ try {
     $unsignedMsix = Join-Path $unsignedDirectory ("{0}-{1}-x64.msix" -f $testPrefix, $PackageVersion)
     if (-not (Test-Path -LiteralPath $unsignedMsix)) { throw "unsigned MSIX가 없습니다: $unsignedMsix" }
 
-    $signedMsix = Join-Path $absoluteOutput ("Sorinuri-LOCAL-TEST-NOT-FOR-DISTRIBUTION-{0}-x64.msix" -f $testPrefix, $PackageVersion)
+    $signedMsix = Join-Path $absoluteOutput ("{0}-{1}-x64.msix" -f $testPrefix, $PackageVersion)
     Move-Item -LiteralPath $unsignedMsix -Destination $signedMsix -Force
     Remove-Item -LiteralPath $unsignedDirectory -Recurse -Force -ErrorAction SilentlyContinue
 
