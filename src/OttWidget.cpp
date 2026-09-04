@@ -86,24 +86,12 @@ void OttWidget::setupUI() {
         "QPushButton:hover { background: #202827; color: #f3fbfa; }"
         "QPushButton:disabled { color: #485452; }";
 
-    // OTT 웹페이지의 방문 기록과 분리된 소리누리 복귀 동작을 첫 버튼으로 고정한다.
-    // Netflix 등 외부 페이지에서 뒤로가기만으로 플레이어를 찾을 수 없는 흐름을 방지한다.
-    returnBtn_ = new QPushButton("플레이어", toolBar_);
-    originalsBtn_ = new QPushButton("오리지널", toolBar_);
+    // 서비스 전환은 앱 전체의 상단바에서만 수행한다. 이 행은 OTT 안에서 필요한
+    // 뒤로·앞으로·새로고침·홈과 주소 입력만 제공해 중복 메뉴를 만들지 않는다.
     backBtn_   = new QPushButton(toolBar_);
     fwdBtn_    = new QPushButton(toolBar_);
     reloadBtn_ = new QPushButton(toolBar_);
     homeBtn_   = new QPushButton(toolBar_);
-    const QString primaryNavStyle =
-        "QPushButton { background: #004d45; color: #e8fffb; border: 1px solid #00bfa5; "
-        "border-radius: 4px; padding: 3px 10px; font-size: 12px; font-weight: 600; }"
-        "QPushButton:hover { background: #006b60; border-color: #00d4b4; color: #ffffff; }";
-    returnBtn_->setStyleSheet(primaryNavStyle);
-    originalsBtn_->setStyleSheet(primaryNavStyle);
-    returnBtn_->setIcon(QIcon(":/icons/play.svg"));
-    originalsBtn_->setIcon(QIcon(":/icons/playlist.svg"));
-    returnBtn_->setIconSize(QSize(15, 15));
-    originalsBtn_->setIconSize(QSize(15, 15));
     backBtn_->setIcon(style()->standardIcon(QStyle::SP_ArrowBack));
     fwdBtn_->setIcon(style()->standardIcon(QStyle::SP_ArrowForward));
     reloadBtn_->setIcon(style()->standardIcon(QStyle::SP_BrowserReload));
@@ -113,21 +101,15 @@ void OttWidget::setupUI() {
         button->setFixedSize(30, 30);
         button->setIconSize(QSize(16, 16));
     }
-    returnBtn_->setFocusPolicy(Qt::NoFocus);
-    originalsBtn_->setFocusPolicy(Qt::NoFocus);
     backBtn_->setFocusPolicy(Qt::NoFocus);
     fwdBtn_->setFocusPolicy(Qt::NoFocus);
     reloadBtn_->setFocusPolicy(Qt::NoFocus);
     homeBtn_->setFocusPolicy(Qt::NoFocus);
-    returnBtn_->setToolTip("소리누리 플레이어로 돌아가기 (Ctrl+Shift+P)");
-    originalsBtn_->setToolTip("소리누리 오리지널 음악 (기존 재생목록/YouTube 재생)");
     backBtn_->setToolTip("웹페이지 뒤로가기");
     fwdBtn_->setToolTip("웹페이지 앞으로가기");
     reloadBtn_->setToolTip("웹페이지 새로고침");
     homeBtn_->setToolTip("OTT 서비스 선택으로 돌아가기");
 
-    tbLayout->addWidget(returnBtn_);
-    tbLayout->addWidget(originalsBtn_);
     tbLayout->addWidget(backBtn_);
     tbLayout->addWidget(fwdBtn_);
     tbLayout->addWidget(reloadBtn_);
@@ -203,8 +185,6 @@ void OttWidget::setupUI() {
     sbLayout->addStretch();
     mainLayout->addWidget(statusBar);
 
-    connect(returnBtn_,    &QPushButton::clicked,    this, &OttWidget::returnToPlayerRequested);
-    connect(originalsBtn_, &QPushButton::clicked,    this, &OttWidget::originalsRequested);
     goBtn->setFocusPolicy(Qt::NoFocus);
     connect(goBtn,         &QPushButton::clicked,    this, &OttWidget::onNavigateClicked);
     connect(urlBar_,     &QLineEdit::returnPressed, this, &OttWidget::onNavigateClicked);

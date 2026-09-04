@@ -457,10 +457,8 @@ void MainWindow::setupConnections() {
     connect(controlBar_, &ControlBar::seeked,            [core](double p) { core->seek(p); });
     connect(controlBar_, &ControlBar::volumeChanged,     core, &MpvCore::setVolume);
     connect(controlBar_, &ControlBar::muteToggled,       core, &MpvCore::setMuted);
-    connect(controlBar_, &ControlBar::openFileClicked,   this, &MainWindow::onOpenFile);
     connect(controlBar_, &ControlBar::prevClicked,       [core]() { core->command({"playlist-prev"}); });
     connect(controlBar_, &ControlBar::nextClicked,       [core]() { core->command({"playlist-next"}); });
-    connect(controlBar_, &ControlBar::settingsClicked,   this, &MainWindow::onSettingsRequested);
 
     connect(titleBar_, &TitleBar::minimizeClicked,   this, &QMainWindow::showMinimized);
     connect(titleBar_, &TitleBar::maximizeClicked, this, [this]() {
@@ -486,10 +484,29 @@ void MainWindow::setupConnections() {
         settings_.setValue("window/alwaysOnTop", pinned);
     });
 
-    // 모드 전환 버튼 (ControlBar에 통합)
-    connect(controlBar_, &ControlBar::playerModeClicked, this, &MainWindow::switchToPlayerMode);
-    connect(controlBar_, &ControlBar::ottModeClicked, this, &MainWindow::switchToOttMode);
-    connect(controlBar_, &ControlBar::originalsModeClicked, this, &MainWindow::showOriginalsPage);
+    // 서비스 이동과 파일·도구 진입은 모든 화면에서 같은 상단바를 사용한다.
+    connect(titleBar_, &TitleBar::playerServiceClicked, this, &MainWindow::switchToPlayerMode);
+    connect(titleBar_, &TitleBar::ottServiceClicked, this, &MainWindow::switchToOttMode);
+    connect(titleBar_, &TitleBar::originalsServiceClicked, this, &MainWindow::showOriginalsPage);
+    connect(titleBar_, &TitleBar::openFileClicked, this, &MainWindow::onOpenFile);
+    connect(titleBar_, &TitleBar::toolsClicked, this, [this]() {
+        QMenu menu(this);
+        menu.setStyleSheet(SorinuriUi::menuStyle());
+        QAction* settingsAction = menu.addAction("환경 설정");
+        connect(settingsAction, &QAction::triggered, this, &MainWindow::onSettingsRequested);
+        menu.addSeparator();
+        QAction* compactAction = menu.addAction("컴팩트 플레이어");
+        QAction* miniAction = menu.addAction("미니 플레이어");
+        compactAction->setEnabled(isMusicMode_);
+        miniAction->setEnabled(isMusicMode_);
+        connect(compactAction, &QAction::triggered, this, &MainWindow::toggleCompactPlayer);
+        connect(miniAction, &QAction::triggered, this, &MainWindow::toggleMiniPlayer);
+        menu.addSeparator();
+        QAction* featuresAction = menu.addAction("고급 기능");
+        connect(featuresAction, &QAction::triggered, this, &MainWindow::toggleProFeatures);
+        const QPoint global = titleBar_->mapToGlobal(QPoint(titleBar_->width() - 240, titleBar_->height()));
+        menu.exec(global);
+    });
 
     // OTT 타이틀 변경 시 윈도우 타이틀 업데이트
     // OTT titleChanged 연결은 switchToOttMode에서 처리
@@ -520,6 +537,12 @@ void MainWindow::playQueue(const QList<PlaybackQueue::Entry>& entries, int start
 
     const bool containsYouTube = std::any_of(entries.cbegin(), entries.cend(),
         [](const PlaybackQueue::Entry& entry) { return entry.source == QStringLiteral("youtube"); });
+    // 파일 열기나 다른 목록 선택이 오면 이전 YouTube 준비 요청은 새 재생을 덮어쓰면
+    // 안 된다. 현재 재생 의도와 무관한 대기열을 즉시 폐기한다.
+    if (!containsYouTube) {
+        pendingYouTubeQueue_.clear();
+        pendingYouTubeQueueStartIndex_ = 0;
+    }
     // 온라인 YouTube 재생은 Windows shared PCM으로 고정한다. 이로써 웹 스트림이
     // WASAPI 독점·bitstream 장치를 잡아 게임·브라우저를 막지 않는다. 이후 로컬
     // 파일 재생에서는 사용자의 single-instance HDMI 고음질 선호를 다시 적용한다.
@@ -650,38 +673,17 @@ void MainWindow::ensureOriginalsQueueOverlay() {
 }
 
 void MainWindow::updateOriginalsQueueOverlay() {
-    if (!playbackQueue_) return;
-    const PlaybackQueue::Entry current = playbackQueue_->currentEntry();
-    const bool isYouTubeQueue = !current.url.isEmpty() && current.source == QStringLiteral("youtube");
-    if (!isYouTubeQueue) {
-        if (originalsQueueOverlay_) originalsQueueOverlay_->hide();
-        return;
-    }
-
-    ensureOriginalsQueueOverlay();
-    if (!originalsQueueOverlay_) return;
-    const QList<PlaybackQueue::Entry> entries = playbackQueue_->entries();
-    const int count = entries.size();
-    const int currentIndex = qBound(0, playbackQueue_->currentIndex(), qMax(0, count - 1));
-    const int nextIndex = count > 1 ? ((currentIndex + 1) % count) : -1;
-    originalsQueueNowLabel_->setText(QStringLiteral("재생 중  ·  %1").arg(current.title));
-    originalsQueueNowLabel_->setToolTip(current.title);
-    originalsQueueCountLabel_->setText(QStringLiteral("%1 / %2").arg(currentIndex + 1).arg(count));
-    if (nextIndex >= 0 && nextIndex < count) {
-        const QString nextTitle = entries.at(nextIndex).title;
-        originalsQueueNextLabel_->setText(QStringLiteral("다음 곡  ·  %1").arg(nextTitle));
-        originalsQueueNextLabel_->setToolTip(nextTitle);
-    } else {
-        originalsQueueNextLabel_->setText(QStringLiteral("마지막 곡입니다"));
-        originalsQueueNextLabel_->setToolTip({});
-    }
-    originalsQueueOverlay_->show();
-    originalsQueueOverlay_->raise();
+    // YouTube 대기열의 현재·다음 곡은 제목과 대기열에서 확인한다. 영상 위에 별도
+    // 좌측 패널을 겹치지 않아야 플레이어·OTT·오리지널 공통 상단 구조가 유지된다.
+    if (originalsQueueOverlay_)
+        originalsQueueOverlay_->hide();
 }
 
 void MainWindow::switchToMusicMode() {
     ensureMusicPage();
+    isOttMode_ = false;
     isMusicMode_ = true;
+    titleBar_->setActiveService(TitleBar::Service::Player);
     playerStack_->setCurrentWidget(musicPage_);
     controlBar_->hide();
     // 음악 모드: 타이틀바는 항상 표시 (상단고정/최소화/종료 버튼 보여야 함)
@@ -703,7 +705,9 @@ void MainWindow::switchToMusicMode() {
 }
 
 void MainWindow::switchToVideoMode() {
+    isOttMode_ = false;
     isMusicMode_ = false;
+    titleBar_->setActiveService(TitleBar::Service::Player);
     playerStack_->setCurrentIndex(0);
     controlBar_->show();
     // 스펙트럼 비활성화 (영상 모드에서는 불필요)
@@ -716,6 +720,9 @@ void MainWindow::switchToVideoMode() {
 }
 
 void MainWindow::loadMusicMeta(const QString& path) {
+    // 파일 대화상자에서 연속으로 선택하면 이전 파일의 지연 작업이 뒤늦게 도착할 수 있다.
+    // 현재 음악 재생 요청과 일치할 때만 메타데이터·앨범아트를 UI에 반영한다.
+    if (!isMusicMode_ || path != currentFilePath_) return;
     ensureMusicPage();
     auto* core = mpvWidget_->core();
     MusicMeta meta;
@@ -796,20 +803,24 @@ void MainWindow::onFileLoaded(const QString& path) {
     // 200ms 지연: MPV가 메타데이터를 완전히 로드한 후 읽음
     if (smtcManager_ && smtcManager_->isEnabled()) {
         QTimer::singleShot(200, this, [this, path]() {
+            // 새 파일 요청 뒤에는 이전 작업을 폐기한다. SMTC 갱신은 UI용 앨범아트를
+            // 다시 디스크에서 읽지 않아 파일 전환 중 이벤트 루프를 막지 않는다.
+            if (path != currentFilePath_) return;
             auto* core = mpvWidget_->core();
             QString title  = core->getProperty("media-title").toString();
             QString artist = core->getProperty("metadata/by-key/artist").toString();
             QString album  = core->getProperty("metadata/by-key/album").toString();
             if (title.isEmpty()) title = QFileInfo(path).completeBaseName();
-            // 앉범아트: 음악 모드에서는 MusicWidget의 상태를 활용
-            QPixmap art = AlbumArtExtractor::extract(path);
+            const QPixmap art = (isMusicMode_ && musicPage_)
+                ? musicPage_->currentMeta().albumArt : QPixmap();
             smtcManager_->updateMetadata(title, artist, album, art);
             smtcManager_->setPlaying(true);
         });
     }
 
     if (isMusicMode_) {
-        // 음악 모드: 메타데이터 로드 (파일 로드 후 MPV가 태그를 읽은 시점)
+        // MPV가 태그를 읽은 뒤 한 번만 메타데이터를 반영한다. 오래된 타이머는
+        // loadMusicMeta의 currentFilePath_ 검사에서 안전하게 무시된다.
         QTimer::singleShot(200, this, [this, path]() { loadMusicMeta(path); });
         musicPage_->setPlaying(true);
     } else {
@@ -857,7 +868,9 @@ void MainWindow::showTopUi() {
     if (cursor().shape() == Qt::BlankCursor) unsetCursor();
     if (mpvWidget_) mpvWidget_->unsetCursor();
     if (musicPage_) musicPage_->unsetCursor();
-    if (isPlaying_ && !isMusicMode_ && uiHideTimer_)
+    // 일반 창 모드에서는 서비스 전환을 항상 유지한다. 전체화면에서만 가장자리
+    // 노출 정책을 적용해 영상 몰입과 메뉴 접근성을 함께 보장한다.
+    if (isFullscreen_ && isPlaying_ && !isMusicMode_ && uiHideTimer_)
         uiHideTimer_->start(UI_AUTO_HIDE_DELAY_MS);
 }
 
@@ -893,7 +906,8 @@ void MainWindow::revealUiForVideoEdge(const QPoint& videoPosition) {
         if (controlBar_) controlBar_->hide();
         showTopUi();
     } else if (videoPosition.y() >= mpvWidget_->height() - BOTTOM_UI_REVEAL_ZONE) {
-        if (titleBar_) titleBar_->hide();
+        // 창 모드에서는 상단 서비스 바를 숨기지 않는다.
+        if (isFullscreen_ && titleBar_) titleBar_->hide();
         showBottomUi();
     }
 }
@@ -906,8 +920,12 @@ void MainWindow::hideUI() {
         uiVisible_ = true;
         return;
     }
-    // 음악 모드에서는 타이틀바/커서를 절대 숨기지 않음
-    if (isMusicMode_) return;
+    // 음악과 일반 창 모드에서는 타이틀바/커서를 절대 숨기지 않는다. 서비스 전환은
+    // 항상 같은 위치에 있어야 하며, 자동 숨김은 전체화면 영상 재생에만 적용한다.
+    if (isMusicMode_ || !isFullscreen_) {
+        if (titleBar_) titleBar_->show();
+        return;
+    }
     // ── 팝업/메뉴가 열려 있으면 절대 숨기지 않음 ──────────────────────────
     // QApplication 레벨 팝업(QMenu, QComboBox 드롭다운 등)이 열려 있으면 숨기지 않음
     if (QApplication::activePopupWidget() != nullptr) {
@@ -1583,13 +1601,7 @@ void MainWindow::showOriginalsPage() {
     playerStack_->setCurrentWidget(originalsPage_);
     originalsWidget_->setCurrentFile(currentFilePath_);
     showUI();
-    controlBar_->playerModeBtn()->setProperty("active", false);
-    controlBar_->ottModeBtn()->setProperty("active", false);
-    controlBar_->originalsModeBtn()->setProperty("active", true);
-    for (QPushButton* button : {controlBar_->playerModeBtn(), controlBar_->ottModeBtn(), controlBar_->originalsModeBtn()}) {
-        button->style()->unpolish(button);
-        button->style()->polish(button);
-    }
+    titleBar_->setActiveService(TitleBar::Service::Originals);
     updateWindowTitle(QStringLiteral("소리누리 오리지널"));
 }
 
@@ -2479,16 +2491,14 @@ void MainWindow::switchToPlayerMode() {
     isOttMode_ = false;
     mainStack_->setCurrentIndex(0);
     // 서비스 메뉴의 ‘플레이어’는 오리지널/OTT 컨텐츠가 아닌 실제 재생 화면으로
-    // 돌아간다. 재생 대기열과 MPV 세션은 유지하고 화면만 전환한다.
-    switchToVideoMode();
+    // 돌아간다. 재생 대기열과 MPV 세션은 유지하며, 음악은 음악 감상 화면을,
+    // 영상·YouTube는 영상 화면을 유지해야 한다.
+    if (!currentFilePath_.isEmpty() && HiFiEngine::isMusicFile(currentFilePath_))
+        switchToMusicMode();
+    else
+        switchToVideoMode();
     showUI();
-    controlBar_->playerModeBtn()->setProperty("active", true);
-    controlBar_->ottModeBtn()->setProperty("active", false);
-    controlBar_->originalsModeBtn()->setProperty("active", false);
-    for (QPushButton* button : {controlBar_->playerModeBtn(), controlBar_->ottModeBtn(), controlBar_->originalsModeBtn()}) {
-        button->style()->unpolish(button);
-        button->style()->polish(button);
-    }
+    titleBar_->setActiveService(TitleBar::Service::Player);
     updateWindowTitle();
 }
 
@@ -2504,12 +2514,8 @@ void MainWindow::switchToOttMode() {
         connect(ottPage_, &OttWidget::titleChanged, this, [this](const QString& t) {
             if (isOttMode_) updateWindowTitle(t);
         });
-        // OTT 웹 방문 기록과 독립된 명시적 복귀 요청은 기존 플레이어 모드 전환만 사용한다.
-        // 재생 상태·오디오 엔진·WebView2 인스턴스는 유지한다.
         connect(ottPage_, &OttWidget::returnToPlayerRequested,
                 this, &MainWindow::switchToPlayerMode);
-        connect(ottPage_, &OttWidget::originalsRequested,
-                this, &MainWindow::showOriginalsPage);
     }
         mainStack_->setCurrentIndex(1);
     // OTT에서도 창 상단 메뉴는 유지한다. WebView2 안으로 들어가도 앱 조작 경로를 잃지 않는다.
@@ -2518,13 +2524,7 @@ void MainWindow::switchToOttMode() {
     if (adManager_)
         adManager_->fetchAd("ott");
 
-    controlBar_->playerModeBtn()->setProperty("active", false);
-    controlBar_->ottModeBtn()->setProperty("active", true);
-    controlBar_->originalsModeBtn()->setProperty("active", false);
-    for (QPushButton* button : {controlBar_->playerModeBtn(), controlBar_->ottModeBtn(), controlBar_->originalsModeBtn()}) {
-        button->style()->unpolish(button);
-        button->style()->polish(button);
-    }
+    titleBar_->setActiveService(TitleBar::Service::Ott);
     updateWindowTitle("소리누리 OTT");
 }
 

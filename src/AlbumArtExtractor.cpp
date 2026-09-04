@@ -34,7 +34,12 @@ QPixmap AlbumArtExtractor::fromId3v2(const QString& path) {
 
     const int verMajor = uchar(header[3]);
     const bool syncsafeFrames = (verMajor >= 4);
-    quint32 tagSize = syncsafeToUint(reinterpret_cast<const uchar*>(header.constData() + 6));
+    const quint32 tagSize = syncsafeToUint(reinterpret_cast<const uchar*>(header.constData() + 6));
+    // 손상된 ID3 헤더가 비정상적인 태그 길이를 보고하면 UI 스레드에서 대량 읽기를
+    // 하지 않는다. 앨범아트가 없어도 재생은 즉시 계속되어야 한다.
+    constexpr quint32 kMaxTagBytes = 16U * 1024U * 1024U;
+    if (tagSize > kMaxTagBytes || tagSize > static_cast<quint64>(qMax<qint64>(0, f.size() - 10)))
+        return {};
 
     QByteArray tag = f.read(tagSize);
     int pos = 0;
@@ -94,6 +99,10 @@ QPixmap AlbumArtExtractor::fromFlac(const QString& path) {
                                   (quint32(uchar(bh[2])) << 8)  |
                                    quint32(uchar(bh[3]));
         if (type == 6) {  // PICTURE
+            // 손상된 메타데이터는 앨범아트 없이 건너뛰고 파일 재생을 우선한다.
+            constexpr quint32 kMaxPictureBlockBytes = 24U * 1024U * 1024U;
+            if (blockSize > kMaxPictureBlockBytes || blockSize > static_cast<quint64>(f.bytesAvailable()))
+                return {};
             QByteArray block = f.read(blockSize);
             if (block.size() < int(blockSize)) break;
             QDataStream ds(block);

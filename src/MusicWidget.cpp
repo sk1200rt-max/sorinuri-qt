@@ -26,19 +26,14 @@ static QLabel* makeBadge(const QString& text, const QString& color, QWidget* par
     return lbl;
 }
 
-static QPixmap blurPixmap(const QPixmap& src, int radius) {
+static QPixmap blurPixmap(const QPixmap& src, int) {
     if (src.isNull()) return src;
-    QImage img = src.toImage().scaled(300, 300, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
-    for (int pass = 0; pass < radius; ++pass)
-        for (int y = 1; y < img.height()-1; ++y)
-            for (int x = 1; x < img.width()-1; ++x) {
-                int r=0,g=0,b=0;
-                for (int dy=-1;dy<=1;++dy) for (int dx=-1;dx<=1;++dx) {
-                    QRgb c=img.pixel(x+dx,y+dy); r+=qRed(c); g+=qGreen(c); b+=qBlue(c);
-                }
-                img.setPixel(x,y,qRgb(r/9,g/9,b/9));
-            }
-    return QPixmap::fromImage(img);
+    // 픽셀 단위 다중 블러는 큰 앨범아트에서 UI 이벤트 루프를 길게 점유한다.
+    // 축소 뒤 부드러운 확대는 배경 질감은 유지하면서 파일 전환을 즉시 끝낸다.
+    const QImage small = src.toImage().scaled(96, 96, Qt::IgnoreAspectRatio,
+                                               Qt::FastTransformation);
+    return QPixmap::fromImage(small.scaled(320, 320, Qt::IgnoreAspectRatio,
+                                            Qt::SmoothTransformation));
 }
 
 static QColor extractDominant(const QPixmap& src) {
@@ -466,29 +461,11 @@ void MusicWidget::setupUI(){
     seekRow->addWidget(volSlider_);
     root->addLayout(seekRow);
 
-    // ── 하단 컨트롤바 ───────────────────────────────────────────────
-    auto* bottomRow=new QHBoxLayout;bottomRow->setContentsMargins(20,4,20,8);bottomRow->setSpacing(8);
-    speedLabel_=new QLabel("1.0x",this);
-    speedLabel_->setStyleSheet("font-size:12px;color:#A3B1B0;font-family:'Cascadia Mono','Consolas';font-weight:600;");
-    btnMini_=new QPushButton("미니",this);btnMini_->setFixedSize(42,28);
-    btnMini_->setFocusPolicy(Qt::NoFocus);
-    btnMini_->setToolTip("미니 플레이어 (M)");
-    btnMini_->setStyleSheet("QPushButton{background:transparent;border:1px solid transparent;border-radius:7px;font-size:11px;color:#A3B1B0;font-weight:700;}QPushButton:hover{color:#F2F7F6;background:#1C292A;border-color:#2B3B3C;}");
-    btnCompact_=new QPushButton("컴팩트",this);btnCompact_->setFixedSize(58,28);
-    btnCompact_->setFocusPolicy(Qt::NoFocus);
-    btnCompact_->setToolTip("소형 모드 전환");
-    btnCompact_->setStyleSheet("QPushButton{background:transparent;border:1px solid transparent;border-radius:7px;font-size:11px;color:#A3B1B0;font-family:'Segoe UI';font-weight:700;}QPushButton:hover{color:#F2F7F6;background:#1C292A;border-color:#2B3B3C;}");
-    btnSettings_=new QPushButton("설정",this);btnSettings_->setFixedSize(42,28);
-    btnSettings_->setFocusPolicy(Qt::NoFocus);
-    btnSettings_->setToolTip("설정");
-    btnSettings_->setStyleSheet("QPushButton{background:transparent;border:1px solid transparent;border-radius:7px;font-size:11px;color:#A3B1B0;font-weight:700;}QPushButton:hover{color:#F2F7F6;background:#1C292A;border-color:#2B3B3C;}");
-    bottomRow->addWidget(speedLabel_);bottomRow->addStretch();
-    bottomRow->addWidget(btnCompact_);bottomRow->addWidget(btnMini_);bottomRow->addWidget(btnSettings_);
-    root->addLayout(bottomRow);
-
+    // 음악의 보조 도구(컴팩트·미니·환경 설정)는 공통 상단바의 도구 메뉴로 이동한다.
+    // 이 화면에는 감상에 필요한 재생 상태와 실제 출력 정보만 남긴다.
     statusBar_=new QLabel("FLAC  ·  DECODE  ·  2.0  ·  192kHz  ·  24bit  ·  BIT-PERFECT",this);
     statusBar_->setAlignment(Qt::AlignCenter);
-    statusBar_->setStyleSheet("font-size:10px;color:#71807F;font-family:'Cascadia Mono','Consolas';background:#0A0F10;border-top:1px solid #1C292A;padding:5px 0;");
+    statusBar_->setStyleSheet("font-size:10px;color:#71807F;font-family:'Cascadia Mono','Consolas';background:#0A0F10;border-top:1px solid #1C292A;padding:7px 0;");
     root->addWidget(statusBar_);
 }
 
@@ -534,9 +511,6 @@ void MusicWidget::setupConnections(){
             btnVolume_->setText("🔊");
         }
     });
-    connect(btnMini_,&QPushButton::clicked,this,&MusicWidget::miniModeRequested);
-    connect(btnCompact_,&QPushButton::clicked,this,&MusicWidget::compactModeRequested);
-    connect(btnSettings_,&QPushButton::clicked,this,&MusicWidget::settingsRequested);
     connect(btnShowLyrics_,&QPushButton::clicked,this,[this](){onRightPanelToggle(0);});
     connect(btnShowEq_,&QPushButton::clicked,this,[this](){onRightPanelToggle(1);});
     connect(btnShowPlaylist_,&QPushButton::clicked,this,[this](){onRightPanelToggle(2);});
