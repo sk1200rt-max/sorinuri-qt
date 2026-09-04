@@ -1,5 +1,14 @@
 [
   {
+    "version": "6.20.9",
+    "date": "2026-09-04",
+    "title": "OTT 오리지널 화면 전환 안정화",
+    "desc": "OTT에서 소리누리 오리지널을 선택할 때 하단 패널이 아닌 독립 음악 화면으로 열리도록 수정하고 플레이어 복귀 경로를 정리했습니다.",
+    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.20.9.exe",
+    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.20.9-Portable.zip",
+    "tags": []
+  },
+  {
     "version": "6.20.8",
     "date": "2026-09-04",
     "title": "OTT 접근성·홈 UI 정리·시작 경량화",

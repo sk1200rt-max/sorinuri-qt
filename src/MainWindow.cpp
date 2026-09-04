@@ -1383,6 +1383,120 @@ void MainWindow::keyPressEvent(QKeyEvent* e) {
     }
 }
 
+void MainWindow::ensureOriginalsPage() {
+    if (originalsPage_) return;
+
+    // OTT에서 선택한 오리지널은 하단 전문 기능 패널이 아니라 main player 영역 전체에 표시한다.
+    // 재생 컨트롤은 공통 ControlBar에 계속 남겨 재생 중인 음악도 즉시 제어할 수 있다.
+    originalsPage_ = new QWidget(playerStack_);
+    originalsPage_->setObjectName("originalsPage");
+    originalsPage_->setStyleSheet(
+        "QWidget#originalsPage { background: #0b1011; }"
+        "QWidget#originalsHeader { background: #101819; border-bottom: 1px solid #1d3233; }"
+        "QLabel#originalsTitle { color: #f2f7f7; font-size: 18px; font-weight: 700; }"
+        "QLabel#originalsSubtitle { color: #88a3a3; font-size: 11px; }"
+        "QPushButton#originalsBack { background: transparent; color: #b9d8d5; border: 1px solid #2a4a49;"
+        " border-radius: 6px; padding: 7px 12px; font-weight: 600; }"
+        "QPushButton#originalsBack:hover { color: #06201c; background: #00d4b4; border-color: #00d4b4; }");
+
+    auto* pageLayout = new QVBoxLayout(originalsPage_);
+    pageLayout->setContentsMargins(0, 0, 0, 0);
+    pageLayout->setSpacing(0);
+
+    auto* header = new QWidget(originalsPage_);
+    header->setObjectName("originalsHeader");
+    auto* headerLayout = new QHBoxLayout(header);
+    headerLayout->setContentsMargins(22, 12, 22, 12);
+    headerLayout->setSpacing(12);
+
+    auto* titleLayout = new QVBoxLayout();
+    titleLayout->setContentsMargins(0, 0, 0, 0);
+    titleLayout->setSpacing(2);
+    auto* title = new QLabel(QStringLiteral("소리누리 오리지널"), header);
+    title->setObjectName("originalsTitle");
+    auto* subtitle = new QLabel(QStringLiteral("장르·상황별 음악 탐색과 연속 재생"), header);
+    subtitle->setObjectName("originalsSubtitle");
+    titleLayout->addWidget(title);
+    titleLayout->addWidget(subtitle);
+
+    auto* backButton = new QPushButton(QStringLiteral("← 플레이어로 돌아가기"), header);
+    backButton->setObjectName("originalsBack");
+    backButton->setFocusPolicy(Qt::NoFocus);
+    backButton->setToolTip(QStringLiteral("일반 플레이어 화면으로 돌아가기"));
+    connect(backButton, &QPushButton::clicked, this, [this]() {
+        const int lastPage = qMax(0, playerStack_->count() - 1);
+        playerStack_->setCurrentIndex(qBound(0, originalsReturnIndex_, lastPage));
+        showUI();
+        updateWindowTitle();
+    });
+
+    headerLayout->addLayout(titleLayout);
+    headerLayout->addStretch(1);
+    headerLayout->addWidget(backButton);
+    pageLayout->addWidget(header);
+
+    originalsWidget_ = new OriginalsWidget(originalsPage_);
+    pageLayout->addWidget(originalsWidget_, 1);
+    playerStack_->addWidget(originalsPage_);
+
+    // 기존 통합 PlaybackQueue를 그대로 사용해 원본 음원·YouTube·저장 재생목록·반복 상태를 보존한다.
+    connect(originalsWidget_, &OriginalsWidget::queueRequested,
+            this, [this](const QList<PlaybackQueue::Entry>& entries, int startIndex) {
+        playQueue(entries, startIndex);
+    });
+    connect(originalsWidget_, &OriginalsWidget::savePlaylistRequested,
+            this, [this](const QList<PlaybackQueue::Entry>& entries) {
+        bool accepted = false;
+        const QString name = QInputDialog::getText(this, QStringLiteral("재생목록 저장"),
+                                                   QStringLiteral("재생목록 이름:"),
+                                                   QLineEdit::Normal, {}, &accepted).trimmed();
+        if (!accepted || name.isEmpty()) return;
+        if (!playbackQueue_->saveNamedPlaylist(name, entries)) return;
+        originalsWidget_->setSavedPlaylistNames(playbackQueue_->savedPlaylistNames());
+        if (osdWidget_) osdWidget_->showInfo(QStringLiteral("♪ 재생목록 저장: %1").arg(name), 1800);
+    });
+    connect(originalsWidget_, &OriginalsWidget::loadSavedPlaylistRequested,
+            this, [this](const QString& name) {
+        const QList<PlaybackQueue::Entry> entries = playbackQueue_->loadNamedPlaylist(name);
+        if (!entries.isEmpty()) playQueue(entries);
+    });
+    connect(originalsWidget_, &OriginalsWidget::deleteSavedPlaylistRequested,
+            this, [this](const QString& name) {
+        if (!playbackQueue_->removeNamedPlaylist(name)) return;
+        originalsWidget_->setSavedPlaylistNames(playbackQueue_->savedPlaylistNames());
+        if (osdWidget_) osdWidget_->showInfo(QStringLiteral("재생목록 삭제: %1").arg(name), 1600);
+    });
+    connect(originalsWidget_, &OriginalsWidget::repeatModeRequested,
+            this, [this](PlaybackQueue::RepeatMode mode) { playbackQueue_->setRepeatMode(mode); });
+    originalsWidget_->setSavedPlaylistNames(playbackQueue_->savedPlaylistNames());
+    originalsWidget_->setRepeatMode(playbackQueue_->repeatMode());
+    originalsWidget_->setCurrentFile(currentFilePath_);
+}
+
+void MainWindow::showOriginalsPage() {
+    ensureOriginalsPage();
+    if (playerStack_->currentWidget() != originalsPage_)
+        originalsReturnIndex_ = playerStack_->currentIndex();
+
+    // OTT의 웹 화면·하단 전문 기능 패널을 모두 벗어나 오리지널 전용 페이지로 전환한다.
+    isOttMode_ = false;
+    mainStack_->setCurrentWidget(playerPage_);
+    if (proFeatures_ && proFeatures_->isVisible()) {
+        proFeatures_->hide();
+        isProFeaturesOpen_ = false;
+    }
+    playerStack_->setCurrentWidget(originalsPage_);
+    originalsWidget_->setCurrentFile(currentFilePath_);
+    showUI();
+    controlBar_->playerModeBtn()->setProperty("active", true);
+    controlBar_->ottModeBtn()->setProperty("active", false);
+    controlBar_->playerModeBtn()->style()->unpolish(controlBar_->playerModeBtn());
+    controlBar_->playerModeBtn()->style()->polish(controlBar_->playerModeBtn());
+    controlBar_->ottModeBtn()->style()->unpolish(controlBar_->ottModeBtn());
+    controlBar_->ottModeBtn()->style()->polish(controlBar_->ottModeBtn());
+    updateWindowTitle(QStringLiteral("소리누리 오리지널"));
+}
+
 void MainWindow::toggleProFeatures() {
     ensureProFeatures();
     // 상태 플래그를 추정으로 토글하지 않는다. 사이드 탭·닫기 버튼·단축키가
@@ -1590,7 +1704,8 @@ void MainWindow::toggleProFeatures() {
 
             proFeatures_->addTab(statsWidget_, "재생 통계");
         }
-        // SORINURI ORIGINALS 탭
+        // SORINURI ORIGINALS는 playerStack_의 독립 페이지를 사용한다. 기존 하단 탭 중복 생성을 막는다.
+        ensureOriginalsPage();
         if (!originalsWidget_) {
             originalsWidget_ = new OriginalsWidget(proFeatures_);
             proFeatures_->addTab(originalsWidget_, "♪ ORIGINALS");
@@ -2294,15 +2409,8 @@ void MainWindow::switchToOttMode() {
         // 재생 상태·오디오 엔진·WebView2 인스턴스는 유지한다.
         connect(ottPage_, &OttWidget::returnToPlayerRequested,
                 this, &MainWindow::switchToPlayerMode);
-        connect(ottPage_, &OttWidget::originalsRequested, this, [this]() {
-            // 기존 OriginalsWidget과 PlaybackQueue를 재사용한다. OTT 전용 재생 경로나
-            // 별도 YouTube 처리를 만들지 않으므로 연속 재생·반복·저장 목록도 보존된다.
-            switchToPlayerMode();
-            if (!proFeatures_ || !proFeatures_->isVisible())
-                toggleProFeatures();
-            if (proFeatures_)
-                proFeatures_->setCurrentTabByName("ORIGINALS");
-        });
+        connect(ottPage_, &OttWidget::originalsRequested,
+                this, &MainWindow::showOriginalsPage);
     }
         mainStack_->setCurrentIndex(1);
     // OTT에서도 창 상단 메뉴는 유지한다. WebView2 안으로 들어가도 앱 조작 경로를 잃지 않는다.

@@ -18,7 +18,7 @@
   6. src/main.cpp - app.setApplicationVersion()
   7. sorinuri.com/index.html - 버전, 다운로드 링크, 릴리즈 노트 (--title/--desc 제공 시)
 """
-import sys, re, os, argparse, json
+import sys, re, os, argparse, json, subprocess
 
 
 def bump(new_ver, scope, purpose):
@@ -80,11 +80,17 @@ def bump(new_ver, scope, purpose):
     scope_dir = os.path.join(root, '.release')
     os.makedirs(scope_dir, exist_ok=True)
     scope_path = os.path.join(scope_dir, 'scope.json')
+    # 이전 테스트 버전 태그가 없더라도, 이번 변경 직전 master 커밋부터만
+    # 릴리즈 게이트를 검사해 과거 변경을 새 릴리즈 범위에 섞지 않는다.
+    base_commit = subprocess.check_output(
+        ['git', '-C', root, 'rev-parse', 'HEAD'], text=True
+    ).strip()
     with open(scope_path, 'w', encoding='utf-8') as f:
         json.dump({
             'version': new_ver,
             'domain': scope,
             'purpose': purpose,
+            'base_commit': base_commit,
         }, f, ensure_ascii=False, indent=2)
         f.write('\n')
     changed.append('.release/scope.json')

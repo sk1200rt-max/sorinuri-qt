@@ -103,6 +103,7 @@ private slots:
     // 모드 전환
     void switchToPlayerMode();
     void switchToOttMode();
+    void showOriginalsPage();  // 하단 전문 기능 패널이 아닌 플레이어 영역 전체의 오리지널 음악 화면
     void switchToMusicMode();
     void switchToVideoMode();
 
@@ -124,6 +125,7 @@ private:
     void setupUI();
     void setupConnections();
     void ensureProFeatures();  // 첫 사용 시 생성하여 초기 창 표시를 우선한다.
+    void ensureOriginalsPage(); // 하단 패널과 분리된 오리지널 음악 페이지를 최초 요청 시 생성한다.
     void ensureMusicPage();    // 첫 음악 재생 시 생성하여 타이머·컨트롤 초기화를 지연한다.
     void loadSettings();
     void saveSettings();
@@ -156,6 +158,7 @@ private:
     QWidget*        videoPage_         = nullptr;
     QWidget*        musicPlaceholder_  = nullptr;
     MusicWidget*    musicPage_         = nullptr;
+    QWidget*        originalsPage_      = nullptr;  // 플레이어 영역 전체의 오리지널 음악 페이지
 
     // 위젯
     TitleBar*          titleBar_        = nullptr;
@@ -196,6 +199,7 @@ private:
     bool   isOttMode_         = false;
     bool   isMusicMode_       = false;
     bool   isProFeaturesOpen_ = false;
+    int    originalsReturnIndex_ = 0;
     bool   isPlaying_         = false;
     bool   uiVisible_         = true;
     QTimer* uiHideTimer_      = nullptr;

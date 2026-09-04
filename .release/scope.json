@@ -1,6 +1,6 @@
 {
-  "version": "6.20.8",
+  "version": "6.20.9",
   "domain": "ui",
-  "purpose": "OTT 복귀·상단 접근성·오리지널 진입 UI 정리 및 비핵심 클라우드 초기화 지연",
-  "base_commit": "3a08ba1"
+  "purpose": "OTT 오리지널 독립 화면 전환 및 하단 패널 중첩 해소",
+  "base_commit": "e8405e18724def667d0d8e81f929f32175d8c4e6"
 }
