@@ -50,13 +50,15 @@ if remove_index < 0 or lock_index < 0 or remove_index < lock_index:
     print("다중 인스턴스 검증 실패: stale IPC endpoint 정리가 coordinator lock 뒤에 있지 않습니다.", file=sys.stderr)
     sys.exit(1)
 
-# multi-session이 되면 init·resume에서 반드시 exclusive=no와 audio-spdif 빈 값을 쓴다.
+# MultiShared와 OnlineShared는 init·resume에서 반드시 exclusive=no와 audio-spdif 빈 값을 쓴다.
+# 온라인 YouTube 정책까지 포괄하되, 단일 HDMI 재생의 저장된 고음질 선호는 유지한다.
 policy_start = core_cpp.find("void MpvCore::applyAudioSessionPolicy")
 policy_end = core_cpp.find("void MpvCore::setAudioDevice", policy_start)
 policy_section = core_cpp[policy_start:policy_end]
 for needle in (
-    'const bool exclusive = !multiShared',
-    'const bool passthrough = !multiShared',
+    'const bool sharedPcm = audioSessionPolicy_ != AudioSessionPolicy::SinglePreferred',
+    'const bool exclusive = !sharedPcm && settings.value("audio/exclusive", true).toBool()',
+    'const bool passthrough = !sharedPcm && settings.value("audio/passthrough", true).toBool()',
     'mpv_set_property_string(mpv_, "audio-exclusive", exclusive ? "yes" : "no")',
     'mpv_set_property_string(mpv_, "audio-spdif",',
     'mpv_set_property_string(mpv_, "audio-channels", "auto")',
@@ -83,7 +85,7 @@ if "if (!multiInstanceAudioLocked_)" not in apply_section:
     print("다중 인스턴스 검증 실패: 설정 저장이 다중 오디오 잠금 상태를 구분하지 않습니다.", file=sys.stderr)
     sys.exit(1)
 
-# MultiShared 상태에서 런타임 단축키가 exclusive를 재활성화하면 안 된다.
+# shared PCM 상태에서 런타임 단축키가 exclusive를 재활성화하면 안 된다.
 shortcut_start = window_cpp.find("case Qt::Key_E:")
 shortcut_end = window_cpp.find("case Qt::Key_Plus:", shortcut_start)
 shortcut_section = window_cpp[shortcut_start:shortcut_end]
