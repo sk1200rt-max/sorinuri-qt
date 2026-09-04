@@ -287,263 +287,214 @@ OriginalsWidget::OriginalsWidget(QWidget* parent) : QWidget(parent) {
 
 // ── UI 구성 ──────────────────────────────────────────────────────────────────
 void OriginalsWidget::setupUI() {
+    // 오리지널은 설정 바를 나열하는 화면이 아니라, 선택하고 바로 감상하는 독립 카탈로그다.
     auto* root = new QVBoxLayout(this);
     root->setContentsMargins(0, 0, 0, 0);
     root->setSpacing(0);
 
-    // ── 헤더 ─────────────────────────────────────────────────────────────
-    auto* header = new QWidget(this);
-    header->setFixedHeight(50);
-    header->setStyleSheet(QString(
-        "background: qlineargradient(x1:0,y1:0,x2:1,y2:0,"
-        "stop:0 #0a1a18, stop:0.6 %1, stop:1 %1);"
-        "border-bottom: 1px solid %2;").arg(BG2).arg(BORDER));
-    auto* hRow = new QHBoxLayout(header);
-    hRow->setContentsMargins(14, 0, 14, 0);
-    hRow->setSpacing(10);
+    auto* catalogHeader = new QWidget(this);
+    catalogHeader->setObjectName("originalsCatalogHeader");
+    catalogHeader->setStyleSheet(
+        "QWidget#originalsCatalogHeader{background:#0D1617;border-bottom:1px solid #203231;}"
+        "QLabel{background:transparent;}");
+    auto* headerLayout = new QVBoxLayout(catalogHeader);
+    headerLayout->setContentsMargins(32, 22, 32, 16);
+    headerLayout->setSpacing(13);
+    auto* titleRow = new QHBoxLayout();
+    titleRow->setContentsMargins(0, 0, 0, 0);
+    auto* titleBlock = new QVBoxLayout();
+    titleBlock->setContentsMargins(0, 0, 0, 0);
+    titleBlock->setSpacing(3);
+    auto* eyebrow = new QLabel(QStringLiteral("SORINURI ORIGINALS  ·  CURATED MUSIC"), catalogHeader);
+    eyebrow->setStyleSheet("color:#00D4B4;font-size:10px;font-weight:800;letter-spacing:1.5px;");
+    auto* title = new QLabel(QStringLiteral("당신의 순간에 맞는 음악"), catalogHeader);
+    title->setStyleSheet("color:#F1F7F5;font-size:26px;font-weight:750;letter-spacing:-0.4px;");
+    auto* subtitle = new QLabel(QStringLiteral("장르와 상황으로 고르고, 선택한 곡만 바로 이어서 들을 수 있습니다."), catalogHeader);
+    subtitle->setStyleSheet("color:#8FA39F;font-size:12px;");
+    titleBlock->addWidget(eyebrow);
+    titleBlock->addWidget(title);
+    titleBlock->addWidget(subtitle);
+    titleRow->addLayout(titleBlock, 1);
+    statusLabel_ = new QLabel(catalogHeader);
+    statusLabel_->setStyleSheet("color:#829793;font-size:11px;font-weight:700;padding:5px 9px;background:#132221;border:1px solid #29423E;border-radius:9px;");
+    titleRow->addWidget(statusLabel_, 0, Qt::AlignTop);
+    headerLayout->addLayout(titleRow);
 
-    auto* titleLbl = new QLabel("♪  SORINURI ORIGINALS", header);
-    titleLbl->setStyleSheet(QString(
-        "color: %1; font-size: 13px; font-weight: 800; letter-spacing: 2px;"
-        "background: transparent;").arg(MINT));
-
-    statusLabel_ = new QLabel("", header);
-    statusLabel_->setStyleSheet("color: #555; font-size: 10px; background: transparent;");
-
-    hRow->addWidget(titleLbl);
-    hRow->addStretch();
-    hRow->addWidget(statusLabel_);
-    root->addWidget(header);
-
-    // ── 검색 + 정렬 바 ───────────────────────────────────────────────────
-    auto* searchBar = new QWidget(this);
-    searchBar->setFixedHeight(44);
-    searchBar->setStyleSheet(QString("background: %1; border-bottom: 1px solid %2;")
-                              .arg(BG2).arg(BORDER));
-    auto* sRow = new QHBoxLayout(searchBar);
-    sRow->setContentsMargins(10, 6, 10, 6);
-    sRow->setSpacing(8);
-
-    searchEdit_ = new QLineEdit(searchBar);
-    searchEdit_->setPlaceholderText("🔍  제목, 아티스트, 태그 검색...");
-    searchEdit_->setStyleSheet(QString(
-        "QLineEdit { background: %1; color: %2; border: 1px solid %3;"
-        "border-radius: 5px; padding: 4px 10px; font-size: 11px; }"
-        "QLineEdit:focus { border-color: %4; }").arg(BG3).arg(TEXT).arg(BORDER).arg(MINT));
-    connect(searchEdit_, &QLineEdit::textChanged,
-            this, &OriginalsWidget::onSearchChanged);
-
-    sortCombo_ = new QComboBox(searchBar);
+    auto* commandRow = new QHBoxLayout();
+    commandRow->setContentsMargins(0, 0, 0, 0);
+    commandRow->setSpacing(8);
+    searchEdit_ = new QLineEdit(catalogHeader);
+    searchEdit_->setPlaceholderText(QStringLiteral("제목, 아티스트, 태그 검색"));
+    searchEdit_->setMinimumWidth(280);
+    searchEdit_->setFixedHeight(36);
+    searchEdit_->setStyleSheet(
+        "QLineEdit{background:#101D1D;color:#EAF5F2;border:1px solid #2B4541;border-radius:8px;padding:0 12px;font-size:12px;}"
+        "QLineEdit:focus{border-color:#00D4B4;background:#132524;}");
+    connect(searchEdit_, &QLineEdit::textChanged, this, &OriginalsWidget::onSearchChanged);
+    sortCombo_ = new QComboBox(catalogHeader);
     sortCombo_->addItems({"기본순", "제목순", "장르순", "상황순", "밝은 곡", "잔잔한 곡"});
-    sortCombo_->setFixedWidth(94);
-    sortCombo_->setStyleSheet(QString(
-        "QComboBox { background: %1; color: %2; border: 1px solid %3;"
-        "border-radius: 5px; padding: 3px 8px; font-size: 11px; }"
-        "QComboBox::drop-down { border: none; }"
-        "QComboBox QAbstractItemView { background: %1; color: %2; "
-        "selection-background-color: %4; }").arg(BG3).arg(TEXT).arg(BORDER).arg(MINT));
-    connect(sortCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged),
-            this, &OriginalsWidget::onSortChanged);
-
-    selectModeBtn_ = new QPushButton(QStringLiteral("곡 선택"), searchBar);
-    selectModeBtn_->setFixedHeight(27);
+    sortCombo_->setFixedSize(100, 36);
+    sortCombo_->setFocusPolicy(Qt::NoFocus);
+    sortCombo_->setStyleSheet(
+        "QComboBox{background:#132221;color:#C9D9D5;border:1px solid #2B4541;border-radius:8px;padding:0 10px;font-size:11px;font-weight:600;}"
+        "QComboBox:hover{border-color:#00D4B4;}QComboBox::drop-down{border:none;}"
+        "QComboBox QAbstractItemView{background:#12201F;color:#EAF5F2;selection-background-color:#19564C;border:1px solid #34514C;}");
+    connect(sortCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &OriginalsWidget::onSortChanged);
+    selectModeBtn_ = new QPushButton(QStringLiteral("곡 선택"), catalogHeader);
+    selectModeBtn_->setFixedHeight(36);
     selectModeBtn_->setCursor(Qt::PointingHandCursor);
     selectModeBtn_->setFocusPolicy(Qt::NoFocus);
+    selectModeBtn_->setStyleSheet(
+        "QPushButton{background:#17322E;color:#D5F5EE;border:1px solid #3D665D;border-radius:8px;padding:0 13px;font-size:11px;font-weight:750;}"
+        "QPushButton:hover{background:#00B89D;color:#06221E;border-color:#00D4B4;}");
     connect(selectModeBtn_, &QPushButton::clicked, this, &OriginalsWidget::onSelectionModeClicked);
+    commandRow->addWidget(searchEdit_, 1);
+    commandRow->addWidget(sortCombo_);
+    commandRow->addWidget(selectModeBtn_);
+    headerLayout->addLayout(commandRow);
+    root->addWidget(catalogHeader);
 
-    sRow->addWidget(searchEdit_, 1);
-    sRow->addWidget(sortCombo_);
-    sRow->addWidget(selectModeBtn_);
-    root->addWidget(searchBar);
-
-    // ── 전체·상황별·장르별 탐색 모드 ────────────────────────────────────
-    auto* browseBar = new QWidget(this);
-    browseBar->setFixedHeight(36);
-    browseBar->setStyleSheet(QString("background: %1; border-bottom: 1px solid %2;")
-                               .arg(BG).arg(BORDER));
-    auto* browseRow = new QHBoxLayout(browseBar);
-    browseRow->setContentsMargins(10, 4, 10, 4);
-    browseRow->setSpacing(5);
-    const QStringList browseLabels = {"전체", "상황별", "장르별"};
+    auto* discoveryBar = new QWidget(this);
+    discoveryBar->setObjectName("originalsDiscoveryBar");
+    discoveryBar->setStyleSheet("QWidget#originalsDiscoveryBar{background:#0A1011;border-bottom:1px solid #1D2C2B;}");
+    auto* discoveryLayout = new QVBoxLayout(discoveryBar);
+    discoveryLayout->setContentsMargins(32, 10, 32, 9);
+    discoveryLayout->setSpacing(7);
+    auto* browseRow = new QHBoxLayout();
+    browseRow->setContentsMargins(0, 0, 0, 0);
+    browseRow->setSpacing(6);
+    const QStringList browseLabels = {QStringLiteral("전체 음악"), QStringLiteral("상황별"), QStringLiteral("장르별")};
     for (int mode = 0; mode < browseLabels.size(); ++mode) {
-        auto* btn = new QPushButton(browseLabels.at(mode), browseBar);
-        btn->setFixedHeight(25);
-        btn->setCursor(Qt::PointingHandCursor);
-        btn->setFocusPolicy(Qt::NoFocus);
-        connect(btn, &QPushButton::clicked, this, [this, mode]() { onBrowseModeClicked(mode); });
-        browseBtns_.append(btn);
-        browseRow->addWidget(btn);
+        auto* button = new QPushButton(browseLabels.at(mode), discoveryBar);
+        button->setFixedHeight(28);
+        button->setCursor(Qt::PointingHandCursor);
+        button->setFocusPolicy(Qt::NoFocus);
+        connect(button, &QPushButton::clicked, this, [this, mode]() { onBrowseModeClicked(mode); });
+        browseBtns_.append(button);
+        browseRow->addWidget(button);
     }
-    browseRow->addStretch();
-    root->addWidget(browseBar);
-    updateBrowseButtons();
+    browseRow->addStretch(1);
+    discoveryLayout->addLayout(browseRow);
 
-    // ── 선택한 탐색 모드의 실제 데이터 기반 필터 바 ─────────────────────
-    catBar_ = new QWidget(this);
-    catBar_->setFixedHeight(38);
-    catBar_->setStyleSheet(QString("background: %1; border-bottom: 1px solid %2;")
-                            .arg(BG).arg(BORDER));
-    auto* catScroll = new QScrollArea(this);
-    catScroll->setWidget(catBar_);
+    auto* catScroll = new QScrollArea(discoveryBar);
+    catScroll->setFrameShape(QFrame::NoFrame);
     catScroll->setWidgetResizable(false);
-    catScroll->setFixedHeight(40);
+    catScroll->setFixedHeight(34);
     catScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     catScroll->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    catScroll->setStyleSheet("QScrollArea { border: none; background: transparent; }");
+    catScroll->setStyleSheet("QScrollArea{background:transparent;border:none;}");
+    catBar_ = new QWidget(catScroll);
+    catBar_->setStyleSheet("background:transparent;");
     auto* catRow = new QHBoxLayout(catBar_);
-    catRow->setContentsMargins(10, 4, 10, 4);
+    catRow->setContentsMargins(0, 0, 0, 0);
     catRow->setSpacing(5);
-    catRow->addStretch();
-    root->addWidget(catScroll);
+    catRow->addStretch(1);
+    catScroll->setWidget(catBar_);
+    discoveryLayout->addWidget(catScroll);
+    root->addWidget(discoveryBar);
+    updateBrowseButtons();
 
-    // ── 곡 목록 ──────────────────────────────────────────────────────────
-    listWidget_ = new QListWidget(this);
-    listWidget_->setStyleSheet(QString(
-        "QListWidget { background: %1; border: none; outline: none; }"
-        "QListWidget::item { border: none; }"
-        "QListWidget::item:selected { background: rgba(0,212,180,0.08); }"
-        "QListWidget::item:hover { background: rgba(255,255,255,0.04); }"
-        "QScrollBar:vertical { background: %2; width: 6px; border: none; }"
-        "QScrollBar::handle:vertical { background: #333; border-radius: 3px; min-height: 30px; }"
-        "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }"
-    ).arg(BG).arg(BG));
+    auto* listFrame = new QWidget(this);
+    listFrame->setObjectName("originalsListFrame");
+    listFrame->setStyleSheet("QWidget#originalsListFrame{background:#0B1011;}");
+    auto* listLayout = new QVBoxLayout(listFrame);
+    listLayout->setContentsMargins(24, 12, 24, 0);
+    listLayout->setSpacing(7);
+    auto* listHeader = new QHBoxLayout();
+    auto* listHint = new QLabel(QStringLiteral("곡을 두 번 클릭하면 바로 재생합니다"), listFrame);
+    listHint->setStyleSheet("color:#637976;font-size:10px;");
+    auto* listSortHint = new QLabel(QStringLiteral("선택 재생 · YouTube 연속 재생 지원"), listFrame);
+    listSortHint->setStyleSheet("color:#6F8A85;font-size:10px;");
+    listHeader->addWidget(listHint);
+    listHeader->addStretch(1);
+    listHeader->addWidget(listSortHint);
+    listLayout->addLayout(listHeader);
+
+    listWidget_ = new QListWidget(listFrame);
+    listWidget_->setStyleSheet(
+        "QListWidget{background:#0F1718;border:1px solid #1F3231;border-radius:10px;outline:none;padding:2px 0;}"
+        "QListWidget::item{border:none;}QListWidget::item:selected{background:rgba(0,212,180,0.08);}"
+        "QListWidget::item:hover{background:rgba(255,255,255,0.04);}"
+        "QScrollBar:vertical{background:transparent;width:7px;}QScrollBar::handle:vertical{background:#2A403D;border-radius:3px;min-height:30px;}"
+        "QScrollBar::add-line:vertical,QScrollBar::sub-line:vertical{height:0;}");
     listWidget_->setMouseTracking(true);
-    // 기본 탐색에서는 한 곡만 선택하고, '곡 선택' 모드에서만 체크 기반 다중 선택을 제공한다.
     listWidget_->setSelectionMode(QAbstractItemView::SingleSelection);
     listWidget_->setSpacing(0);
     listWidget_->setUniformItemSizes(true);
-
-    // 커스텀 델리게이트 설정
     delegate_ = new SongItemDelegate(this);
     listWidget_->setItemDelegate(delegate_);
+    connect(listWidget_, &QListWidget::itemDoubleClicked, this, &OriginalsWidget::onItemDoubleClicked);
+    connect(listWidget_, &QListWidget::itemSelectionChanged, this, &OriginalsWidget::onSelectionChanged);
+    listLayout->addWidget(listWidget_, 1);
+    root->addWidget(listFrame, 1);
 
-    connect(listWidget_, &QListWidget::itemDoubleClicked,
-            this, &OriginalsWidget::onItemDoubleClicked);
-    connect(listWidget_, &QListWidget::itemSelectionChanged,
-            this, &OriginalsWidget::onSelectionChanged);
-    root->addWidget(listWidget_, 1);
-
-    // ── 하단 재생·재생목록 바 ─────────────────────────────────────────────
+    // 선택·반복·저장 재생목록은 카탈로그 밖의 큰 2단 바가 아니라 한 개의 감상 컨텍스트로 묶는다.
     auto* actionBar = new QWidget(this);
-    actionBar->setFixedHeight(112);
-    actionBar->setStyleSheet(QString("background: %1; border-top: 1px solid %2;")
-                              .arg(BG2).arg(BORDER));
-    auto* actionLayout = new QVBoxLayout(actionBar);
-    actionLayout->setContentsMargins(10, 6, 10, 6);
-    actionLayout->setSpacing(5);
-    auto* playRow = new QHBoxLayout();
-    auto* listRow = new QHBoxLayout();
-    playRow->setSpacing(8);
-    listRow->setSpacing(6);
+    actionBar->setObjectName("originalsActionContext");
+    actionBar->setFixedHeight(72);
+    actionBar->setStyleSheet("QWidget#originalsActionContext{background:#101A1A;border-top:1px solid #263B38;}");
+    auto* actionLayout = new QHBoxLayout(actionBar);
+    actionLayout->setContentsMargins(28, 12, 28, 12);
+    actionLayout->setSpacing(8);
 
-    auto* playAllBtn = new QPushButton("▶  현재 목록 전체 재생", actionBar);
-    playAllBtn->setFixedHeight(30);
-    playAllBtn->setCursor(Qt::PointingHandCursor);
-    playAllBtn->setFocusPolicy(Qt::NoFocus);
-    playAllBtn->setStyleSheet(QString(
-        "QPushButton { background: %1; color: #000; border: none;"
-        "border-radius: 6px; padding: 0 14px; font-size: 11px; font-weight: 700; }"
-        "QPushButton:hover { background: #00f0cc; }"
-        "QPushButton:pressed { background: #00b89a; }").arg(MINT));
-    connect(playAllBtn, &QPushButton::clicked, this, &OriginalsWidget::onPlayAllClicked);
-
-    playSelectedBtn_ = new QPushButton("▶  선택 재생 (0)", actionBar);
-    playSelectedBtn_->setFixedHeight(30);
-    playSelectedBtn_->setCursor(Qt::PointingHandCursor);
-    playSelectedBtn_->setFocusPolicy(Qt::NoFocus);
-    playSelectedBtn_->setStyleSheet(QString(
-        "QPushButton { background: %1; color: %2; border: 1px solid %3;"
-        "border-radius: 6px; padding: 0 12px; font-size: 11px; font-weight: 600; }"
-        "QPushButton:hover:enabled { border-color: %4; color: %4; }"
-        "QPushButton:disabled { color: #555; border-color: #292929; }")
-        .arg(BG3).arg(TEXT).arg(BORDER).arg(MINT));
-    connect(playSelectedBtn_, &QPushButton::clicked, this, &OriginalsWidget::onPlaySelectedClicked);
-
-    selectAllBtn_ = new QPushButton(QStringLiteral("전체 선택"), actionBar);
-    clearSelectionBtn_ = new QPushButton(QStringLiteral("선택 해제"), actionBar);
-    for (QPushButton* button : {selectAllBtn_, clearSelectionBtn_}) {
-        button->setFixedHeight(30);
+    auto makeAction = [actionBar](const QString& text, bool primary = false) {
+        auto* button = new QPushButton(text, actionBar);
+        button->setFixedHeight(34);
         button->setCursor(Qt::PointingHandCursor);
         button->setFocusPolicy(Qt::NoFocus);
-        button->setStyleSheet(QString("QPushButton { background: transparent; color: %1; border: 1px solid %2; border-radius: 6px; padding: 0 9px; font-size: 10px; } QPushButton:hover:enabled { border-color: %3; color: %3; }")
-                              .arg(TEXT2).arg(BORDER).arg(MINT));
-    }
+        button->setStyleSheet(primary
+            ? "QPushButton{background:#00C7AA;color:#05231E;border:1px solid #5BE3D1;border-radius:8px;padding:0 13px;font-size:11px;font-weight:800;}QPushButton:hover{background:#38DDC4;}"
+            : "QPushButton{background:#152725;color:#C7DAD6;border:1px solid #314C47;border-radius:8px;padding:0 11px;font-size:11px;font-weight:700;}QPushButton:hover{border-color:#00D4B4;color:#EEFFFB;background:#19332F;}");
+        return button;
+    };
+    auto* playAllBtn = makeAction(QStringLiteral("현재 목록 재생"), true);
+    connect(playAllBtn, &QPushButton::clicked, this, &OriginalsWidget::onPlayAllClicked);
+    playSelectedBtn_ = makeAction(QStringLiteral("선택 재생 (0)"));
+    connect(playSelectedBtn_, &QPushButton::clicked, this, &OriginalsWidget::onPlaySelectedClicked);
+    selectAllBtn_ = makeAction(QStringLiteral("전체 선택"));
+    clearSelectionBtn_ = makeAction(QStringLiteral("선택 해제"));
     connect(selectAllBtn_, &QPushButton::clicked, this, &OriginalsWidget::onSelectAllClicked);
     connect(clearSelectionBtn_, &QPushButton::clicked, this, &OriginalsWidget::onClearSelectionClicked);
-
-    youTubeBtn_ = new QPushButton("▶  YouTube 전체 듣기", actionBar);
-    youTubeBtn_->setFixedHeight(30);
-    youTubeBtn_->setCursor(Qt::PointingHandCursor);
-    youTubeBtn_->setFocusPolicy(Qt::NoFocus);
+    youTubeBtn_ = makeAction(QStringLiteral("YouTube 전체 듣기"));
     youTubeBtn_->setStyleSheet(
-        "QPushButton { background: #B92F2F; color: #fff; border: none;"
-        "border-radius: 6px; padding: 0 12px; font-size: 11px; font-weight: 700; }"
-        "QPushButton:hover { background: #D13A3A; }"
-        "QPushButton:pressed { background: #942424; }");
+        "QPushButton{background:#472024;color:#FFEAEA;border:1px solid #93474C;border-radius:8px;padding:0 12px;font-size:11px;font-weight:800;}"
+        "QPushButton:hover{background:#B92F3B;border-color:#EA6771;}");
     connect(youTubeBtn_, &QPushButton::clicked, this, &OriginalsWidget::onYouTubeClicked);
-
-    repeatBtn_ = new QPushButton(actionBar);
-    repeatBtn_->setFixedHeight(30);
-    repeatBtn_->setCursor(Qt::PointingHandCursor);
-    repeatBtn_->setFocusPolicy(Qt::NoFocus);
-    repeatBtn_->setStyleSheet(QString(
-        "QPushButton { background: %1; color: %2; border: 1px solid %3; border-radius: 6px;"
-        "padding: 0 10px; font-size: 11px; } QPushButton:hover { border-color: %4; color: %4; }")
-        .arg(BG3).arg(TEXT).arg(BORDER).arg(MINT));
+    repeatBtn_ = makeAction(QStringLiteral("반복: 끔"));
     connect(repeatBtn_, &QPushButton::clicked, this, &OriginalsWidget::onRepeatModeClicked);
     setRepeatMode(repeatMode_);
 
-    auto* saveBtn = new QPushButton("＋ 현재 목록 저장", actionBar);
-    saveBtn->setFixedHeight(28);
-    saveBtn->setCursor(Qt::PointingHandCursor);
-    saveBtn->setFocusPolicy(Qt::NoFocus);
-    saveBtn->setStyleSheet(QString("QPushButton { background: transparent; color: %1; border: 1px solid %2;"
-        "border-radius: 5px; padding: 0 9px; font-size: 10px; } QPushButton:hover { border-color: %1; }")
-        .arg(MINT).arg(BORDER));
+    auto* saveBtn = makeAction(QStringLiteral("목록 저장"));
     connect(saveBtn, &QPushButton::clicked, this, &OriginalsWidget::onSavePlaylistClicked);
-
     savedPlaylistCombo_ = new QComboBox(actionBar);
     savedPlaylistCombo_->setMinimumWidth(150);
-    savedPlaylistCombo_->setFixedHeight(28);
-    savedPlaylistCombo_->addItem("내 재생목록 선택");
-    savedPlaylistCombo_->setStyleSheet(QString("QComboBox { background: %1; color: %2; border: 1px solid %3;"
-        "border-radius: 5px; padding: 2px 8px; font-size: 10px; } QComboBox QAbstractItemView {"
-        "background: %1; color: %2; selection-background-color: %4; }")
-        .arg(BG3).arg(TEXT).arg(BORDER).arg(MINT));
-
-    auto* loadBtn = new QPushButton("재생", actionBar);
-    auto* deleteBtn = new QPushButton("삭제", actionBar);
-    for (QPushButton* btn : {loadBtn, deleteBtn}) {
-        btn->setFixedHeight(28);
-        btn->setCursor(Qt::PointingHandCursor);
-        btn->setFocusPolicy(Qt::NoFocus);
-        btn->setStyleSheet(QString("QPushButton { background: %1; color: %2; border: 1px solid %3;"
-            "border-radius: 5px; padding: 0 9px; font-size: 10px; } QPushButton:hover { border-color: %4; color: %4; }")
-            .arg(BG3).arg(TEXT2).arg(BORDER).arg(MINT));
-    }
+    savedPlaylistCombo_->setFixedHeight(34);
+    savedPlaylistCombo_->addItem(QStringLiteral("내 재생목록"));
+    savedPlaylistCombo_->setFocusPolicy(Qt::NoFocus);
+    savedPlaylistCombo_->setStyleSheet(
+        "QComboBox{background:#111F1E;color:#B9CDCA;border:1px solid #314C47;border-radius:8px;padding:0 9px;font-size:11px;}"
+        "QComboBox:hover{border-color:#00D4B4;}QComboBox::drop-down{border:none;}"
+        "QComboBox QAbstractItemView{background:#12201F;color:#EAF5F2;selection-background-color:#19564C;border:1px solid #34514C;}");
+    auto* loadBtn = makeAction(QStringLiteral("재생"));
+    auto* deleteBtn = makeAction(QStringLiteral("삭제"));
     connect(loadBtn, &QPushButton::clicked, this, &OriginalsWidget::onLoadSavedPlaylistClicked);
     connect(deleteBtn, &QPushButton::clicked, this, &OriginalsWidget::onDeleteSavedPlaylistClicked);
 
-    playRow->addWidget(playAllBtn);
-    playRow->addWidget(playSelectedBtn_);
-    playRow->addWidget(selectAllBtn_);
-    playRow->addWidget(clearSelectionBtn_);
-    playRow->addWidget(youTubeBtn_);
-    playRow->addStretch();
-    playRow->addWidget(repeatBtn_);
-    listRow->addWidget(saveBtn);
-    listRow->addWidget(savedPlaylistCombo_, 1);
-    listRow->addWidget(loadBtn);
-    listRow->addWidget(deleteBtn);
-    actionLayout->addLayout(playRow);
-    actionLayout->addLayout(listRow);
+    actionLayout->addWidget(playAllBtn);
+    actionLayout->addWidget(playSelectedBtn_);
+    actionLayout->addWidget(selectAllBtn_);
+    actionLayout->addWidget(clearSelectionBtn_);
+    actionLayout->addWidget(youTubeBtn_);
+    actionLayout->addStretch(1);
+    actionLayout->addWidget(repeatBtn_);
+    actionLayout->addWidget(saveBtn);
+    actionLayout->addWidget(savedPlaylistCombo_);
+    actionLayout->addWidget(loadBtn);
+    actionLayout->addWidget(deleteBtn);
     root->addWidget(actionBar);
 
-    // ── 토스트 알림 (플로팅) ─────────────────────────────────────────────
     toastLabel_ = new QLabel(this);
-    toastLabel_->setStyleSheet(QString(
-        "background: %1; color: #000; border-radius: 8px;"
-        "padding: 8px 16px; font-size: 12px; font-weight: 700;").arg(MINT));
+    toastLabel_->setStyleSheet("background:#00D4B4;color:#06221E;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:800;");
     toastLabel_->setVisible(false);
     toastLabel_->setAttribute(Qt::WA_TransparentForMouseEvents);
     toastLabel_->raise();

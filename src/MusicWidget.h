@@ -132,6 +132,8 @@ private:
 
     // 앨범아트 회전
     QPixmap       albumArtPixmap_;
+    QLabel*       albumArtLabel_ = nullptr;
+    QWidget*      assistantPanel_ = nullptr;
     qreal         rotationAngle_ = 0.0;
     QTimer*       rotationTimer_ = nullptr;
 

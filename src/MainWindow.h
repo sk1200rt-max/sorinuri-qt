@@ -106,6 +106,7 @@ private slots:
     void showOriginalsPage();  // 하단 전문 기능 패널이 아닌 플레이어 영역 전체의 오리지널 음악 화면
     void ensureOriginalsQueueOverlay();
     void updateOriginalsQueueOverlay();
+    void updateVideoShelf();
     void switchToMusicMode();
     void switchToVideoMode();
 
@@ -191,6 +192,11 @@ private:
     QLabel*                originalsQueueNowLabel_ = nullptr;
     QLabel*                originalsQueueNextLabel_ = nullptr;
     QLabel*                originalsQueueCountLabel_ = nullptr;
+    QWidget*               videoShelf_ = nullptr;
+    QLabel*                videoShelfTitle_ = nullptr;
+    QLabel*                videoShelfContext_ = nullptr;
+    QLabel*                videoShelfNext_ = nullptr;
+    QPushButton*           videoShelfQueueButton_ = nullptr;
     PlaybackQueue*        playbackQueue_        = nullptr;  // 오리지널·YouTube·로컬 통합 대기열
     AdManager*            adManager_            = nullptr;  // 광고 관리자
     SplashAdWidget*       splashAdWidget_       = nullptr;  // 시작 화면 광고
@@ -234,8 +240,10 @@ private:
     void          stopRemoteServer();
     void          handleRemoteRequest(QTcpSocket* socket);
     QString pendingUrl_;
+    quint64 pendingUrlGeneration_ = 0;
     QList<PlaybackQueue::Entry> pendingYouTubeQueue_;
     int pendingYouTubeQueueStartIndex_ = 0;
+    quint64 playbackRequestGeneration_ = 0;  // 지연 파일·YouTube 요청의 최신성 보장
     QProgressDialog* ytdlpProgress_ = nullptr;
 
     // HiDPI 근본 수정: 시작 파일 대기 큐

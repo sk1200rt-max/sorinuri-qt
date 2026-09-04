@@ -45,6 +45,7 @@ protected:
     void mouseMoveEvent(QMouseEvent* e) override;
     void mouseReleaseEvent(QMouseEvent* e) override;
     void mouseDoubleClickEvent(QMouseEvent* e) override;
+    void resizeEvent(QResizeEvent* e) override;
 
 private:
     static QPushButton* makeIconBtn(const QString& svgPath, const QString& tooltip,
@@ -52,6 +53,7 @@ private:
     static QPushButton* makeCommandBtn(const QString& text, const QString& tooltip);
     static QPushButton* makeServiceBtn(const QString& text, const QString& tooltip);
     void refreshServiceButtons();
+    void updateResponsiveLayout();
 
     QLabel*      titleLabel_    = nullptr;
     QLabel*      badgeLabel_    = nullptr;
@@ -69,5 +71,6 @@ private:
     Service activeService_ = Service::Player;
     bool   dragging_  = false;
     bool   pinned_    = false;
+    bool   compactLayout_ = false;
     QPoint dragStart_;
 };

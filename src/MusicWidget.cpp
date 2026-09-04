@@ -306,167 +306,224 @@ void MusicWidget::contextMenuEvent(QContextMenuEvent* e) {
 }
 
 void MusicWidget::setupUI(){
-    setStyleSheet("background:transparent;");
-    auto* root=new QVBoxLayout(this);root->setContentsMargins(0,0,0,0);root->setSpacing(0);
-    auto* content=new QHBoxLayout;content->setContentsMargins(20,16,20,8);content->setSpacing(20);
-    auto* leftPanel=new QVBoxLayout;leftPanel->setSpacing(8);leftPanel->setAlignment(Qt::AlignTop|Qt::AlignHCenter);
-    auto* artSpacer=new QWidget(this);artSpacer->setFixedSize(280,280);artSpacer->setAttribute(Qt::WA_TransparentForMouseEvents);
-    leftPanel->addWidget(artSpacer,0,Qt::AlignHCenter);leftPanel->addSpacing(12);
-    titleLabel_=new QLabel("트랙 제목",this);titleLabel_->setAlignment(Qt::AlignCenter);
-    titleLabel_->setStyleSheet("font-size:22px;font-weight:800;color:#F2F7F6;");titleLabel_->setWordWrap(true);
-    leftPanel->addWidget(titleLabel_);
-    artistLabel_=new QLabel("아티스트",this);artistLabel_->setAlignment(Qt::AlignCenter);
-    artistLabel_->setStyleSheet("font-size:14px;font-weight:600;color:#A3B1B0;");leftPanel->addWidget(artistLabel_);
-    albumLabel_=new QLabel("",this);albumLabel_->setAlignment(Qt::AlignCenter);
-    albumLabel_->setStyleSheet("font-size:12px;color:#71807F;");leftPanel->addWidget(albumLabel_);
-    badgeRow_=new QWidget(this);badgeRow_->setStyleSheet("background:transparent;");
-    auto* bl=new QHBoxLayout(badgeRow_);bl->setContentsMargins(0,4,0,4);bl->setSpacing(4);bl->setAlignment(Qt::AlignCenter);
-    codecBadge_=makeBadge("FLAC","#00D4B4",badgeRow_);bitBadge_=makeBadge("24bit","#A3B1B0",badgeRow_);
-    rateBadge_=makeBadge("192kHz","#A3B1B0",badgeRow_);chBadge_=makeBadge("Stereo","#A3B1B0",badgeRow_);
-    bpBadge_=makeBadge("BIT-PERFECT","#00D4B4",badgeRow_);
-    bl->addWidget(codecBadge_);bl->addWidget(bitBadge_);bl->addWidget(rateBadge_);bl->addWidget(chBadge_);bl->addWidget(bpBadge_);
-    leftPanel->addWidget(badgeRow_);
-    auto* specSpacer=new QWidget(this);specSpacer->setFixedHeight(60);specSpacer->setAttribute(Qt::WA_TransparentForMouseEvents);
-    leftPanel->addWidget(specSpacer);
+    // 음악은 영상용 전역 콘솔의 변형이 아니라, 현재 곡에 집중하는 독립 감상 화면이다.
+    setStyleSheet("background:#0A0F10;");
+    auto* root = new QVBoxLayout(this);
+    root->setContentsMargins(0, 0, 0, 0);
+    root->setSpacing(0);
 
-    // ── 컨트롤 버튼 행 ──────────────────────────────────────────────
-    auto* ctrlRow=new QHBoxLayout;ctrlRow->setSpacing(12);ctrlRow->setAlignment(Qt::AlignHCenter);
-    auto makeCtrlBtn=[&](const QString& text,bool big=false){
-        auto* btn=new QPushButton(text,this);int sz=big?48:32;btn->setFixedSize(sz,sz);
-        btn->setFocusPolicy(Qt::NoFocus);
-        if(big) btn->setStyleSheet(QString("QPushButton{background:#0A4940;color:#F2F7F6;border-radius:%1px;font-size:18px;font-weight:800;border:1px solid #00D4B4;}"
-                                           "QPushButton:hover{background:#0F6256;}QPushButton:pressed{background:#233536;}").arg(sz/2));
-        else btn->setStyleSheet("QPushButton{background:transparent;color:#A3B1B0;border:1px solid transparent;border-radius:8px;font-size:16px;}"
-                                "QPushButton:hover{color:#F2F7F6;background:#1C292A;border-color:#2B3B3C;}");
-        return btn;
+    auto* stage = new QWidget(this);
+    stage->setObjectName("musicStage");
+    stage->setStyleSheet(
+        "QWidget#musicStage{background:#0D1415;border-bottom:1px solid #1D2A2B;}"
+        "QLabel{background:transparent;}");
+    auto* stageLayout = new QHBoxLayout(stage);
+    stageLayout->setContentsMargins(48, 32, 48, 24);
+    stageLayout->setSpacing(42);
+
+    // 앨범아트는 별도의 고정 사이드바가 아니라, 현재 곡을 대표하는 독립 스테이지다.
+    auto* artStage = new QWidget(stage);
+    artStage->setMinimumWidth(330);
+    auto* artLayout = new QVBoxLayout(artStage);
+    artLayout->setContentsMargins(0, 0, 0, 0);
+    artLayout->setSpacing(12);
+    artLayout->setAlignment(Qt::AlignHCenter | Qt::AlignVCenter);
+    albumArtLabel_ = new QLabel(artStage);
+    albumArtLabel_->setObjectName("musicAlbumArt");
+    albumArtLabel_->setFixedSize(294, 294);
+    albumArtLabel_->setAlignment(Qt::AlignCenter);
+    albumArtLabel_->setText(QStringLiteral("♪"));
+    albumArtLabel_->setStyleSheet(
+        "QLabel#musicAlbumArt{background:#142223;color:#7EA49E;border:1px solid #29403D;"
+        "border-radius:12px;font-size:54px;font-weight:300;}");
+    artLayout->addWidget(albumArtLabel_, 0, Qt::AlignHCenter);
+    auto* sourceLabel = new QLabel(QStringLiteral("MUSIC  ·  LOCAL / ORIGINALS"), artStage);
+    sourceLabel->setAlignment(Qt::AlignCenter);
+    sourceLabel->setStyleSheet("color:#6F8481;font-size:10px;font-weight:700;letter-spacing:1.4px;");
+    artLayout->addWidget(sourceLabel);
+    stageLayout->addWidget(artStage, 0);
+
+    auto* detailStage = new QWidget(stage);
+    auto* detailLayout = new QVBoxLayout(detailStage);
+    detailLayout->setContentsMargins(0, 12, 0, 12);
+    detailLayout->setSpacing(9);
+    auto* eyebrow = new QLabel(QStringLiteral("현재 감상 중"), detailStage);
+    eyebrow->setStyleSheet("color:#00D4B4;font-size:11px;font-weight:700;letter-spacing:1.5px;");
+    detailLayout->addWidget(eyebrow);
+
+    titleLabel_ = new QLabel(QStringLiteral("트랙 제목"), detailStage);
+    titleLabel_->setWordWrap(true);
+    titleLabel_->setStyleSheet("color:#F3F7F6;font-size:32px;font-weight:750;letter-spacing:-0.5px;");
+    detailLayout->addWidget(titleLabel_);
+    artistLabel_ = new QLabel(QStringLiteral("아티스트"), detailStage);
+    artistLabel_->setStyleSheet("color:#B1C0BE;font-size:17px;font-weight:500;");
+    detailLayout->addWidget(artistLabel_);
+    albumLabel_ = new QLabel(detailStage);
+    albumLabel_->setStyleSheet("color:#718582;font-size:12px;");
+    detailLayout->addWidget(albumLabel_);
+    detailLayout->addSpacing(13);
+
+    badgeRow_ = new QWidget(detailStage);
+    badgeRow_->setStyleSheet("background:transparent;");
+    auto* badgeLayout = new QHBoxLayout(badgeRow_);
+    badgeLayout->setContentsMargins(0, 0, 0, 0);
+    badgeLayout->setSpacing(6);
+    codecBadge_ = makeBadge("FLAC", "#00D4B4", badgeRow_);
+    bitBadge_ = makeBadge("24-bit", "#A3B1B0", badgeRow_);
+    rateBadge_ = makeBadge("192kHz", "#A3B1B0", badgeRow_);
+    chBadge_ = makeBadge("Stereo", "#A3B1B0", badgeRow_);
+    bpBadge_ = makeBadge("BIT-PERFECT", "#00D4B4", badgeRow_);
+    for (QLabel* badge : {codecBadge_, bitBadge_, rateBadge_, chBadge_, bpBadge_}) badgeLayout->addWidget(badge);
+    badgeLayout->addStretch(1);
+    detailLayout->addWidget(badgeRow_);
+    detailLayout->addStretch(1);
+
+    auto* assistHint = new QLabel(QStringLiteral("가사 · EQ · 재생목록은 필요할 때만 열립니다"), detailStage);
+    assistHint->setStyleSheet("color:#6E807E;font-size:11px;");
+    detailLayout->addWidget(assistHint);
+    stageLayout->addWidget(detailStage, 1);
+    root->addWidget(stage, 1);
+
+    // 보조 기능은 항상 화면을 나누지 않고, 사용자가 요청할 때만 열린다.
+    assistantPanel_ = new QWidget(this);
+    assistantPanel_->setObjectName("musicAssistantPanel");
+    assistantPanel_->setStyleSheet(
+        "QWidget#musicAssistantPanel{background:#10191A;border-top:1px solid #233333;border-bottom:1px solid #233333;}");
+    auto* assistantLayout = new QVBoxLayout(assistantPanel_);
+    assistantLayout->setContentsMargins(32, 12, 32, 14);
+    assistantLayout->setSpacing(8);
+    auto* tabRow = new QHBoxLayout();
+    tabRow->setContentsMargins(0, 0, 0, 0);
+    tabRow->setSpacing(6);
+    auto makeAssistantButton = [this](const QString& text) {
+        auto* button = new QPushButton(text, assistantPanel_);
+        button->setCheckable(true);
+        button->setFocusPolicy(Qt::NoFocus);
+        button->setCursor(Qt::PointingHandCursor);
+        button->setFixedHeight(30);
+        button->setStyleSheet(
+            "QPushButton{background:transparent;color:#91A3A0;border:1px solid transparent;border-radius:7px;padding:0 12px;font-size:11px;font-weight:700;}"
+            "QPushButton:hover{background:#192727;color:#EFF8F6;border-color:#31504C;}"
+            "QPushButton:checked{background:#0B3932;color:#DFFFF7;border-color:#00D4B4;}");
+        return button;
     };
-    btnShuffle_=makeCtrlBtn("⇌"); btnShuffle_->setToolTip("셔플 (S)");
-    btnPrev_=makeCtrlBtn("⏮");    btnPrev_->setToolTip("이전 트랙 (←)");
-    btnPlay_=makeCtrlBtn("▶",true);btnPlay_->setToolTip("재생/일시정지 (Space)");
-    btnNext_=makeCtrlBtn("⏭");    btnNext_->setToolTip("다음 트랙 (→)");
-    btnRepeat_=makeCtrlBtn("↺");  btnRepeat_->setToolTip("반복 재생 (R)");
+    btnShowLyrics_ = makeAssistantButton(QStringLiteral("가사"));
+    btnShowEq_ = makeAssistantButton(QStringLiteral("이퀄라이저"));
+    btnShowPlaylist_ = makeAssistantButton(QStringLiteral("재생목록"));
+    tabRow->addWidget(btnShowLyrics_);
+    tabRow->addWidget(btnShowEq_);
+    tabRow->addWidget(btnShowPlaylist_);
+    tabRow->addStretch(1);
+    auto* closeAssist = new QPushButton(QStringLiteral("접기"), assistantPanel_);
+    closeAssist->setFocusPolicy(Qt::NoFocus);
+    closeAssist->setCursor(Qt::PointingHandCursor);
+    closeAssist->setFixedHeight(30);
+    closeAssist->setStyleSheet("QPushButton{background:transparent;color:#70827F;border:none;padding:0 8px;font-size:11px;}QPushButton:hover{color:#F3F7F6;}");
+    tabRow->addWidget(closeAssist);
+    assistantLayout->addLayout(tabRow);
 
-    // A-B 반복 버튼
-    btnAbRepeat_=new QPushButton("A-B",this);
-    btnAbRepeat_->setFixedSize(36,28);
-    btnAbRepeat_->setToolTip("A-B 구간 반복\n첫 클릭: A 지점 설정\n두 번째 클릭: B 지점 설정 후 반복 시작\n세 번째 클릭: 해제");
-    btnAbRepeat_->setStyleSheet(
-        "QPushButton{background:#151F20;color:#A3B1B0;border:1px solid #2B3B3C;border-radius:7px;"
-        "font-size:11px;font-weight:700;font-family:'Cascadia Mono','Consolas';}"
-        "QPushButton:hover{color:#F2F7F6;border-color:#00D4B4;background:#1C292A;}");
-
-    ctrlRow->addWidget(btnShuffle_);ctrlRow->addWidget(btnPrev_);ctrlRow->addWidget(btnPlay_);
-    ctrlRow->addWidget(btnNext_);ctrlRow->addWidget(btnRepeat_);ctrlRow->addSpacing(8);
-    ctrlRow->addWidget(btnAbRepeat_);
-    leftPanel->addLayout(ctrlRow);leftPanel->addStretch();
-
-    // ── 우측 패널 ──────────────────────────────────────────────────
-    auto* rightPanel=new QVBoxLayout;rightPanel->setSpacing(0);
-    auto* tabRow=new QHBoxLayout;tabRow->setSpacing(0);tabRow->setContentsMargins(0,0,0,0);
-    auto makeTabBtn=[&](const QString& text){
-        auto* btn=new QPushButton(text,this);btn->setCheckable(true);
-        btn->setFocusPolicy(Qt::NoFocus);
-        btn->setStyleSheet("QPushButton{background:transparent;color:#71807F;border:none;padding:7px 14px;font-size:12px;font-weight:700;border-bottom:2px solid transparent;}"
-                           "QPushButton:checked{color:#00D4B4;border-bottom:2px solid #00D4B4;}"
-                           "QPushButton:hover{color:#F2F7F6;background:#151F20;}");
-        return btn;
-    };
-    btnShowLyrics_=makeTabBtn("가사");btnShowEq_=makeTabBtn("EQ");btnShowPlaylist_=makeTabBtn("재생목록");
-    btnShowLyrics_->setChecked(true);
-    tabRow->addWidget(btnShowLyrics_);tabRow->addWidget(btnShowEq_);tabRow->addWidget(btnShowPlaylist_);
-    tabRow->addStretch();
-    // ── LRC 싱크 오프셋 +/- 버튼 ────────────────────────────────────────
-    auto* lblOffset = new QLabel("싱크:", this);
-    lblOffset->setStyleSheet("color:#71807F; font-size:10px; font-weight:600;");
-    auto makeSyncBtn = [this](const QString& text) -> QPushButton* {
-        auto* btn = new QPushButton(text, this);
-        btn->setFixedSize(22, 22);
-        btn->setStyleSheet(
-            "QPushButton{background:#151F20;color:#A3B1B0;border:1px solid #2B3B3C;"
-            "border-radius:6px;font-size:10px;font-weight:700;padding:0;}"
-            "QPushButton:hover{background:#1C292A;color:#F2F7F6;border-color:#00D4B4;}"
-        );
-        btn->setFocusPolicy(Qt::NoFocus);
-        return btn;
-    };
-    auto* btnSyncMinus = makeSyncBtn("-");
-    auto* btnSyncPlus  = makeSyncBtn("+");
-    auto* btnSyncReset = makeSyncBtn("↺");
-    btnSyncReset->setToolTip("싱크 오프셋 초기화");
-    tabRow->addWidget(lblOffset);
-    tabRow->addWidget(btnSyncMinus);
-    tabRow->addWidget(btnSyncPlus);
-    tabRow->addWidget(btnSyncReset);
-    // 싱크 오프셋 버튼 연결 (500ms 단위)
-    connect(btnSyncMinus, &QPushButton::clicked, this, [this]() {
-        if (!lyricsWidget_) return;
-        double newOffset = lyricsWidget_->syncOffset() - 500.0;
-        lyricsWidget_->setSyncOffset(newOffset);
-        lyricsWidget_->saveSyncOffset(currentMeta_.filePath);
+    rightStack_ = new QStackedWidget(assistantPanel_);
+    rightStack_->setStyleSheet("QStackedWidget{background:#0D1415;border:1px solid #21302F;border-radius:9px;}");
+    lyricsWidget_ = new LyricsWidget(rightStack_);
+    eqPanel_ = new EqPanel(rightStack_);
+    playlistPanel_ = new PlaylistPanel(rightStack_);
+    rightStack_->addWidget(lyricsWidget_);
+    rightStack_->addWidget(eqPanel_);
+    rightStack_->addWidget(playlistPanel_);
+    rightStack_->setCurrentIndex(0);
+    rightStack_->setMinimumHeight(190);
+    assistantLayout->addWidget(rightStack_);
+    connect(closeAssist, &QPushButton::clicked, this, [this]() {
+        if (assistantPanel_) assistantPanel_->hide();
+        if (btnShowLyrics_) btnShowLyrics_->setChecked(false);
+        if (btnShowEq_) btnShowEq_->setChecked(false);
+        if (btnShowPlaylist_) btnShowPlaylist_->setChecked(false);
     });
-    connect(btnSyncPlus, &QPushButton::clicked, this, [this]() {
-        if (!lyricsWidget_) return;
-        double newOffset = lyricsWidget_->syncOffset() + 500.0;
-        lyricsWidget_->setSyncOffset(newOffset);
-        lyricsWidget_->saveSyncOffset(currentMeta_.filePath);
-    });
-    connect(btnSyncReset, &QPushButton::clicked, this, [this]() {
-        if (!lyricsWidget_) return;
-        lyricsWidget_->setSyncOffset(0.0);
-        lyricsWidget_->saveSyncOffset(currentMeta_.filePath);
-    });
-    rightPanel->addLayout(tabRow);
-    rightStack_=new QStackedWidget(this);rightStack_->setStyleSheet("background:#101718;border:1px solid #1C292A;border-radius:10px;");
-    lyricsWidget_=new LyricsWidget(this);eqPanel_=new EqPanel(this);playlistPanel_=new PlaylistPanel(this);
-    rightStack_->addWidget(lyricsWidget_);rightStack_->addWidget(eqPanel_);rightStack_->addWidget(playlistPanel_);
-    rightStack_->setCurrentIndex(0);rightPanel->addWidget(rightStack_,1);
-    auto* leftWidget=new QWidget(this);leftWidget->setLayout(leftPanel);leftWidget->setFixedWidth(320);
-    content->addWidget(leftWidget);content->addLayout(rightPanel,1);root->addLayout(content,1);
+    assistantPanel_->hide();
+    root->addWidget(assistantPanel_);
 
-    // ── 시크바 행 (볼륨 인라인 배치) ────────────────────────────────
-    auto* seekRow=new QHBoxLayout;seekRow->setContentsMargins(20,0,20,4);seekRow->setSpacing(8);
-    timeCurrent_=new QLabel("00:00",this);
-    timeCurrent_->setStyleSheet("font-size:12px;color:#A3B1B0;font-family:'Cascadia Mono','Consolas';font-weight:600;");
-    timeCurrent_->setFixedWidth(42);
-    seekSlider_=new ClickSeekSlider(Qt::Horizontal,this);seekSlider_->setRange(0,1000);
+    auto* deck = new QWidget(this);
+    deck->setObjectName("musicDeck");
+    deck->setStyleSheet("QWidget#musicDeck{background:#0A0F10;border-top:1px solid #1A2829;}");
+    auto* deckLayout = new QVBoxLayout(deck);
+    deckLayout->setContentsMargins(32, 12, 32, 10);
+    deckLayout->setSpacing(10);
+    auto* seekRow = new QHBoxLayout();
+    seekRow->setSpacing(10);
+    timeCurrent_ = new QLabel("00:00", deck);
+    timeCurrent_->setFixedWidth(46);
+    timeCurrent_->setStyleSheet("color:#B9C8C5;font-size:11px;font-family:'Cascadia Mono','Consolas';font-weight:700;");
+    seekSlider_ = new ClickSeekSlider(Qt::Horizontal, deck);
+    seekSlider_->setRange(0, 1000);
+    seekSlider_->setFocusPolicy(Qt::NoFocus);
     seekSlider_->setStyleSheet(
-        "QSlider::groove:horizontal{background:#1C292A;height:5px;border-radius:2px;}"
-        "QSlider::handle:horizontal{background:#00D4B4;width:12px;height:12px;margin:-4px 0;border:2px solid #0A0F10;border-radius:6px;}"
-        "QSlider::sub-page:horizontal{background:#0A4940;border-radius:2px;}");
-    timeDuration_=new QLabel("00:00",this);
-    timeDuration_->setStyleSheet("font-size:12px;color:#A3B1B0;font-family:'Cascadia Mono','Consolas';font-weight:600;");
-    timeDuration_->setFixedWidth(42);timeDuration_->setAlignment(Qt::AlignRight);
-
-    // 볼륨 버튼 + 슬라이더 (시크바 우측 인라인)
-    btnVolume_=new QPushButton("볼륨",this);btnVolume_->setFixedSize(48,28);
-    btnVolume_->setFocusPolicy(Qt::NoFocus);
-    btnVolume_->setToolTip("음소거 (M)");
-    btnVolume_->setStyleSheet(
-        "QPushButton{background:transparent;border:1px solid transparent;border-radius:7px;font-size:11px;color:#A3B1B0;font-weight:700;}"
-        "QPushButton:hover{color:#F2F7F6;background:#1C292A;border-color:#2B3B3C;}");
-    volSlider_=new QSlider(Qt::Horizontal,this);
-    volSlider_->setRange(0,100);volSlider_->setValue(100);volSlider_->setFixedWidth(90);
-    volSlider_->setToolTip("볼륨");
-    volSlider_->setFocusPolicy(Qt::NoFocus);  // HiDPI: 키 이벤트가 MainWindow로 전달되도록
-    volSlider_->setStyleSheet(
-        "QSlider::groove:horizontal{background:#2a2a2a;height:3px;border-radius:2px;}"
-        "QSlider::handle:horizontal{background:#888;width:10px;height:10px;margin:-3.5px 0;border-radius:5px;}"
-        "QSlider::sub-page:horizontal{background:#666;border-radius:2px;}");
-
+        "QSlider::groove:horizontal{background:#263536;height:4px;border-radius:2px;}"
+        "QSlider::sub-page:horizontal{background:#00B89D;border-radius:2px;}"
+        "QSlider::handle:horizontal{background:#00D4B4;width:13px;height:13px;margin:-5px 0;border:2px solid #0A0F10;border-radius:7px;}");
+    timeDuration_ = new QLabel("00:00", deck);
+    timeDuration_->setFixedWidth(46);
+    timeDuration_->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    timeDuration_->setStyleSheet("color:#B9C8C5;font-size:11px;font-family:'Cascadia Mono','Consolas';font-weight:700;");
     seekRow->addWidget(timeCurrent_);
-    seekRow->addWidget(seekSlider_,1);
+    seekRow->addWidget(seekSlider_, 1);
     seekRow->addWidget(timeDuration_);
-    seekRow->addSpacing(12);
-    seekRow->addWidget(btnVolume_);
-    seekRow->addWidget(volSlider_);
-    root->addLayout(seekRow);
+    deckLayout->addLayout(seekRow);
 
-    // 음악의 보조 도구(컴팩트·미니·환경 설정)는 공통 상단바의 도구 메뉴로 이동한다.
-    // 이 화면에는 감상에 필요한 재생 상태와 실제 출력 정보만 남긴다.
-    statusBar_=new QLabel("FLAC  ·  DECODE  ·  2.0  ·  192kHz  ·  24bit  ·  BIT-PERFECT",this);
+    auto* controlRow = new QHBoxLayout();
+    controlRow->setContentsMargins(0, 0, 0, 0);
+    controlRow->setSpacing(10);
+    auto makeCtrlBtn = [&](const QString& text, bool primary = false) {
+        auto* button = new QPushButton(text, deck);
+        const int size = primary ? 50 : 34;
+        button->setFixedSize(size, size);
+        button->setFocusPolicy(Qt::NoFocus);
+        button->setCursor(Qt::PointingHandCursor);
+        button->setStyleSheet(primary
+            ? "QPushButton{background:#00BFA5;color:#052521;border:1px solid #57E4CF;border-radius:25px;font-size:19px;font-weight:800;}QPushButton:hover{background:#35D9C0;}"
+            : "QPushButton{background:transparent;color:#C9D5D3;border:1px solid transparent;border-radius:8px;font-size:17px;}QPushButton:hover{background:#172425;color:#FFFFFF;border-color:#2D4442;}");
+        return button;
+    };
+    btnShuffle_ = makeCtrlBtn(QStringLiteral("⇌"));
+    btnPrev_ = makeCtrlBtn(QStringLiteral("⏮"));
+    btnPlay_ = makeCtrlBtn(QStringLiteral("▶"), true);
+    btnNext_ = makeCtrlBtn(QStringLiteral("⏭"));
+    btnRepeat_ = makeCtrlBtn(QStringLiteral("↺"));
+    btnAbRepeat_ = new QPushButton(QStringLiteral("A-B"), deck);
+    btnAbRepeat_->setFixedSize(42, 28);
+    btnAbRepeat_->setFocusPolicy(Qt::NoFocus);
+    btnAbRepeat_->setCursor(Qt::PointingHandCursor);
+    btnAbRepeat_->setToolTip("A-B 구간 반복");
+    btnAbRepeat_->setStyleSheet("QPushButton{background:#111C1D;color:#A7B8B5;border:1px solid #2B4240;border-radius:7px;font-size:10px;font-weight:800;}QPushButton:hover{color:#EEFFFB;border-color:#00D4B4;}");
+    controlRow->addStretch(1);
+    controlRow->addWidget(btnShuffle_);
+    controlRow->addWidget(btnPrev_);
+    controlRow->addWidget(btnPlay_);
+    controlRow->addWidget(btnNext_);
+    controlRow->addWidget(btnRepeat_);
+    controlRow->addWidget(btnAbRepeat_);
+    controlRow->addStretch(1);
+    controlRow->addSpacing(16);
+    btnVolume_ = new QPushButton(QStringLiteral("볼륨"), deck);
+    btnVolume_->setFixedHeight(30);
+    btnVolume_->setFocusPolicy(Qt::NoFocus);
+    btnVolume_->setCursor(Qt::PointingHandCursor);
+    btnVolume_->setToolTip("음소거 (M)");
+    btnVolume_->setStyleSheet("QPushButton{background:transparent;color:#B8C7C4;border:none;padding:0 4px;font-size:11px;font-weight:700;}QPushButton:hover{color:#FFFFFF;}");
+    volSlider_ = new QSlider(Qt::Horizontal, deck);
+    volSlider_->setRange(0, 100);
+    volSlider_->setValue(100);
+    volSlider_->setFixedWidth(104);
+    volSlider_->setFocusPolicy(Qt::NoFocus);
+    volSlider_->setStyleSheet("QSlider::groove:horizontal{background:#334443;height:3px;border-radius:1px;}QSlider::sub-page:horizontal{background:#85A6A0;border-radius:1px;}QSlider::handle:horizontal{background:#F0F7F5;width:10px;height:10px;margin:-3.5px 0;border-radius:5px;}");
+    controlRow->addWidget(btnVolume_);
+    controlRow->addWidget(volSlider_);
+    deckLayout->addLayout(controlRow);
+
+    statusBar_ = new QLabel("재생 대기 중", deck);
     statusBar_->setAlignment(Qt::AlignCenter);
-    statusBar_->setStyleSheet("font-size:10px;color:#71807F;font-family:'Cascadia Mono','Consolas';background:#0A0F10;border-top:1px solid #1C292A;padding:7px 0;");
-    root->addWidget(statusBar_);
+    statusBar_->setStyleSheet("color:#738784;font-size:10px;font-family:'Cascadia Mono','Consolas';letter-spacing:.5px;background:transparent;padding:2px 0;");
+    deckLayout->addWidget(statusBar_);
+    root->addWidget(deck);
 }
 
 void MusicWidget::setupConnections(){
@@ -566,7 +623,9 @@ void MusicWidget::onAbRepeatClicked(){
 }
 
 void MusicWidget::onRightPanelToggle(int panel){
+    if (!rightStack_ || !assistantPanel_) return;
     rightStack_->setCurrentIndex(panel);
+    assistantPanel_->show();
     btnShowLyrics_->setChecked(panel==0);
     btnShowEq_->setChecked(panel==1);
     btnShowPlaylist_->setChecked(panel==2);
@@ -606,8 +665,16 @@ void MusicWidget::loadMeta(const MusicMeta& meta){
             :QString("%1kHz").arg(meta.sampleRate/1000.0,0,'f',1));
     else rateBadge_->setText(QString("%1Hz").arg(meta.sampleRate));
     chBadge_->setText(meta.channels==1?"Mono":meta.channels>2?QString("%1ch").arg(meta.channels):"Stereo");
-    if(!meta.albumArt.isNull()) updateAlbumArt(meta.albumArt);
-    else { albumArtPixmap_=QPixmap(); updateBlurBackground(QPixmap()); dominantColor_=kTeal; }
+    if (!meta.albumArt.isNull()) {
+        updateAlbumArt(meta.albumArt);
+    } else {
+        albumArtPixmap_ = QPixmap();
+        dominantColor_ = kTeal;
+        if (albumArtLabel_) {
+            albumArtLabel_->setPixmap(QPixmap());
+            albumArtLabel_->setText(QStringLiteral("♪"));
+        }
+    }
     QString status=QString("%1  ·  DECODE  ·  %2  ·  %3  ·  %4")
         .arg(meta.codec.toUpper())
         .arg(meta.channels==2?"2.0":QString("%1ch").arg(meta.channels))
@@ -648,9 +715,13 @@ void MusicWidget::setOutputInfo(int outSampleRate,const QString& outFormat,bool 
 }
 
 void MusicWidget::updateAlbumArt(const QPixmap& art){
-    albumArtPixmap_=art;
-    updateBlurBackground(art);
-    dominantColor_=extractDominant(art);
+    albumArtPixmap_ = art;
+    dominantColor_ = extractDominant(art);
+    if (albumArtLabel_) {
+        albumArtLabel_->setPixmap(art.scaled(albumArtLabel_->size(), Qt::KeepAspectRatioByExpanding,
+                                              Qt::SmoothTransformation));
+        albumArtLabel_->setText(QString());
+    }
     update();
 }
 
@@ -710,15 +781,8 @@ void MusicWidget::updateSpectrum(const QVector<float>& bins){
 void MusicWidget::setMiniMode(bool mini){miniMode_=mini;}
 
 void MusicWidget::paintEvent(QPaintEvent*){
-    QPainter p(this);p.setRenderHint(QPainter::Antialiasing);p.setRenderHint(QPainter::SmoothPixmapTransform);
-    if(!blurBg_.isNull()){
-        p.drawPixmap(rect(),blurBg_.scaled(size(),Qt::IgnoreAspectRatio,Qt::SmoothTransformation));
-        p.fillRect(rect(),QColor(0,0,0,60));
-    } else p.fillRect(rect(),kDark);
-    QRect artRect(20+(320-280)/2,16,280,280);
-    drawAlbumArt(p,artRect);
-    QRect specRect(20,artRect.bottom()+12+80+30+26,320,60);
-    drawSpectrum(p,specRect);
+    // 실제 앨범아트·재생 제어는 위젯 계층이 담당한다. 배경을 직접 다시 그리지 않아
+    // 큰 앨범아트와 스펙트럼 repaint가 파일 전환이나 HiDPI 레이아웃을 방해하지 않게 한다.
 }
 
 void MusicWidget::drawAlbumArt(QPainter& p,const QRect& rect){
@@ -759,7 +823,10 @@ void MusicWidget::drawSpectrum(QPainter& p,const QRect& rect){
 
 void MusicWidget::resizeEvent(QResizeEvent* e){
     QWidget::resizeEvent(e);
-    if(!currentMeta_.albumArt.isNull()) updateBlurBackground(currentMeta_.albumArt);
+    if (albumArtLabel_ && !albumArtPixmap_.isNull()) {
+        albumArtLabel_->setPixmap(albumArtPixmap_.scaled(albumArtLabel_->size(), Qt::KeepAspectRatioByExpanding,
+                                                          Qt::SmoothTransformation));
+    }
 }
 
 QString MusicWidget::formatTime(double secs) const{
