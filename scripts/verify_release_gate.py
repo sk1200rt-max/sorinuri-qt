@@ -25,7 +25,7 @@ DOMAINS: dict[str, tuple[str, ...]] = {
         "src/InstanceCoordinator.cpp", "src/InstanceCoordinator.h",
         "src/MpvCore.cpp", "src/MpvCore.h", "src/AudioAdvancedWidget.cpp",
         "src/AudioAdvancedWidget.h", "src/HiFiEngine.cpp", "src/HiFiEngine.h",
-        "src/AudioInfoBar.cpp", "src/AudioInfoBar.h",
+        "src/AudioInfoBar.cpp", "src/AudioInfoBar.h", "src/AlbumArtExtractor.cpp",
     ),
     "renderer": (
         "src/MpvWidget.cpp", "src/MpvWidget.h", "src/RenderEnvironment.h",

@@ -61,8 +61,9 @@ checks += [
      "mpvWidget_->unsetCursor();" in main_cpp,
      "이전 상태에서 숨겨진 포인터를 항상 복원해야 합니다."),
     ("if (controlBar_) controlBar_->hide();\n        showTopUi();" in main_cpp and
-     "if (titleBar_) titleBar_->hide();\n        showBottomUi();" in main_cpp,
-     "상단·하단 가장자리에서는 반대쪽 UI를 함께 표시하면 안 됩니다."),
+     "if (isFullscreen_ && titleBar_) titleBar_->hide();\n        showBottomUi();" in main_cpp and
+     "if (isMusicMode_ || !isFullscreen_)" in main_cpp,
+     "일반 창 모드에서는 상단 서비스 바를 유지하고 전체화면 가장자리에서만 반대쪽 UI를 숨겨야 합니다."),
     ("eventTimer_" not in core_h and "eventTimer_" not in core_cpp,
      "wakeup callback과 중복되는 16ms MPV 이벤트 폴링은 없어야 합니다."),
     ("mpv_set_wakeup_callback" in core_cpp and "QTimer::singleShot(0, self, &MpvCore::onMpvEvents)" in core_cpp,
