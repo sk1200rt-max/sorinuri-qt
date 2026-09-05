@@ -67,6 +67,14 @@ inline QString menuStyle()
         .arg(SurfaceRaised, Text, Border, MintDark, TextDim);
 }
 
+inline QString toolTipStyle()
+{
+    return QStringLiteral(
+        "QToolTip { background:#111A1B; color:#F8FCFB; border:1px solid #66807B;"
+        " border-radius:5px; padding:6px 9px; font-family:'Segoe UI','Malgun Gothic',sans-serif;"
+        " font-size:12px; font-weight:600; }");
+}
+
 inline QString statusBadgeStyle(const QString& color)
 {
     return QStringLiteral(

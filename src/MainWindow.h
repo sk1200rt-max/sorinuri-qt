@@ -260,7 +260,8 @@ private:
     QPoint resizeStart_;
     QSize  resizeStartSize_;
     int    resizeEdge_  = 0;
-    static const int RESIZE_MARGIN = 6;
+    // Qt 논리 좌표 기준 10px: 250% HiDPI에서도 가장자리·모서리 드래그를 안정적으로 감지한다.
+    static const int RESIZE_MARGIN = 10;
     int getResizeEdge(const QPoint& pos) const;
 
     // 절전 복귀·HDMI 장치 변경이 연속 도착해도 한 번만 오디오 출력을 복구한다.

@@ -1,6 +1,6 @@
 {
-  "version": "6.21.3",
+  "version": "6.21.4",
   "domain": "ui,playback",
-  "purpose": "목업 A–D 대응 영상 오버레이·공식 아이콘·독립 감상 화면 안정화",
-  "base_commit": "fe251378a6503f0199a6c441b6ba3f7de151962e"
+  "purpose": "승인된 초슬림 전체 폭 하단 바, 전체 화면 가장자리 UI, 창 테두리 리사이즈, 고대비 호버 안내문 및 지정 앱 아이콘 적용",
+  "base_commit": "292395c5557a93657eda7d23dbb22b5a5179a56b"
 }

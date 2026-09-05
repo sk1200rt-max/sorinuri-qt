@@ -69,33 +69,51 @@ def main() -> int:
     ):
         require(main_window, fragment, label, errors)
 
-    # 영상은 오버레이가 아닌 실제 재생 선반으로 현재·다음 항목과 목록 접근을 제공한다.
+    # 영상은 중앙 카드가 아닌 영상 하단 전체 폭의 초슬림 재생 바로 현재·다음 항목과 목록 접근을 제공한다.
     for fragment, label in (
-        ("videoPlaybackShelf", "영상 재생 선반"),
-        ("void MainWindow::updateVideoShelf", "영상 재생 선반 상태 갱신"),
-        ("ORIGINALS  ·  YOUTUBE 연속 재생", "YouTube 재생 문맥"),
+        ("void MainWindow::updateVideoShelf", "영상 재생 정보 갱신"),
+        ("ORIGINALS · YOUTUBE 연속 재생", "YouTube 재생 문맥"),
+        ("setFixedHeight(64)", "초슬림 하단 바 높이"),
+        ("videoOverlayDeck_->setFixedWidth(mpvWidget_->width())", "영상 전체 폭 하단 바"),
         ("originalsQueueOverlay_->hide();", "기존 YouTube 오버레이 숨김"),
     ):
         require(main_window, fragment, label, errors)
+    forbid(main_window, "videoPlaybackShelf", "이전 카드형 영상 선반", errors)
     forbid(main_window, "originalsQueueOverlay_->show();", "영상 위 YouTube 오버레이 표시", errors)
 
-    # 하단은 서비스 메뉴가 아닌 정밀 재생·출력 덱 하나로만 유지한다.
+    # 하단은 서비스 메뉴가 아닌 한 줄 재생·출력·대기열 덱으로만 유지한다.
     for fragment, label in (
-        ("setMinimumHeight(78)", "축소된 단일 재생 덱 높이"),
-        ("transportSurface", "재생 덱 표면"),
-        ("btnTracks_ = makeBtn(\":/icons/audio.svg\"", "기존 공식 아이콘 기반 트랙 열기"),
+        ("setFixedHeight(64)", "초슬림 단일 재생 바 높이"),
+        ("transportSurface", "재생 바 표면"),
+        ("btnPrev_ = makeBtn(\":/icons/prev.svg\"", "이전 항목"),
+        ("btnPlay_ = makeBtn(\":/icons/play.svg\"", "단일 재생·일시정지 토글"),
+        ("btnNext_ = makeBtn(\":/icons/next.svg\"", "다음 항목"),
+        ("btnQueue_ = makeBtn(\":/icons/playlist.svg\"", "대기열 접근"),
+        ("btnSettings_ = makeBtn(\":/icons/settings.svg\"", "환경 설정 접근"),
+        ("setMediaDetails", "인라인 재생 정보"),
         ("trackSurface_->hide();", "기본 화면에서 접힌 트랙 선택"),
-        ("insertWidget(5, trackSurface_, 1)", "같은 덱 안의 접이식 트랙 선택"),
         ("audioInfoLabel_->hide();", "빈 출력 상태 숨김"),
     ):
         require(controls, fragment, label, errors)
     for fragment, label in (
         ("makeModeBtn", "하단 서비스 메뉴"),
-        ("settingsClicked", "하단 설정 메뉴"),
         ("openFileClicked", "하단 파일 열기"),
         ("root->addWidget(trackSurface);", "트랙 선택의 별도 하단 행"),
+        ("btnLogo_", "재생 제어에 중복된 앱 아이콘"),
     ):
         forbid(controls, fragment, label, errors)
+
+    # 전체 화면만 가장자리 오버·짧은 자동 숨김을 사용하고 일반·최대화 창에서는 UI를 유지한다.
+    for fragment, label in (
+        ("UI_AUTO_HIDE_DELAY_MS = 900", "짧은 전체 화면 자동 숨김"),
+        ("if (!isFullscreen_)", "창·최대화 모드 UI 상시 표시"),
+        ("if (isFullscreen_ && !isMusicMode_)", "전체 화면 영상 시작 시 메뉴 숨김"),
+        ("TOP_UI_REVEAL_ZONE = 48", "상단 가장자리 표시 영역"),
+        ("BOTTOM_UI_REVEAL_ZONE = 48", "하단 가장자리 표시 영역"),
+    ):
+        require(main_window, fragment, label, errors)
+
+    require(theme, "toolTipStyle", "고대비 호버 안내문 테마", errors)
 
     # 음악은 앨범아트 스테이지와 접이식 보조 패널로, 기존 고정 좌우 분할을 사용하지 않는다.
     for fragment, label in (
