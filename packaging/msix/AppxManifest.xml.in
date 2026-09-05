@@ -16,7 +16,7 @@
     <DisplayName>__PACKAGE_DISPLAY_NAME__</DisplayName>
     <PublisherDisplayName>__PUBLISHER_DISPLAY_NAME__</PublisherDisplayName>
     <Description>__PACKAGE_DESCRIPTION__</Description>
-    <Logo>Assets\StoreLogo.png</Logo>
+    <Logo>Assets\SorinuriPlayerStore.png</Logo>
   </Properties>
 
   <Resources>
