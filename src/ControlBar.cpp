@@ -19,28 +19,32 @@ static const char* VOL_STYLE =
 QPushButton* ControlBar::makeBtn(const QString& svg, const QString& tip, int size) {
     auto* btn = new QPushButton();
     btn->setToolTip(tip);
-    btn->setFixedSize(size, 32);
+    // 공식 SVG 자체는 바꾸지 않고, 영상 위 어두운 오버레이에서도 조작 대상을
+    // 즉시 인식할 수 있는 정사각형 터치 영역과 아이콘 비례만 적용한다.
+    btn->setFixedSize(size, size);
     btn->setFlat(true);
     btn->setCursor(Qt::PointingHandCursor);
     btn->setFocusPolicy(Qt::NoFocus);
     btn->setIcon(QIcon(svg));
-    btn->setIconSize(QSize(size >= 36 ? 19 : 16, size >= 36 ? 19 : 16));
-    btn->setStyleSheet(SorinuriUi::iconButtonStyle());
+    btn->setIconSize(QSize(size >= 36 ? 22 : 18, size >= 36 ? 22 : 18));
+    btn->setStyleSheet(SorinuriUi::iconButtonStyle() +
+                       "QPushButton { background:rgba(20,31,32,0.32); }"
+                       "QPushButton:hover { background:#1C292A; border-color:#2B3B3C; }"
+                       "QPushButton:pressed { background:#233536; border-color:#00D4B4; }");
     return btn;
 }
 
 ControlBar::ControlBar(QWidget* parent) : QWidget(parent) {
-    // 하단은 모든 화면의 서비스 이동이나 환경 설정이 아닌, 현재 미디어를 조작하는
-    // 정밀 콘솔이다. 화면 모드가 달라도 파일·출력·대기열의 맥락이 한 곳에 유지된다.
+    // 기존 소리누리 SVG 아이콘과 정확한 출력 표시는 보존한다. 컨트롤은 영상 아래의
+    // 전역 바가 아니라 영상 내부 오버레이 선반에 들어가므로 배경·테두리는 부모 덱이 맡는다.
     setMinimumHeight(78);
     setMaximumHeight(88);
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    setStyleSheet(QString("background: %1; border-top: 1px solid %2;")
-                  .arg(SorinuriUi::SurfaceAlt, SorinuriUi::BorderSoft));
+    setStyleSheet("background: transparent; border: none;");
 
     auto* root = new QVBoxLayout(this);
-    root->setContentsMargins(22, 5, 22, 5);
-    root->setSpacing(2);
+    root->setContentsMargins(5, 1, 5, 1);
+    root->setSpacing(1);
 
     auto* seekRow = new QHBoxLayout();
     seekRow->setContentsMargins(0, 0, 0, 0);
@@ -78,14 +82,27 @@ ControlBar::ControlBar(QWidget* parent) : QWidget(parent) {
     transportRow_->setSpacing(5);
 
     btnPrev_ = makeBtn(":/icons/prev.svg", "이전");
-    btnPlay_ = makeBtn(":/icons/play.svg", "재생/일시정지 (Space)", 38);
+    btnPlay_ = makeBtn(":/icons/play.svg", "재생/일시정지 (Space)", 42);
+    btnPlay_->setStyleSheet(SorinuriUi::iconButtonStyle() +
+                            "QPushButton { background:#102221; border:1px solid #00A991; border-radius:21px; }"
+                            "QPushButton:hover { background:#16443E; border-color:#00D4B4; }");
+    // 기존 소리누리 공식 SVG 리소스를 그대로 사용한다. 목업 아이콘으로 교체하지 않는다.
     btnNext_ = makeBtn(":/icons/next.svg", "다음");
     btnStop_ = makeBtn(":/icons/stop.svg", "정지");
+    btnTracks_ = makeBtn(":/icons/audio.svg", "오디오·자막 트랙 표시/숨김");
     btnMute_ = makeBtn(":/icons/volume.svg", "음소거 (M)");
     connect(btnPrev_, &QPushButton::clicked, this, &ControlBar::prevClicked);
     connect(btnPlay_, &QPushButton::clicked, this, &ControlBar::playPauseClicked);
     connect(btnNext_, &QPushButton::clicked, this, &ControlBar::nextClicked);
     connect(btnStop_, &QPushButton::clicked, this, &ControlBar::stopClicked);
+    connect(btnTracks_, &QPushButton::clicked, this, [this]() {
+        if (!trackSurface_) return;
+        const bool willShow = !trackSurface_->isVisible();
+        trackSurface_->setVisible(willShow);
+        btnTracks_->setProperty("active", willShow);
+        btnTracks_->style()->unpolish(btnTracks_);
+        btnTracks_->style()->polish(btnTracks_);
+    });
     connect(btnMute_, &QPushButton::clicked, [this]() {
         muted_ = !muted_;
         btnMute_->setIcon(QIcon(muted_ ? ":/icons/mute.svg" : ":/icons/volume.svg"));
@@ -117,6 +134,7 @@ ControlBar::ControlBar(QWidget* parent) : QWidget(parent) {
     transportRow_->addWidget(btnPlay_);
     transportRow_->addWidget(btnNext_);
     transportRow_->addWidget(btnStop_);
+    transportRow_->addWidget(btnTracks_);
     transportRow_->addSpacing(10);
     transportRow_->addWidget(btnMute_);
     transportRow_->addWidget(volSlider_);
@@ -126,17 +144,19 @@ ControlBar::ControlBar(QWidget* parent) : QWidget(parent) {
     root->addWidget(transportSurface);
 
     // 스트림·오디오·자막 트랙 선택은 재생 콘솔의 보조 행에만 둔다.
-    auto* trackSurface = new QWidget(transportSurface);
-    trackSurface->setObjectName("trackSurface");
-    trackSurface->setMinimumWidth(260);
-    trackSurface->setStyleSheet(
+    trackSurface_ = new QWidget(transportSurface);
+    trackSurface_->setObjectName("trackSurface");
+    trackSurface_->setMinimumWidth(280);
+    trackSurface_->setStyleSheet(
         "QWidget#trackSurface { background: #101A1A; border: 1px solid #273B39; border-radius: 7px; }");
-    trackRow_ = new QHBoxLayout(trackSurface);
+    trackRow_ = new QHBoxLayout(trackSurface_);
     trackRow_->setContentsMargins(7, 1, 7, 1);
     trackRow_->setSpacing(5);
     trackRow_->addStretch(1);
-    // 트랙 선택은 별도의 두 번째 줄이 아니라 같은 재생 덱의 컨텍스트 제어로 유지한다.
-    transportRow_->insertWidget(4, trackSurface, 1);
+    // 트랙 선택은 별도의 두 번째 줄이 아니라 같은 재생 덱의 요청형 컨텍스트 제어다.
+    // 기본 재생 화면에는 기존 아이콘 조작부를 우선 보여 주고, 필요할 때만 연다.
+    trackSurface_->hide();
+    transportRow_->insertWidget(5, trackSurface_, 1);
 }
 
 void ControlBar::embedTrackSelector(TrackSelector* selector) {
