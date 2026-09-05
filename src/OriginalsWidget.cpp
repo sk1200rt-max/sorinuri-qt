@@ -13,6 +13,8 @@
 #include <QPainterPath>
 #include <QFontMetrics>
 #include <QRegularExpression>
+#include <QDateTime>
+#include <QUrlQuery>
 #include <algorithm>
 
 namespace {
@@ -34,6 +36,8 @@ const QStringList CALM_MOODS = {
     "잔잔한", "차분한", "힐링", "평화로운", "아늑함", "따뜻함", "몽환적", "감성적",
     "comforting", "nostalgic", "calm", "warm"
 };
+
+const QString CANONICAL_ORIGINALS_API = QStringLiteral("https://sorinuri.com/api/songs.json");
 
 QString normalizedToken(const QString& value) {
     return value.trimmed().toCaseFolded();
@@ -260,8 +264,16 @@ OriginalsWidget::OriginalsWidget(QWidget* parent) : QWidget(parent) {
     setStyleSheet(QString("background: %1; color: %2;").arg(BG).arg(TEXT));
 
     // API URL을 설정에서 로드
-    apiUrl_ = settings_.value("originals/api_url",
-        "https://sorinuri.com/api/songs.json").toString();
+    apiUrl_ = settings_.value("originals/api_url", CANONICAL_ORIGINALS_API).toString().trimmed();
+    const QUrl configuredApi(apiUrl_);
+    const bool staleSorinuriCatalog = configuredApi.isValid()
+        && configuredApi.scheme().compare(QStringLiteral("https"), Qt::CaseInsensitive) == 0
+        && configuredApi.host().compare(QStringLiteral("sorinuri.com"), Qt::CaseInsensitive) == 0
+        && configuredApi.path() != QStringLiteral("/api/songs.json");
+    if (staleSorinuriCatalog) {
+        apiUrl_ = CANONICAL_ORIGINALS_API;
+        settings_.setValue("originals/api_url", apiUrl_);
+    }
 
     setupUI();
 
@@ -504,9 +516,17 @@ void OriginalsWidget::setupUI() {
 void OriginalsWidget::fetchSongs() {
     statusLabel_->setText("갱신 중...");
     QUrl fetchUrl(apiUrl_);
+    QUrlQuery query(fetchUrl);
+    query.removeAllQueryItems(QStringLiteral("_sorinuriCatalogRefresh"));
+    query.addQueryItem(QStringLiteral("_sorinuriCatalogRefresh"), QString::number(QDateTime::currentMSecsSinceEpoch()));
+    fetchUrl.setQuery(query);
     QNetworkRequest req;
     req.setUrl(fetchUrl);
     req.setHeader(QNetworkRequest::UserAgentHeader, "SorinuriPlayer/6.0");
+    req.setRawHeader("Cache-Control", "no-cache, no-store, max-age=0");
+    req.setRawHeader("Pragma", "no-cache");
+    req.setAttribute(QNetworkRequest::CacheLoadControlAttribute, QNetworkRequest::AlwaysNetwork);
+    req.setAttribute(QNetworkRequest::CacheSaveControlAttribute, false);
     req.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
                      QNetworkRequest::NoLessSafeRedirectPolicy);
     QNetworkReply* reply = nam_->get(req);
@@ -584,7 +604,7 @@ void OriginalsWidget::onFetchFinished(QNetworkReply* reply) {
         songs_.append(s);
     }
 
-    statusLabel_->setText(QString("%1곡").arg(songs_.size()));
+    statusLabel_->setText(QString("%1곡 · 최신").arg(songs_.size()));
     rebuildCategoryButtons();
     applyFilter();
 
