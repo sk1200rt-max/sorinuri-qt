@@ -1,6 +1,6 @@
 {
-  "version": "6.21.5",
-  "domain": "ui,playback,installer",
-  "purpose": "승인된 전체 화면·재생 UI 개선을 유지하면서 오래된 소리누리 오리지널 카탈로그 주소를 자동 복구하고 캐시 우회 갱신으로 공개 59곡 목록을 안정화",
-  "base_commit": "292395c5557a93657eda7d23dbb22b5a5179a56b"
+  "version": "6.21.6",
+  "domain": "ui,playback,renderer,installer",
+  "purpose": "영상 탭 복귀 최신 프레임, 전체 화면 가장자리 메뉴 유지, 서비스 공통 하단 재생 바, 오리지널 필터·정렬, MSIX unplated 바로가기 아이콘 안정화",
+  "base_commit": "cfb49dd2dd76151c4fab7f49f924020522f57ceb"
 }

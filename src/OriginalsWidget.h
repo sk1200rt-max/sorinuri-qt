@@ -165,6 +165,7 @@ private:
     QComboBox*           sortCombo_    = nullptr;
     QLabel*              toastLabel_   = nullptr;
     QTimer*              toastTimer_   = nullptr;
+    QScrollArea*         catScroll_    = nullptr;
     QWidget*             catBar_       = nullptr;
     QList<QPushButton*>  browseBtns_;
     QList<QPushButton*>  catBtns_;

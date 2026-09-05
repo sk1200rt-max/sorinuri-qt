@@ -318,6 +318,22 @@ bool MpvWidget::isMpvInitialized() const {
     return core_ && core_->isInitialized();
 }
 
+void MpvWidget::setPresentationActive(bool active) {
+    const bool previouslyActive = presentationActive_.exchange(active);
+    if (previouslyActive == active) return;
+
+    // 이 플래그는 OpenGL repaint에만 적용한다. libmpv의 재생 시계·디코더·WASAPI
+    // 출력에는 명령을 보내지 않으므로 OTT/오리지널 화면에서도 재생 위치와 오디오는
+    // 계속 진행된다. 복귀 때는 최신 프레임만 한 번 요청해 누적 프레임을 빠르게 훑는
+    // 것처럼 보이는 현상을 피한다.
+    if (active && renderCtx_) {
+        presentationRefreshPending_.store(false);
+        QTimer::singleShot(0, this, [this]() {
+            if (presentationActive_.load() && renderCtx_ && !window()->isMinimized()) update();
+        });
+    }
+}
+
 void MpvWidget::showLogo(bool show) {
     if (!logoLabel_) return;
     logoLabel_->setVisible(show);
@@ -334,14 +350,25 @@ void MpvWidget::appendFile(const QString& path) {
 }
 
 void MpvWidget::onUpdate(void* ctx) {
-    // MPV 렌더 스레드 → Qt 메인 스레드로 안전하게 전달
-    // QueuedConnection: 이벤트 루프를 통해 메인 스레드에서 실행 (스레드 안전)
+    // MPV 렌더 스레드 → Qt 메인 스레드로 안전하게 전달한다. 영상 표면이 숨겨진
+    // 서비스 탭에서는 GUI 큐에 프레임별 작업을 적재하지 않고 최신 프레임만 표시
+    // 대기로 기록한다. 재생·디코드·오디오에는 관여하지 않는다.
     MpvWidget* w = reinterpret_cast<MpvWidget*>(ctx);
+    if (!w) return;
+    if (!w->presentationActive_.load()) {
+        w->presentationRefreshPending_.store(true);
+        return;
+    }
     QMetaObject::invokeMethod(w, "maybeUpdate", Qt::QueuedConnection);
 }
 
 void MpvWidget::maybeUpdate() {
     if (!renderCtx_) return;
+    // 서비스 전환과 콜백 사이의 경합도 GUI 스레드에서 한 번 더 막는다.
+    if (!presentationActive_.load()) {
+        presentationRefreshPending_.store(true);
+        return;
+    }
     // 최소화 시 렌더링 완전 중단
     // 이전 코드: isMinimized() 시 makeCurrent()+paintGL()+swapBuffers() 직접 호용
     // 문제: Qt 콤포지팅 파이프라인을 우회하여 Optimus 환경에서

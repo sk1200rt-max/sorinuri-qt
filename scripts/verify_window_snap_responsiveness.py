@@ -52,19 +52,21 @@ checks += [
      "상단·하단 UI 노출 영역과 독립 표시 함수가 필요합니다."),
     ("if (event->type() == QEvent::MouseMove) {\n        showUI();\n    }\n    if (obj == mpvWidget_)" not in main_cpp,
      "전역 마우스 이동마다 전체 UI를 표시하면 안 됩니다."),
-    ("revealUiForVideoEdge(me->pos());" in main_cpp,
-     "비디오 마우스 이동은 가장자리 노출 함수로만 처리해야 합니다."),
+    ("qApp->installEventFilter(this);" in main_cpp and
+     "revealUiForVideoEdge(me->globalPosition().toPoint());" in main_cpp,
+     "상·하단 메뉴 위 포인터도 전역 가장자리 노출 함수로 처리해야 합니다."),
     ("setCursor(Qt::BlankCursor)" not in main_cpp and
      "mpvWidget_->setCursor(Qt::BlankCursor)" not in main_cpp,
      "UI를 숨길 때 영상 영역의 마우스 포인터를 숨기면 안 됩니다."),
     ("if (cursor().shape() == Qt::BlankCursor) unsetCursor();" in main_cpp and
      "mpvWidget_->unsetCursor();" in main_cpp,
      "이전 상태에서 숨겨진 포인터를 항상 복원해야 합니다."),
-    ("setVideoOverlayVisible(false);\n        showTopUi();" in main_cpp and
-     "if (titleBar_) titleBar_->hide();\n        showBottomUi();" in main_cpp and
-     "if (!isFullscreen_) {\n        showTopUi();\n        showBottomUi();" in main_cpp and
+    ("if (!isFullscreen_) {\n        showTopUi();\n        showBottomUi();" in main_cpp and
+     "titleBar_->geometry().contains(position)" in main_cpp and
+     "videoOverlayDeck_->geometry().contains(position)" in main_cpp and
+     "uiHideTimer_->stop();" in main_cpp and
      "UI_AUTO_HIDE_DELAY_MS = 900" in main_cpp,
-     "창·최대화 모드에서는 메뉴를 유지하고 전체 화면 가장자리에서만 짧게 영상 UI를 표시해야 합니다."),
+     "창·최대화 모드에서는 메뉴를 유지하고 전체 화면에서 포인터가 메뉴 위에 있는 동안 숨기지 않아야 합니다."),
     ("eventTimer_" not in core_h and "eventTimer_" not in core_cpp,
      "wakeup callback과 중복되는 16ms MPV 이벤트 폴링은 없어야 합니다."),
     ("mpv_set_wakeup_callback" in core_cpp and "QTimer::singleShot(0, self, &MpvCore::onMpvEvents)" in core_cpp,

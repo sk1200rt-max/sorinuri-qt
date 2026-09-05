@@ -2,6 +2,7 @@
 #include <QOpenGLWidget>
 #include <QLabel>
 #include <QShowEvent>
+#include <atomic>
 #include "MpvCore.h"
 #include <mpv/render.h>
 #include <mpv/render_gl.h>
@@ -21,6 +22,11 @@ public:
     void showLogo(bool show);
     void setAiSubtitle(const QString& text, int confidence);
     void clearAiSubtitle();
+
+    // OTT·오리지널·음악 화면처럼 영상 표면이 보이지 않는 동안에는 OpenGL repaint만
+    // 멈춘다. libmpv 재생·오디오 출력은 계속 유지하고, 플레이어로 돌아오면 현재
+    // 프레임을 즉시 한 번 갱신한다.
+    void setPresentationActive(bool active);
 
     // 메인 창 closeEvent에서 호출한다. OpenGL render context를 먼저 해제한 뒤
     // MpvCore를 동기 종료하여 WASAPI 독점 핸들이 다른 앱을 막지 않게 한다.
@@ -61,6 +67,8 @@ private:
     bool mpvInitializationQueued_ = false;
     bool  shutdownStarted_ = false;
     bool  screenChangedConnected_ = false;  // 멀티모니터 감지 연결 여부
+    std::atomic_bool presentationActive_{true};        // 화면에 실제로 보이는 영상 표면만 repaint
+    std::atomic_bool presentationRefreshPending_{false};
     void  connectScreenChanged(QWindow* win);  // 멀티모니터 시그널 연결 헬퍼
 
     QLabel*  logoLabel_  = nullptr;
