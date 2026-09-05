@@ -65,7 +65,10 @@ def main() -> int:
         'Compare-Object',
         'unsigned artifact',
         'altform-unplated',
-        'Square44x44Logo.targetsize-44_altform-unplated.png',
+        'SorinuriPlayerIcon.png',
+        'SorinuriPlayerIcon.targetsize-44_altform-unplated.png',
+        'SorinuriPlayerTile150.png',
+        'SorinuriPlayerTileWide.png',
     ):
         require(packer, required, "scripts/build_store_msix.ps1")
 
@@ -93,6 +96,14 @@ def main() -> int:
         raise AssertionError('MSIX 버전은 누락될 수 있는 APP_VERSION 환경변수가 아니라 CMakeLists.txt의 실제 제품 버전에서 생성해야 합니다.')
     if 'BackgroundColor="transparent"' not in manifest:
         raise AssertionError('MSIX 시각 요소는 투명 배경을 유지해야 합니다.')
+    for required in (
+        'Assets\\SorinuriPlayerIcon.png',
+        'Assets\\SorinuriPlayerTile150.png',
+        'Assets\\SorinuriPlayerTileWide.png',
+    ):
+        require(manifest, required, 'packaging/msix/AppxManifest.xml.in')
+    if 'Square44x44Logo.png' in manifest:
+        raise AssertionError('MSIX 매니페스트는 이전 Square44x44Logo 경로를 사용하면 안 됩니다.')
 
     for required in (
         'build_local_test_msix:',
