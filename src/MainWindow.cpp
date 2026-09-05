@@ -207,9 +207,10 @@ void MainWindow::setupUI() {
     mpvWidget_->setFocusPolicy(Qt::ClickFocus);
     videoLayout->addWidget(mpvWidget_, 1);
 
-    // 승인 목업: 영상 영역을 가리지 않는 전체 폭 64px 단일 하단 바.
-    // 별도 카드·라운드 모서리·두 번째 정보 행 없이 ControlBar 한 줄만 둔다.
-    videoOverlayDeck_ = new QWidget(videoContainer);
+    // 승인 목업: 서비스와 관계없이 창 하단에 유지하는 전체 폭 64px 단일 재생 바.
+    // central의 직접 자식으로 두어 영상·OTT·오리지널 화면 전환에도 재생 상태와
+    // 대기열 접근이 사라지지 않는다. 콘텐츠 레이아웃은 바 뒤에서 유지된다.
+    videoOverlayDeck_ = new QWidget(central);
     videoOverlayDeck_->setObjectName(QStringLiteral("videoOverlayDeck"));
     videoOverlayDeck_->setAttribute(Qt::WA_StyledBackground, true);
     videoOverlayDeck_->setFixedHeight(64);
@@ -763,21 +764,20 @@ void MainWindow::updateVideoShelf() {
 }
 
 void MainWindow::positionVideoOverlayDeck() {
-    if (!videoOverlayDeck_ || !mpvWidget_) return;
-    // 승인 목업 기준: 영상 컨테이너의 실제 하단에 전체 폭으로 붙는 64px 단일 바.
-    // 창 크기·HiDPI 논리 좌표에 맞춰 매번 계산하며 영상 렌더 위젯의 크기는 바꾸지 않는다.
-    videoOverlayDeck_->setFixedWidth(mpvWidget_->width());
-    const int x = mpvWidget_->x();
-    const int y = mpvWidget_->y() + qMax(0, mpvWidget_->height() - videoOverlayDeck_->height());
-    videoOverlayDeck_->move(x, y);
+    if (!videoOverlayDeck_ || !centralWidget()) return;
+    // 전체 폭 하단 재생 바는 중앙 표면의 직접 자식이다. 서비스 페이지의 내부
+    // 스택·WebView와 분리해 전환 중에도 같은 위치·폭·논리 좌표를 유지한다.
+    QWidget* surface = centralWidget();
+    videoOverlayDeck_->setFixedWidth(surface->width());
+    videoOverlayDeck_->move(0, qMax(0, surface->height() - videoOverlayDeck_->height()));
     videoOverlayDeck_->raise();
 }
 
 void MainWindow::setVideoOverlayVisible(bool visible) {
     if (!videoOverlayDeck_) return;
-    // 파일을 열기 전 기본 플레이어는 기존의 깨끗한 로고 화면을 유지한다.
-    // 실제 미디어가 있을 때만 목업 A의 영상 내부 재생 선반을 표시한다.
-    if (visible && !currentFilePath_.isEmpty()) {
+    // 최초 단독 실행부터 빈 재생 상태·파일 열기·대기열 접근을 같은 하단 바에
+    // 제공한다. 미디어 유무로 가시성을 제한하지 않는다.
+    if (visible) {
         positionVideoOverlayDeck();
         videoOverlayDeck_->show();
         videoOverlayDeck_->raise();
@@ -790,6 +790,9 @@ void MainWindow::switchToMusicMode() {
     ensureMusicPage();
     isOttMode_ = false;
     isMusicMode_ = true;
+    // 음악 화면에서는 영상 repaint만 멈춰 CPU/GPU 부하를 줄인다. 재생·오디오는
+    // MpvCore가 계속 담당하므로 세션과 출력 정책은 바뀌지 않는다.
+    if (mpvWidget_) mpvWidget_->setPresentationActive(false);
     titleBar_->setActiveService(TitleBar::Service::Player);
     playerStack_->setCurrentWidget(musicPage_);
     setVideoOverlayVisible(false);
@@ -816,6 +819,10 @@ void MainWindow::switchToVideoMode() {
     isMusicMode_ = false;
     titleBar_->setActiveService(TitleBar::Service::Player);
     playerStack_->setCurrentIndex(0);
+    // 오리지널/OTT 동안 누적된 repaint를 재생하지 않고, 플레이어 표면이 다시
+    // 보인 뒤 최신 프레임만 즉시 갱신한다. libmpv 재생 시계와 오디오 출력은
+    // 중단하지 않는다.
+    if (mpvWidget_) mpvWidget_->setPresentationActive(true);
     // 창·최대화 모드에서는 항상 보이고, 전체 화면에서는 하단 가장자리 오버 전까지 숨긴다.
     setVideoOverlayVisible(!isFullscreen_);
     updateVideoShelf();
@@ -992,17 +999,16 @@ void MainWindow::showTopUi() {
     if (cursor().shape() == Qt::BlankCursor) unsetCursor();
     if (mpvWidget_) mpvWidget_->unsetCursor();
     if (musicPage_) musicPage_->unsetCursor();
-    // 일반 창 모드에서는 서비스 전환을 항상 유지한다. 전체화면에서만 가장자리
-    // 노출 정책을 적용해 영상 몰입과 메뉴 접근성을 함께 보장한다.
-    if (isFullscreen_ && isPlaying_ && !isMusicMode_ && uiHideTimer_)
-        uiHideTimer_->start(UI_AUTO_HIDE_DELAY_MS);
+    // 타이머는 포인터가 상·하단 표시 영역에서 벗어난 뒤에만 eventFilter가
+    // 시작한다. 표시 영역 위에서 다시 시작하면 사용자가 머무는 중에도 메뉴가
+    // 사라지는 문제가 생긴다.
 }
 
 void MainWindow::showBottomUi() {
-    // 재생 선반·하단 콘솔은 영상 플레이어 페이지 전용이다. 음악·OTT·오리지널 화면에서
-    // showUI가 호출돼도 다시 나타나면 독립 감상 화면의 정보 구조가 무너진다.
-    const bool isVideoPlayerPage = playerStack_ && playerStack_->currentWidget() == videoPage_;
-    if (isMusicMode_ || isOttMode_ || !isVideoPlayerPage || !controlBar_) {
+    if (!controlBar_) return;
+    // 하단 재생 바는 현재 재생 상태·대기열·설정의 공통 접근점이다. 음악의 자체
+    // 감상 화면만 예외로 두고 영상·OTT·오리지널에서는 같은 위치에 계속 보인다.
+    if (isMusicMode_) {
         setVideoOverlayVisible(false);
         return;
     }
@@ -1011,8 +1017,6 @@ void MainWindow::showBottomUi() {
 
     if (cursor().shape() == Qt::BlankCursor) unsetCursor();
     if (mpvWidget_) mpvWidget_->unsetCursor();
-    if (isFullscreen_ && isPlaying_ && uiHideTimer_)
-        uiHideTimer_->start(UI_AUTO_HIDE_DELAY_MS);
 }
 
 void MainWindow::showUI() {
@@ -1027,26 +1031,41 @@ void MainWindow::showUI() {
     showBottomUi();
 }
 
-void MainWindow::revealUiForVideoEdge(const QPoint& videoPosition) {
-    if (isMusicMode_ || !mpvWidget_) return;
+void MainWindow::revealUiForVideoEdge(const QPoint& globalPosition) {
+    if (isMusicMode_ || !centralWidget()) return;
 
-    // 창 모드와 최대화 모드에서는 상·하단 메뉴를 계속 보인다. 가장자리 트리거는
-    // 전체 화면 영상 재생에서만 사용하므로 일반 창의 리사이즈·Snap 동작과 섞이지 않는다.
+    // 중앙 표면 기준의 전역 좌표를 쓴다. mpvWidget뿐 아니라 상단 메뉴·하단 재생
+    // 바의 버튼 위에서 마우스를 멈춘 상태도 같은 정책으로 처리할 수 있다.
+    const QPoint position = centralWidget()->mapFromGlobal(globalPosition);
+    const QRect surfaceRect = centralWidget()->rect();
+    if (!surfaceRect.contains(position)) return;
+
+    // 창 모드와 최대화 모드에서는 상·하단 메뉴를 항상 보인다. 가장자리 트리거는
+    // 전체 화면에서만 적용해 일반 창의 리사이즈·Snap 동작과 섞이지 않는다.
     if (!isFullscreen_) {
         showTopUi();
         showBottomUi();
         return;
     }
-    if (!isPlaying_) return;
 
-    // 중앙 영상 영역 이동만으로는 UI가 나타나지 않는다. 상·하단 가장자리에서만
-    // 각각 해당 UI를 표시하고 짧은 타이머가 다시 시작된다.
-    if (videoPosition.y() <= TOP_UI_REVEAL_ZONE) {
-        setVideoOverlayVisible(false);
+    const bool onTopEdge = position.y() <= TOP_UI_REVEAL_ZONE
+        || (titleBar_ && titleBar_->isVisible() && titleBar_->geometry().contains(position));
+    const bool onBottomEdge = position.y() >= surfaceRect.height() - BOTTOM_UI_REVEAL_ZONE
+        || (videoOverlayDeck_ && videoOverlayDeck_->isVisible()
+            && videoOverlayDeck_->geometry().contains(position));
+
+    // 포인터가 표시된 메뉴 위에 있는 동안에는 절대 자동 숨김 타이머를 실행하지
+    // 않는다. 메뉴를 벗어난 후에만 짧은 지연으로 다시 몰입 화면으로 돌아간다.
+    if (onTopEdge) {
+        if (videoOverlayDeck_) videoOverlayDeck_->hide();
         showTopUi();
-    } else if (videoPosition.y() >= mpvWidget_->height() - BOTTOM_UI_REVEAL_ZONE) {
+        if (uiHideTimer_) uiHideTimer_->stop();
+    } else if (onBottomEdge) {
         if (titleBar_) titleBar_->hide();
         showBottomUi();
+        if (uiHideTimer_) uiHideTimer_->stop();
+    } else if (uiVisible_ && uiHideTimer_) {
+        uiHideTimer_->start(UI_AUTO_HIDE_DELAY_MS);
     }
 }
 
@@ -1110,15 +1129,18 @@ void MainWindow::onPlaybackStarted() {
     }
     isPlaying_ = true;
     if (isFullscreen_ && !isMusicMode_) {
-        // 전체 화면 재생 시작은 몰입 상태로 시작한다. 메뉴는 가장자리 오버에서만 연다.
+        // 전체 화면 재생은 몰입 상태로 시작하되, 포인터가 이미 상·하단 가장자리에
+        // 있으면 해당 메뉴는 계속 표시한다.
         if (titleBar_) titleBar_->hide();
         setVideoOverlayVisible(false);
         uiVisible_ = false;
+        QTimer::singleShot(0, this, [this]() {
+            revealUiForVideoEdge(QCursor::pos());
+            if (!uiVisible_ && uiHideTimer_) uiHideTimer_->start(UI_AUTO_HIDE_DELAY_MS);
+        });
     } else {
         showUI();
     }
-    // 자동 숨김 타이머는 전체 화면 영상 모드에서만 시작한다.
-    if (isFullscreen_ && !isMusicMode_) uiHideTimer_->start(UI_AUTO_HIDE_DELAY_MS);
 #ifdef Q_OS_WIN
     SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED);
 #endif
@@ -1719,14 +1741,23 @@ void MainWindow::showOriginalsPage() {
 
     // OTT의 웹 화면·하단 전문 기능 패널을 모두 벗어나 오리지널 전용 페이지로 전환한다.
     isOttMode_ = false;
+    // 카탈로그는 음악 감상 화면과 별도다. 숨겨진 스펙트럼 타이머를 멈추고 공통
+    // 하단 재생 바를 사용할 수 있게 모드 상태를 분리한다.
+    if (isMusicMode_) {
+        isMusicMode_ = false;
+        if (musicPage_) musicPage_->setVisualizationActive(false);
+        if (mpvWidget_) mpvWidget_->core()->setSpectrumEnabled(false);
+    }
     mainStack_->setCurrentWidget(playerPage_);
     if (proFeatures_ && proFeatures_->isVisible()) {
         proFeatures_->hide();
         isProFeaturesOpen_ = false;
     }
     playerStack_->setCurrentWidget(originalsPage_);
-    // 오리지널은 선택·탐색에 집중하는 독립 카탈로그다. 플레이어 전용 오버레이는 남기지 않는다.
-    setVideoOverlayVisible(false);
+    // 오리지널에서도 현재 재생 상태·대기열을 확인할 수 있는 공통 하단 바는 유지한다.
+    // 보이지 않는 영상 표면의 repaint만 멈춰 카탈로그 탐색 중 CPU/GPU 부하를 낮춘다.
+    if (mpvWidget_) mpvWidget_->setPresentationActive(false);
+    showBottomUi();
     originalsWidget_->setCurrentFile(currentFilePath_);
     showUI();
     titleBar_->setActiveService(TitleBar::Service::Originals);
@@ -2278,6 +2309,13 @@ void MainWindow::mousePressEvent(QMouseEvent* e) {
 }
 
 bool MainWindow::eventFilter(QObject* obj, QEvent* event) {
+    // qApp 레벨 필터에서 처리한다. 전체 화면에 표시된 상단바·하단바의 자식 버튼 위에
+    // 마우스를 그대로 두어도 숨김 타이머가 다시 시작되지 않도록 전역 좌표를 사용한다.
+    if (event->type() == QEvent::MouseMove && isFullscreen_ && !isMusicMode_) {
+        auto* me = static_cast<QMouseEvent*>(event);
+        revealUiForVideoEdge(me->globalPosition().toPoint());
+    }
+
     if (obj == mpvWidget_) {
         // 클릭 시 MainWindow로 포커스 재설정 - 키 이벤트가 keyPressEvent로 정상 전달됨
         if (event->type() == QEvent::MouseButtonPress) {
@@ -2291,10 +2329,7 @@ bool MainWindow::eventFilter(QObject* obj, QEvent* event) {
             }
         }
         if (event->type() == QEvent::MouseMove) {
-            // 중앙 영상 영역의 마우스 이동은 UI를 건드리지 않는다.
-            // 상단·하단 가장자리 진입에만 각각의 UI를 노출한다.
-            auto* me = static_cast<QMouseEvent*>(event);
-            revealUiForVideoEdge(me->pos());
+            // 전체 화면 가장자리 표시는 위의 qApp 필터에서 전역 좌표로 처리한다.
         } else if (event->type() == QEvent::MouseButtonDblClick) {
             // 영상 더블클릭 → 전체화면 토글 (팟플레이어 동일 동작)
             auto* me = static_cast<QMouseEvent*>(event);
@@ -2643,6 +2678,13 @@ void MainWindow::switchToPlayerMode() {
 
 void MainWindow::switchToOttMode() {
     isOttMode_ = true;
+    // OTT는 음악 감상 스테이지와 별도다. 보이지 않는 스펙트럼 repaint를 멈추고
+    // 공통 하단 재생 바를 사용할 수 있도록 모드를 분리한다.
+    if (isMusicMode_) {
+        isMusicMode_ = false;
+        if (musicPage_) musicPage_->setVisualizationActive(false);
+        if (mpvWidget_) mpvWidget_->core()->setSpectrumEnabled(false);
+    }
     // 지연 초기화: 처음 OTT 탭 클릭 시 WebView2 생성
     if (!ottPage_) {
         ottPage_ = new OttWidget(this);
@@ -2657,8 +2699,10 @@ void MainWindow::switchToOttMode() {
                 this, &MainWindow::switchToPlayerMode);
     }
     mainStack_->setCurrentIndex(1);
-    // OTT는 독립 탐색 화면이다. 플레이어 전용 오버레이는 남기지 않는다.
-    setVideoOverlayVisible(false);
+    // OTT 탐색 중에도 공통 하단 재생 바는 유지하고, 보이지 않는 영상 표면 repaint만
+    // 멈춰 WebView와 재생이 같은 CPU/GPU 자원을 과도하게 경쟁하지 않게 한다.
+    if (mpvWidget_) mpvWidget_->setPresentationActive(false);
+    showBottomUi();
     // OTT에서도 창 상단 메뉴는 유지한다. WebView2 안으로 들어가도 앱 조작 경로를 잃지 않는다.
     showTopUi();
     // OTT 모드 진입 시 광고 요청 (비동기, 광고 없으면 표시 안 함)

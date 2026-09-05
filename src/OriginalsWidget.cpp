@@ -388,21 +388,21 @@ void OriginalsWidget::setupUI() {
     browseRow->addStretch(1);
     discoveryLayout->addLayout(browseRow);
 
-    auto* catScroll = new QScrollArea(discoveryBar);
-    catScroll->setFrameShape(QFrame::NoFrame);
-    catScroll->setWidgetResizable(false);
-    catScroll->setFixedHeight(34);
-    catScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    catScroll->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    catScroll->setStyleSheet("QScrollArea{background:transparent;border:none;}");
-    catBar_ = new QWidget(catScroll);
+    catScroll_ = new QScrollArea(discoveryBar);
+    catScroll_->setFrameShape(QFrame::NoFrame);
+    catScroll_->setWidgetResizable(false);
+    catScroll_->setFixedHeight(34);
+    catScroll_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    catScroll_->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    catScroll_->setStyleSheet("QScrollArea{background:transparent;border:none;}");
+    catBar_ = new QWidget(catScroll_);
     catBar_->setStyleSheet("background:transparent;");
     auto* catRow = new QHBoxLayout(catBar_);
     catRow->setContentsMargins(0, 0, 0, 0);
     catRow->setSpacing(5);
     catRow->addStretch(1);
-    catScroll->setWidget(catBar_);
-    discoveryLayout->addWidget(catScroll);
+    catScroll_->setWidget(catBar_);
+    discoveryLayout->addWidget(catScroll_);
     root->addWidget(discoveryBar);
     updateBrowseButtons();
 
@@ -608,10 +608,11 @@ void OriginalsWidget::onFetchFinished(QNetworkReply* reply) {
     rebuildCategoryButtons();
     applyFilter();
 
-    // 썸네일 fetch (처음 30개 즉시)
-    int limit = qMin(songs_.size(), 30);
+    // 첫 화면에 필요한 썸네일만 지연 없이 요청한다. 전체 카탈로그의 30개 이미지를
+    // 한꺼번에 디코드하면 노트북에서도 탭 전환과 스크롤이 무거워질 수 있다.
+    const int limit = qMin(filtered_.size(), 12);
     for (int i = 0; i < limit; ++i)
-        fetchThumbnail(songs_[i]);
+        fetchThumbnail(filtered_[i]);
 }
 
 // ── 썸네일 fetch ──────────────────────────────────────────────────────────────
@@ -752,7 +753,13 @@ void OriginalsWidget::rebuildCategoryButtons() {
         layout->addWidget(button);
     }
     layout->addStretch();
-    catBar_->setMinimumWidth(qMax(1, categories.size()) * 82);
+    // QScrollArea가 직접 자식의 크기를 자동으로 확대하지 않는 환경에서도 하부
+    // 분류 행이 0폭으로 접히지 않게 실제 레이아웃 크기를 적용한다.
+    layout->activate();
+    const int rowWidth = qMax(catScroll_ ? catScroll_->viewport()->width() : 1,
+                              layout->sizeHint().width());
+    catBar_->setFixedSize(rowWidth, 28);
+    if (catScroll_) catScroll_->setVisible(true);
 }
 
 void OriginalsWidget::updatePlayButtons() {
@@ -891,17 +898,20 @@ void OriginalsWidget::onBrowseModeClicked(int mode) {
     updateBrowseButtons();
     rebuildCategoryButtons();
     applyFilter();
+    if (listWidget_) listWidget_->scrollToTop();
 }
 
 void OriginalsWidget::onCategoryClicked(const QString& category) {
     activeCategory_ = category;
     rebuildCategoryButtons();
     applyFilter();
+    if (listWidget_) listWidget_->scrollToTop();
 }
 
 void OriginalsWidget::onSortChanged(int index) {
     sortIndex_ = index;
     applyFilter();
+    if (listWidget_) listWidget_->scrollToTop();
 }
 
 void OriginalsWidget::onSelectionChanged() {
