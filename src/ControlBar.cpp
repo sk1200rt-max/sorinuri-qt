@@ -1,59 +1,67 @@
 #include "ControlBar.h"
 #include "UiTheme.h"
+#include <QFrame>
 #include <QIcon>
+#include <QStyle>
 
 static const char* SEEK_STYLE =
-    "QSlider::groove:horizontal { height: 4px; background: #273334; border-radius: 2px; }"
-    "QSlider::handle:horizontal { width: 12px; height: 12px; margin: -4px 0;"
-    "  background: #00D4B4; border: 2px solid #0A0F10; border-radius: 6px; }"
-    "QSlider::handle:horizontal:hover { width: 15px; height: 15px; margin: -5.5px 0;"
-    "  background: #2AE2C5; border-radius: 7px; }"
-    "QSlider::sub-page:horizontal { background: #00A991; border-radius: 2px; }";
+    "QSlider::groove:horizontal { height: 2px; background: #2A3233; border: none; }"
+    "QSlider::handle:horizontal { width: 10px; height: 10px; margin: -4px 0;"
+    "  background: #00D4B4; border: 1px solid #0A0F10; border-radius: 5px; }"
+    "QSlider::handle:horizontal:hover { width: 12px; height: 12px; margin: -5px 0;"
+    "  background: #2AE2C5; border-radius: 6px; }"
+    "QSlider::sub-page:horizontal { background: #00D4B4; border: none; }";
 static const char* VOL_STYLE =
-    "QSlider::groove:horizontal { height: 3px; background: #2B3B3C; border-radius: 1px; }"
-    "QSlider::handle:horizontal { width: 9px; height: 9px; margin: -3px 0;"
-    "  background: #D7E2E0; border-radius: 4px; }"
+    "QSlider::groove:horizontal { height: 2px; background: #3A4546; border: none; }"
+    "QSlider::handle:horizontal { width: 9px; height: 9px; margin: -3.5px 0;"
+    "  background: #D7E2E0; border: none; border-radius: 4px; }"
     "QSlider::handle:horizontal:hover { background: #F2F7F6; }"
-    "QSlider::sub-page:horizontal { background: #71807F; border-radius: 1px; }";
+    "QSlider::sub-page:horizontal { background: #00A991; border: none; }";
+
+namespace {
+QFrame* makeDivider(QWidget* parent) {
+    auto* divider = new QFrame(parent);
+    divider->setFrameShape(QFrame::VLine);
+    divider->setFixedSize(1, 26);
+    divider->setStyleSheet("background:#313A3B; border:none;");
+    return divider;
+}
+}
 
 QPushButton* ControlBar::makeBtn(const QString& svg, const QString& tip, int size) {
     auto* btn = new QPushButton();
     btn->setToolTip(tip);
-    // 공식 SVG 자체는 바꾸지 않고, 영상 위 어두운 오버레이에서도 조작 대상을
-    // 즉시 인식할 수 있는 정사각형 터치 영역과 아이콘 비례만 적용한다.
     btn->setFixedSize(size, size);
     btn->setFlat(true);
     btn->setCursor(Qt::PointingHandCursor);
     btn->setFocusPolicy(Qt::NoFocus);
     btn->setIcon(QIcon(svg));
-    btn->setIconSize(QSize(size >= 36 ? 22 : 18, size >= 36 ? 22 : 18));
-    btn->setStyleSheet(SorinuriUi::iconButtonStyle() +
-                       "QPushButton { background:rgba(20,31,32,0.32); }"
-                       "QPushButton:hover { background:#1C292A; border-color:#2B3B3C; }"
-                       "QPushButton:pressed { background:#233536; border-color:#00D4B4; }");
+    btn->setIconSize(QSize(size >= 38 ? 19 : 16, size >= 38 ? 19 : 16));
+    btn->setStyleSheet(
+        "QPushButton { background:transparent; border:1px solid transparent; border-radius:4px; }"
+        "QPushButton:hover { background:#232C2D; border-color:#3A4A4B; }"
+        "QPushButton:pressed { background:#2B3A3A; border-color:#00D4B4; }");
     return btn;
 }
 
 ControlBar::ControlBar(QWidget* parent) : QWidget(parent) {
-    // 기존 소리누리 SVG 아이콘과 정확한 출력 표시는 보존한다. 컨트롤은 영상 아래의
-    // 전역 바가 아니라 영상 내부 오버레이 선반에 들어가므로 배경·테두리는 부모 덱이 맡는다.
-    setMinimumHeight(78);
-    setMaximumHeight(88);
+    // 기본 상태는 전체 폭의 한 줄이며, 영상 화면의 하단에만 붙는다.
+    // 재생/오디오 제어의 기존 signal 연결과 공식 SVG 리소스는 유지한다.
+    setFixedHeight(64);
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     setStyleSheet("background: transparent; border: none;");
 
     auto* root = new QVBoxLayout(this);
-    root->setContentsMargins(5, 1, 5, 1);
-    root->setSpacing(1);
+    root->setContentsMargins(0, 0, 0, 0);
+    root->setSpacing(0);
 
-    auto* seekRow = new QHBoxLayout();
-    seekRow->setContentsMargins(0, 0, 0, 0);
-    seekRow->setSpacing(9);
     seekSlider_ = new ClickSeekSlider(Qt::Horizontal, this);
     seekSlider_->setRange(0, 10000);
     seekSlider_->setValue(0);
+    seekSlider_->setFixedHeight(6);
     seekSlider_->setStyleSheet(SEEK_STYLE);
     seekSlider_->setFocusPolicy(Qt::NoFocus);
+    seekSlider_->setCursor(Qt::PointingHandCursor);
     seekSlider_->setTracking(true);
     connect(seekSlider_, &QSlider::sliderPressed, [this]() {
         seeking_ = true;
@@ -64,33 +72,31 @@ ControlBar::ControlBar(QWidget* parent) : QWidget(parent) {
         seeking_ = false;
         emit seeked((seekSlider_->value() / 10000.0) * totalDuration_);
     });
-    timeLabel_ = new QLabel("00:00 / 00:00", this);
-    timeLabel_->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-    timeLabel_->setStyleSheet(
-        "color: #A3B1B0; font-size: 11px; font-weight: 600;"
-        "font-family: 'Cascadia Mono', 'Consolas', monospace; min-width: 108px; background: transparent;");
-    seekRow->addWidget(seekSlider_, 1);
-    seekRow->addWidget(timeLabel_);
-    root->addLayout(seekRow);
+    root->addWidget(seekSlider_);
 
     auto* transportSurface = new QWidget(this);
     transportSurface->setObjectName("transportSurface");
-    transportSurface->setStyleSheet(
-        "QWidget#transportSurface { background: transparent; border: none; }");
+    transportSurface->setFixedHeight(58);
+    transportSurface->setStyleSheet("QWidget#transportSurface { background:transparent; border:none; }");
     transportRow_ = new QHBoxLayout(transportSurface);
-    transportRow_->setContentsMargins(0, 0, 0, 0);
-    transportRow_->setSpacing(5);
+    transportRow_->setContentsMargins(9, 0, 9, 0);
+    transportRow_->setSpacing(6);
 
-    btnPrev_ = makeBtn(":/icons/prev.svg", "이전");
-    btnPlay_ = makeBtn(":/icons/play.svg", "재생/일시정지 (Space)", 42);
-    btnPlay_->setStyleSheet(SorinuriUi::iconButtonStyle() +
-                            "QPushButton { background:#102221; border:1px solid #00A991; border-radius:21px; }"
-                            "QPushButton:hover { background:#16443E; border-color:#00D4B4; }");
-    // 기존 소리누리 공식 SVG 리소스를 그대로 사용한다. 목업 아이콘으로 교체하지 않는다.
-    btnNext_ = makeBtn(":/icons/next.svg", "다음");
-    btnStop_ = makeBtn(":/icons/stop.svg", "정지");
-    btnTracks_ = makeBtn(":/icons/audio.svg", "오디오·자막 트랙 표시/숨김");
-    btnMute_ = makeBtn(":/icons/volume.svg", "음소거 (M)");
+    // 한 상태에는 하나의 기본 제어만 표시한다. 이전/다음은 그 좌우에,
+    // 정지는 별도 구분선 뒤 낮은 우선순위로 둔다.
+    btnPrev_ = makeBtn(":/icons/prev.svg", "이전 항목", 32);
+    btnPlay_ = makeBtn(":/icons/play.svg", "재생/일시정지 (Space)", 38);
+    btnPlay_->setStyleSheet(
+        "QPushButton { background:#152221; border:1px solid #00D4B4; border-radius:19px; }"
+        "QPushButton:hover { background:#1D3532; border-color:#2AE2C5; }"
+        "QPushButton:pressed { background:#244542; border-color:#00D4B4; }");
+    btnNext_ = makeBtn(":/icons/next.svg", "다음 항목", 32);
+    btnStop_ = makeBtn(":/icons/stop.svg", "정지", 30);
+    btnTracks_ = makeBtn(":/icons/audio.svg", "오디오·자막 트랙", 30);
+    btnMute_ = makeBtn(":/icons/volume.svg", "음소거 (M)", 30);
+    btnQueue_ = makeBtn(":/icons/playlist.svg", "대기열", 30);
+    btnSettings_ = makeBtn(":/icons/settings.svg", "환경 설정", 30);
+
     connect(btnPrev_, &QPushButton::clicked, this, &ControlBar::prevClicked);
     connect(btnPlay_, &QPushButton::clicked, this, &ControlBar::playPauseClicked);
     connect(btnNext_, &QPushButton::clicked, this, &ControlBar::nextClicked);
@@ -103,65 +109,87 @@ ControlBar::ControlBar(QWidget* parent) : QWidget(parent) {
         btnTracks_->style()->unpolish(btnTracks_);
         btnTracks_->style()->polish(btnTracks_);
     });
-    connect(btnMute_, &QPushButton::clicked, [this]() {
+    connect(btnMute_, &QPushButton::clicked, this, [this]() {
         muted_ = !muted_;
         btnMute_->setIcon(QIcon(muted_ ? ":/icons/mute.svg" : ":/icons/volume.svg"));
         emit muteToggled(muted_);
     });
+    connect(btnQueue_, &QPushButton::clicked, this, &ControlBar::queueRequested);
+    connect(btnSettings_, &QPushButton::clicked, this, &ControlBar::settingsRequested);
 
-    volSlider_ = new QSlider(Qt::Horizontal, this);
+    timeLabel_ = new QLabel("00:00 / 00:00", transportSurface);
+    timeLabel_->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    timeLabel_->setStyleSheet(
+        "color:#D6E1DF; font-size:11px; font-weight:650;"
+        "font-family:'Cascadia Mono','Consolas',monospace; min-width:96px; background:transparent;");
+
+    audioInfoLabel_ = new QLabel(transportSurface);
+    audioInfoLabel_->setTextFormat(Qt::RichText);
+    audioInfoLabel_->setMinimumWidth(0);
+    audioInfoLabel_->setMaximumWidth(260);
+    audioInfoLabel_->setStyleSheet(
+        "color:#A3B1B0; font-size:10px; font-family:'Cascadia Mono','Consolas',monospace;"
+        "background:transparent; border:none; padding:0 3px;");
+    audioInfoLabel_->hide();
+
+    mediaInfoLabel_ = new QLabel(transportSurface);
+    mediaInfoLabel_->setAlignment(Qt::AlignCenter | Qt::AlignVCenter);
+    mediaInfoLabel_->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+    mediaInfoLabel_->setMinimumWidth(100);
+    mediaInfoLabel_->setStyleSheet(
+        "color:#AAB8B6; font-size:11px; font-weight:550; background:transparent; padding:0 8px;");
+    mediaInfoLabel_->setText(QStringLiteral("재생할 파일을 열어 주세요"));
+
+    volSlider_ = new QSlider(Qt::Horizontal, transportSurface);
     volSlider_->setRange(0, 200);
     volSlider_->setValue(100);
-    volSlider_->setFixedWidth(84);
+    volSlider_->setFixedWidth(94);
     volSlider_->setFocusPolicy(Qt::NoFocus);
+    volSlider_->setCursor(Qt::PointingHandCursor);
     volSlider_->setStyleSheet(VOL_STYLE);
     connect(volSlider_, &QSlider::valueChanged, this, &ControlBar::onVolMoved);
-    volLabel_ = new QLabel("100%", this);
+    volLabel_ = new QLabel("100%", transportSurface);
     volLabel_->setStyleSheet(
-        "color: #A3B1B0; font-size: 10px; font-family: 'Cascadia Mono', 'Consolas', monospace;"
-        "min-width: 34px; background: transparent;");
-
-    audioInfoLabel_ = new QLabel(this);
-    audioInfoLabel_->setTextFormat(Qt::RichText);
-    audioInfoLabel_->setMinimumWidth(180);
-    audioInfoLabel_->setMaximumWidth(480);
-    audioInfoLabel_->setStyleSheet(
-        "color: #A3B1B0; font-size: 10px; font-family: 'Cascadia Mono', 'Consolas', monospace;"
-        "background: transparent; border: none; padding: 0 5px;");
-    audioInfoLabel_->hide();
+        "color:#B7C5C3; font-size:10px; font-family:'Cascadia Mono','Consolas',monospace;"
+        "min-width:34px; background:transparent;");
 
     transportRow_->addWidget(btnPrev_);
     transportRow_->addWidget(btnPlay_);
     transportRow_->addWidget(btnNext_);
+    transportRow_->addWidget(makeDivider(transportSurface));
     transportRow_->addWidget(btnStop_);
+    transportRow_->addWidget(makeDivider(transportSurface));
+    transportRow_->addWidget(timeLabel_);
+    transportRow_->addWidget(audioInfoLabel_);
+    transportRow_->addWidget(mediaInfoLabel_, 1);
+
+    // 트랙 선택은 기본 한 줄을 유지하다가 사용자가 요청할 때만 같은 줄에서 펼친다.
+    trackSurface_ = new QWidget(transportSurface);
+    trackSurface_->setObjectName("trackSurface");
+    trackSurface_->setMinimumWidth(240);
+    trackSurface_->setStyleSheet(
+        "QWidget#trackSurface { background:#101A1A; border:1px solid #273B39; border-radius:5px; }");
+    trackRow_ = new QHBoxLayout(trackSurface_);
+    trackRow_->setContentsMargins(6, 1, 6, 1);
+    trackRow_->setSpacing(4);
+    trackRow_->addStretch(1);
+    trackSurface_->hide();
+    transportRow_->addWidget(trackSurface_);
+
     transportRow_->addWidget(btnTracks_);
-    transportRow_->addSpacing(10);
+    transportRow_->addWidget(makeDivider(transportSurface));
     transportRow_->addWidget(btnMute_);
     transportRow_->addWidget(volSlider_);
     transportRow_->addWidget(volLabel_);
-    transportRow_->addSpacing(10);
-    transportRow_->addWidget(audioInfoLabel_, 1);
+    transportRow_->addWidget(makeDivider(transportSurface));
+    transportRow_->addWidget(btnQueue_);
+    transportRow_->addWidget(btnSettings_);
     root->addWidget(transportSurface);
-
-    // 스트림·오디오·자막 트랙 선택은 재생 콘솔의 보조 행에만 둔다.
-    trackSurface_ = new QWidget(transportSurface);
-    trackSurface_->setObjectName("trackSurface");
-    trackSurface_->setMinimumWidth(280);
-    trackSurface_->setStyleSheet(
-        "QWidget#trackSurface { background: #101A1A; border: 1px solid #273B39; border-radius: 7px; }");
-    trackRow_ = new QHBoxLayout(trackSurface_);
-    trackRow_->setContentsMargins(7, 1, 7, 1);
-    trackRow_->setSpacing(5);
-    trackRow_->addStretch(1);
-    // 트랙 선택은 별도의 두 번째 줄이 아니라 같은 재생 덱의 요청형 컨텍스트 제어다.
-    // 기본 재생 화면에는 기존 아이콘 조작부를 우선 보여 주고, 필요할 때만 연다.
-    trackSurface_->hide();
-    transportRow_->insertWidget(5, trackSurface_, 1);
 }
 
 void ControlBar::embedTrackSelector(TrackSelector* selector) {
     if (!selector || !trackRow_) return;
-    selector->setParent(this);
+    selector->setParent(trackSurface_);
     trackRow_->insertWidget(0, selector, 1);
 }
 
@@ -169,6 +197,15 @@ void ControlBar::connectMpv(MpvCore* core) {
     connect(core, &MpvCore::audioFormatChanged, this, &ControlBar::onAudioFormatChanged);
     connect(core, &MpvCore::videoInfoChanged, this, &ControlBar::onVideoInfoChanged);
     connect(core, &MpvCore::playbackStopped, this, &ControlBar::onPlaybackStopped);
+}
+
+void ControlBar::setMediaDetails(const QString& context, const QString& title, const QString& nextTitle) {
+    if (!mediaInfoLabel_) return;
+    QString detail = title.trimmed().isEmpty() ? QStringLiteral("재생할 파일을 열어 주세요") : title.trimmed();
+    if (!context.trimmed().isEmpty()) detail += QStringLiteral("  ·  ") + context.trimmed();
+    if (!nextTitle.trimmed().isEmpty()) detail += QStringLiteral("  ·  ") + nextTitle.trimmed();
+    mediaInfoLabel_->setText(detail);
+    mediaInfoLabel_->setToolTip(detail);
 }
 
 void ControlBar::onAudioFormatChanged(const QString& codec, int channels,
@@ -186,7 +223,7 @@ void ControlBar::onAudioFormatChanged(const QString& codec, int channels,
     const QString sampleRateText = sampleRate > 0 ? QString("  %1Hz").arg(sampleRate) : QString();
     audioInfoLabel_->setText(
         QString("<span style='color:%1;font-weight:800;'>%2</span>"
-                "<span style='color:#A3B1B0;'>  %3%4%5</span>"
+                "<span style='color:#C2D0CE;'>  %3%4%5</span>"
                 "<span style='color:#00D4B4;font-weight:700;'>  → %6</span>")
         .arg(modeColor, mode, getDisplayCodec(codec),
              channelText.isEmpty() ? QString() : "  " + channelText,
@@ -202,6 +239,8 @@ void ControlBar::onPlaybackStopped() {
 
 void ControlBar::setPlaying(bool playing) {
     btnPlay_->setIcon(QIcon(playing ? ":/icons/pause.svg" : ":/icons/play.svg"));
+    btnPlay_->setToolTip(playing ? QStringLiteral("일시정지 (Space)")
+                                 : QStringLiteral("재생 (Space)"));
 }
 
 void ControlBar::setPosition(double pos, double dur) {
@@ -282,11 +321,11 @@ void ControlBar::setChapters(const QVector<ChapterMark>& chapters, double durati
         if (ratio <= 0.0 || ratio >= 1.0) continue;
         auto* marker = new QWidget(seekSlider_);
         marker->setObjectName("chapterMarker");
-        marker->setFixedSize(2, seekSlider_->height() > 0 ? seekSlider_->height() : 16);
-        marker->setStyleSheet("background: rgba(255,255,255,0.35); border-radius: 1px;");
+        marker->setFixedSize(2, seekSlider_->height() > 0 ? seekSlider_->height() : 6);
+        marker->setStyleSheet("background:rgba(255,255,255,0.38); border-radius:1px;");
         marker->setToolTip(chapter.title);
         marker->setAttribute(Qt::WA_TransparentForMouseEvents);
-        const int handleHalf = 6;
+        const int handleHalf = 5;
         const int usable = seekSlider_->width() - handleHalf * 2;
         const int x = static_cast<int>(handleHalf + ratio * usable) - 1;
         marker->move(x, 0);

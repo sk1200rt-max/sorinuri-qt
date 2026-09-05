@@ -163,6 +163,8 @@ void MainWindow::scheduleAudioOutputRecovery(int delayMs) {
 void MainWindow::setupUI() {
     // 키 이벤트가 항상 MainWindow로 전달되도록 포커스 정책 설정
     setFocusPolicy(Qt::StrongFocus);
+    // 모든 아이콘의 hover 안내문은 배경과 대비되는 공통 색·글자 크기를 사용한다.
+    qApp->setStyleSheet(SorinuriUi::toolTipStyle());
 
     auto* central = new QWidget(this);
     central->setObjectName("mainSurface");
@@ -205,53 +207,18 @@ void MainWindow::setupUI() {
     mpvWidget_->setFocusPolicy(Qt::ClickFocus);
     videoLayout->addWidget(mpvWidget_, 1);
 
-    // 목업 A 대응: 전체 창 폭의 하단 바가 아닌 영상 안 중앙 하단의 단일 재생 선반.
+    // 승인 목업: 영상 영역을 가리지 않는 전체 폭 64px 단일 하단 바.
+    // 별도 카드·라운드 모서리·두 번째 정보 행 없이 ControlBar 한 줄만 둔다.
     videoOverlayDeck_ = new QWidget(videoContainer);
     videoOverlayDeck_->setObjectName(QStringLiteral("videoOverlayDeck"));
     videoOverlayDeck_->setAttribute(Qt::WA_StyledBackground, true);
-    videoOverlayDeck_->setFixedHeight(142);
+    videoOverlayDeck_->setFixedHeight(64);
     videoOverlayDeck_->setStyleSheet(
-        "QWidget#videoOverlayDeck { background:rgba(8,14,15,238); border:1px solid #2A3E3D; border-radius:12px; }"
+        "QWidget#videoOverlayDeck { background:#171717; border:none; border-top:1px solid #303839; }"
         "QLabel { background:transparent; }");
     auto* deckLayout = new QVBoxLayout(videoOverlayDeck_);
-    deckLayout->setContentsMargins(14, 8, 14, 8);
-    deckLayout->setSpacing(2);
-
-    videoShelf_ = new QWidget(videoOverlayDeck_);
-    videoShelf_->setObjectName(QStringLiteral("videoPlaybackShelf"));
-    videoShelf_->setFixedHeight(43);
-    videoShelf_->setStyleSheet(
-        "QWidget#videoPlaybackShelf { background:transparent; border:none; border-bottom:1px solid #223433; }"
-        "QLabel { background:transparent; }");
-    auto* shelfLayout = new QHBoxLayout(videoShelf_);
-    shelfLayout->setContentsMargins(5, 0, 4, 2);
-    shelfLayout->setSpacing(10);
-    auto* shelfMeta = new QVBoxLayout();
-    shelfMeta->setContentsMargins(0, 0, 0, 0);
-    shelfMeta->setSpacing(0);
-    videoShelfContext_ = new QLabel(QStringLiteral("플레이어  ·  로컬 미디어"), videoShelf_);
-    videoShelfContext_->setStyleSheet("color:#00D4B4;font-size:9px;font-weight:750;letter-spacing:1px;");
-    videoShelfTitle_ = new QLabel(QStringLiteral("재생할 파일을 열어 주세요"), videoShelf_);
-    videoShelfTitle_->setStyleSheet("color:#F2F7F6;font-size:12px;font-weight:650;");
-    shelfMeta->addWidget(videoShelfContext_);
-    shelfMeta->addWidget(videoShelfTitle_);
-    shelfLayout->addLayout(shelfMeta, 1);
-    videoShelfNext_ = new QLabel(videoShelf_);
-    videoShelfNext_->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-    videoShelfNext_->setMaximumWidth(230);
-    videoShelfNext_->setStyleSheet("color:#839793;font-size:10px;");
-    shelfLayout->addWidget(videoShelfNext_);
-    videoShelfQueueButton_ = new QPushButton(QStringLiteral("대기열"), videoShelf_);
-    videoShelfQueueButton_->setFocusPolicy(Qt::NoFocus);
-    videoShelfQueueButton_->setCursor(Qt::PointingHandCursor);
-    videoShelfQueueButton_->setFixedHeight(26);
-    videoShelfQueueButton_->setStyleSheet(
-        "QPushButton{background:transparent;color:#C8D9D5;border:1px solid #34514C;border-radius:6px;padding:0 10px;font-size:10px;font-weight:700;}"
-        "QPushButton:hover{background:#00B89D;color:#06221E;border-color:#00D4B4;}");
-    videoShelfQueueButton_->setToolTip(QStringLiteral("대기열 열기"));
-    connect(videoShelfQueueButton_, &QPushButton::clicked, this, &MainWindow::showOriginalsPage);
-    shelfLayout->addWidget(videoShelfQueueButton_);
-    deckLayout->addWidget(videoShelf_);
+    deckLayout->setContentsMargins(0, 0, 0, 0);
+    deckLayout->setSpacing(0);
     videoOverlayDeck_->hide();
     // ── 플레이어 페이지 내부: 영상 vs 음악 스택 ────────────────────────────
     videoPage_ = videoContainer;  // videoPage_ 멤버에 저장 (멀티뷰 전환용)
@@ -279,15 +246,19 @@ void MainWindow::setupUI() {
 
     mainLayout->addWidget(mainStack_, 1);
 
-    // 목업 A의 단일 영상 오버레이 덱 안에 기존 공식 아이콘·트랙 선택·출력 상태를 그대로 둔다.
-    // 서비스 이동·환경 설정은 상단바에만 있고, 이 ControlBar는 재생 제어만 담당한다.
+    // 하단 바는 재생·상태·대기열·설정만 담당한다. 서비스 전환은 상단바에 유지한다.
     trackSelector_ = new TrackSelector(videoOverlayDeck_);
     controlBar_ = new ControlBar(videoOverlayDeck_);
     controlBar_->setObjectName(QStringLiteral("videoOverlayTransport"));
     controlBar_->embedTrackSelector(trackSelector_);
+    connect(controlBar_, &ControlBar::queueRequested, this, &MainWindow::showOriginalsPage);
+    connect(controlBar_, &ControlBar::settingsRequested, this, &MainWindow::onSettingsRequested);
     if (auto* deckLayout = qobject_cast<QVBoxLayout*>(videoOverlayDeck_->layout()))
         deckLayout->addWidget(controlBar_);
-    QTimer::singleShot(0, this, [this]() { positionVideoOverlayDeck(); });
+    QTimer::singleShot(0, this, [this]() {
+        positionVideoOverlayDeck();
+        showBottomUi();
+    });
 
     // 오디오 정보는 ControlBar에 인라인으로 통합됨 (AudioInfoBar 제거)
 
@@ -768,39 +739,36 @@ void MainWindow::updateOriginalsQueueOverlay() {
 }
 
 void MainWindow::updateVideoShelf() {
-    if (!videoShelf_ || !playbackQueue_) return;
+    if (!controlBar_ || !playbackQueue_) return;
     const PlaybackQueue::Entry current = playbackQueue_->currentEntry();
     const QList<PlaybackQueue::Entry> entries = playbackQueue_->entries();
     const QString title = current.title.trimmed().isEmpty()
         ? QFileInfo(current.url).completeBaseName() : current.title.trimmed();
-    videoShelfTitle_->setText(title.isEmpty() ? QStringLiteral("재생할 파일을 열어 주세요") : title);
 
     const bool isYouTube = current.source == QStringLiteral("youtube");
     const bool isOriginal = current.source == QStringLiteral("original") || isYouTube;
-    videoShelfContext_->setText(isYouTube ? QStringLiteral("ORIGINALS  ·  YOUTUBE 연속 재생")
-                               : isOriginal ? QStringLiteral("SORINURI ORIGINALS  ·  현재 재생")
-                                            : QStringLiteral("플레이어  ·  로컬 미디어"));
+    const QString context = isYouTube ? QStringLiteral("ORIGINALS · YOUTUBE 연속 재생")
+                          : isOriginal ? QStringLiteral("SORINURI ORIGINALS")
+                                       : QStringLiteral("로컬 미디어");
 
     const int currentIndex = playbackQueue_->currentIndex();
     QString nextTitle;
     if (currentIndex >= 0 && currentIndex + 1 < entries.size()) {
         const PlaybackQueue::Entry next = entries.at(currentIndex + 1);
-        nextTitle = next.title.trimmed().isEmpty() ? QFileInfo(next.url).completeBaseName() : next.title.trimmed();
+        const QString nextName = next.title.trimmed().isEmpty()
+            ? QFileInfo(next.url).completeBaseName() : next.title.trimmed();
+        if (!nextName.isEmpty()) nextTitle = QStringLiteral("다음: %1").arg(nextName);
     }
-    videoShelfNext_->setText(nextTitle.isEmpty()
-        ? QStringLiteral("대기열 %1곡").arg(entries.size())
-        : QStringLiteral("다음  ·  %1").arg(nextTitle));
-    videoShelfQueueButton_->setText(isOriginal ? QStringLiteral("오리지널 목록") : QStringLiteral("대기열"));
+    controlBar_->setMediaDetails(context, title, nextTitle);
 }
 
 void MainWindow::positionVideoOverlayDeck() {
     if (!videoOverlayDeck_ || !mpvWidget_) return;
-    const int horizontalMargin = 20;
-    // 재생 아이콘·음량·실제 오디오 형식이 동시에 읽히는 폭을 확보하되 영상 중앙을 가리지 않는다.
-    const int desiredWidth = qBound(560, mpvWidget_->width() - horizontalMargin * 2, 980);
-    videoOverlayDeck_->setFixedWidth(desiredWidth);
-    const int x = mpvWidget_->x() + (mpvWidget_->width() - desiredWidth) / 2;
-    const int y = mpvWidget_->y() + qMax(12, mpvWidget_->height() - videoOverlayDeck_->height() - 26);
+    // 승인 목업 기준: 영상 컨테이너의 실제 하단에 전체 폭으로 붙는 64px 단일 바.
+    // 창 크기·HiDPI 논리 좌표에 맞춰 매번 계산하며 영상 렌더 위젯의 크기는 바꾸지 않는다.
+    videoOverlayDeck_->setFixedWidth(mpvWidget_->width());
+    const int x = mpvWidget_->x();
+    const int y = mpvWidget_->y() + qMax(0, mpvWidget_->height() - videoOverlayDeck_->height());
     videoOverlayDeck_->move(x, y);
     videoOverlayDeck_->raise();
 }
@@ -848,7 +816,8 @@ void MainWindow::switchToVideoMode() {
     isMusicMode_ = false;
     titleBar_->setActiveService(TitleBar::Service::Player);
     playerStack_->setCurrentIndex(0);
-    setVideoOverlayVisible(true);
+    // 창·최대화 모드에서는 항상 보이고, 전체 화면에서는 하단 가장자리 오버 전까지 숨긴다.
+    setVideoOverlayVisible(!isFullscreen_);
     updateVideoShelf();
     // 스펙트럼 비활성화 (영상 모드에서는 불필요)
     mpvWidget_->core()->setSpectrumEnabled(false);
@@ -1008,9 +977,10 @@ void MainWindow::onFileLoaded(const QString& path) {
 }
 
 namespace {
-constexpr int TOP_UI_REVEAL_ZONE = 56;
-constexpr int BOTTOM_UI_REVEAL_ZONE = 96;
-constexpr int UI_AUTO_HIDE_DELAY_MS = 3000;
+constexpr int TOP_UI_REVEAL_ZONE = 48;
+constexpr int BOTTOM_UI_REVEAL_ZONE = 48;
+// 전체 화면에서만 적용한다. 가장자리에서 벗어난 뒤 UI가 오래 남지 않도록 짧게 둔다.
+constexpr int UI_AUTO_HIDE_DELAY_MS = 900;
 }
 
 void MainWindow::showTopUi() {
@@ -1041,13 +1011,14 @@ void MainWindow::showBottomUi() {
 
     if (cursor().shape() == Qt::BlankCursor) unsetCursor();
     if (mpvWidget_) mpvWidget_->unsetCursor();
-    if (isPlaying_ && uiHideTimer_)
+    if (isFullscreen_ && isPlaying_ && uiHideTimer_)
         uiHideTimer_->start(UI_AUTO_HIDE_DELAY_MS);
 }
 
 void MainWindow::showUI() {
-    // 명시적 동작(일시정지, 팝업, 우클릭, 설정 복귀)에서는 두 영역을 함께 표시한다.
-    // 단순 마우스 이동은 revealUiForVideoEdge()만 호출하므로 중앙 영상 영역에서 UI가 나타나지 않는다.
+    // 전체 화면에서 재생 중일 때는 명시적 재생 시작·일반 마우스 이동으로 메뉴를 열지 않는다.
+    // 상·하단 가장자리 오버만 revealUiForVideoEdge()가 처리한다.
+    if (isFullscreen_ && isPlaying_ && !isMusicMode_) return;
     if (isMusicMode_) {
         showTopUi();
         return;
@@ -1057,16 +1028,24 @@ void MainWindow::showUI() {
 }
 
 void MainWindow::revealUiForVideoEdge(const QPoint& videoPosition) {
-    if (isMusicMode_ || !isPlaying_ || !mpvWidget_) return;
+    if (isMusicMode_ || !mpvWidget_) return;
 
-    // 중앙 영상 영역의 단순 마우스 이동은 어떠한 UI도 표시하지 않는다.
+    // 창 모드와 최대화 모드에서는 상·하단 메뉴를 계속 보인다. 가장자리 트리거는
+    // 전체 화면 영상 재생에서만 사용하므로 일반 창의 리사이즈·Snap 동작과 섞이지 않는다.
+    if (!isFullscreen_) {
+        showTopUi();
+        showBottomUi();
+        return;
+    }
+    if (!isPlaying_) return;
+
+    // 중앙 영상 영역 이동만으로는 UI가 나타나지 않는다. 상·하단 가장자리에서만
+    // 각각 해당 UI를 표시하고 짧은 타이머가 다시 시작된다.
     if (videoPosition.y() <= TOP_UI_REVEAL_ZONE) {
-        // 가장자리 동작은 해당 영역만 표시한다. 중앙 화면과 반대쪽 UI는 가리지 않는다.
         setVideoOverlayVisible(false);
         showTopUi();
     } else if (videoPosition.y() >= mpvWidget_->height() - BOTTOM_UI_REVEAL_ZONE) {
-        // 창 모드에서는 상단 서비스 바를 숨기지 않는다.
-        if (isFullscreen_ && titleBar_) titleBar_->hide();
+        if (titleBar_) titleBar_->hide();
         showBottomUi();
     }
 }
@@ -1079,10 +1058,18 @@ void MainWindow::hideUI() {
         uiVisible_ = true;
         return;
     }
-    // 음악과 일반 창 모드에서는 타이틀바/커서를 절대 숨기지 않는다. 서비스 전환은
-    // 항상 같은 위치에 있어야 하며, 자동 숨김은 전체화면 영상 재생에만 적용한다.
-    if (isMusicMode_ || !isFullscreen_) {
+    // 창 모드와 최대화 모드에서는 타이틀바·하단 바를 절대 숨기지 않는다.
+    // 전체 화면 영상 재생에서만 가장자리 오버 표시를 사용한다.
+    if (!isFullscreen_) {
         if (titleBar_) titleBar_->show();
+        if (!isMusicMode_) setVideoOverlayVisible(true);
+        uiVisible_ = true;
+        return;
+    }
+    // 음악 화면의 자체 감상 제어는 유지하되, 전체 화면에서는 공통 상단 메뉴만 숨긴다.
+    if (isMusicMode_) {
+        if (titleBar_) titleBar_->hide();
+        uiVisible_ = false;
         return;
     }
     // ── 팝업/메뉴가 열려 있으면 절대 숨기지 않음 ──────────────────────────
@@ -1122,9 +1109,16 @@ void MainWindow::onPlaybackStarted() {
         connect(uiHideTimer_, &QTimer::timeout, this, &MainWindow::hideUI);
     }
     isPlaying_ = true;
-    showUI();
-    // 자동 숨김 타이머: 영상 모드에서만 시작
-    if (!isMusicMode_) uiHideTimer_->start(3000);
+    if (isFullscreen_ && !isMusicMode_) {
+        // 전체 화면 재생 시작은 몰입 상태로 시작한다. 메뉴는 가장자리 오버에서만 연다.
+        if (titleBar_) titleBar_->hide();
+        setVideoOverlayVisible(false);
+        uiVisible_ = false;
+    } else {
+        showUI();
+    }
+    // 자동 숨김 타이머는 전체 화면 영상 모드에서만 시작한다.
+    if (isFullscreen_ && !isMusicMode_) uiHideTimer_->start(UI_AUTO_HIDE_DELAY_MS);
 #ifdef Q_OS_WIN
     SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED);
 #endif
@@ -1374,15 +1368,20 @@ void MainWindow::onSubtitleSearch() {
 void MainWindow::toggleFullscreen() {
     if (isFullscreen_) {
         showNormal();
-        titleBar_->show();
-        titleBar_->setFullscreenMode(false);
         isFullscreen_ = false;
+        titleBar_->setFullscreenMode(false);
+        // 일반 창과 최대화 상태에서는 두 메뉴를 항상 보인다.
+        showUI();
         QTimer::singleShot(0, this, [this]() { positionVideoOverlayDeck(); });
     } else {
         showFullScreen();
-        titleBar_->hide();
         isFullscreen_ = true;
         titleBar_->setFullscreenMode(true);
+        // 전체 화면 진입 직후에는 메뉴를 숨긴다. 상·하단 가장자리 오버에서만 다시 표시된다.
+        if (titleBar_) titleBar_->hide();
+        setVideoOverlayVisible(false);
+        uiVisible_ = false;
+        if (uiHideTimer_) uiHideTimer_->stop();
         QTimer::singleShot(0, this, [this]() { positionVideoOverlayDeck(); });
     }
 }
@@ -2080,10 +2079,19 @@ void MainWindow::showEvent(QShowEvent* e) {
 
 // ── 창 크기 조절 ──────────────────────────────────────────────────
 int MainWindow::getResizeEdge(const QPoint& pos) const {
-    int m = RESIZE_MARGIN, w = width(), h = height();
-    bool L = pos.x() < m, R = pos.x() > w-m, T = pos.y() < m, B = pos.y() > h-m;
-    if (L&&T) return 5; if (R&&T) return 6;
-    if (L&&B) return 7; if (R&&B) return 8;
+    // 최대화·전체 화면은 Windows가 크기 변경 대상이 아니므로 일반 클라이언트로 둔다.
+    if (isMaximized() || isFullScreen()) return 0;
+    const int m = RESIZE_MARGIN;
+    const int w = width();
+    const int h = height();
+    // WM_NCHITTEST와 Qt mouse event는 모두 논리 좌표를 사용한다. 경계값을 포함해
+    // 얇은 커스텀 프레임에서도 모서리 드래그가 놓치지 않도록 한다.
+    const bool L = pos.x() <= m;
+    const bool R = pos.x() >= w - 1 - m;
+    const bool T = pos.y() <= m;
+    const bool B = pos.y() >= h - 1 - m;
+    if (L && T) return 5; if (R && T) return 6;
+    if (L && B) return 7; if (R && B) return 8;
     if (L) return 1; if (R) return 2;
     if (T) return 3; if (B) return 4;
     return 0;

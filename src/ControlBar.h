@@ -86,6 +86,7 @@ public:
     void setDuration(double dur);
     void setVolume(int vol);
     void setMuted(bool muted);
+    void setMediaDetails(const QString& context, const QString& title, const QString& nextTitle = {});
     void embedTrackSelector(TrackSelector* selector);
     void connectMpv(MpvCore* core);
     void setChapters(const QVector<ChapterMark>& chapters, double duration);
@@ -98,6 +99,8 @@ signals:
     void muteToggled(bool muted);
     void prevClicked();
     void nextClicked();
+    void queueRequested();
+    void settingsRequested();
 
 public slots:
     void onAudioFormatChanged(const QString& codec, int channels,
@@ -123,12 +126,15 @@ private:
     QPushButton* btnStop_    = nullptr;
     QPushButton* btnTracks_  = nullptr;  // 기존 트랙 선택을 영상 오버레이에서 요청 시만 연다.
     QPushButton* btnMute_    = nullptr;
+    QPushButton* btnQueue_   = nullptr;
+    QPushButton* btnSettings_ = nullptr;
     QSlider*     volSlider_  = nullptr;
     QLabel*      volLabel_   = nullptr;
     QHBoxLayout* transportRow_ = nullptr;
     QWidget*      trackSurface_ = nullptr;
     QHBoxLayout* trackRow_     = nullptr;
     QLabel*      audioInfoLabel_ = nullptr;
+    QLabel*      mediaInfoLabel_ = nullptr;
 
     double totalDuration_ = 0;
     bool   seeking_       = false;
