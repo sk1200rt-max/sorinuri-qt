@@ -97,6 +97,8 @@ def main() -> int:
     if 'BackgroundColor="transparent"' not in manifest:
         raise AssertionError('MSIX 시각 요소는 투명 배경을 유지해야 합니다.')
     for required in (
+        'Assets\\SorinuriPlayerStore.png',
+        '<Logo>Assets\\SorinuriPlayerStore.png</Logo>',
         'Assets\\SorinuriPlayerIcon.png',
         'Assets\\SorinuriPlayerTile150.png',
         'Assets\\SorinuriPlayerTileWide.png',
