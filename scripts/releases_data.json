@@ -1,5 +1,14 @@
 [
   {
+    "version": "6.21.7",
+    "date": "2026-09-05",
+    "title": "창 제어 및 바로가기 아이콘 안정화",
+    "desc": "최대화 버튼 hover Snap Layout을 억제하고 창 제어 버튼 비율과 MSIX 시작 메뉴·바로가기 아이콘 선택 경로를 보정했습니다.",
+    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.21.7.exe",
+    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.21.7-Portable.zip",
+    "tags": []
+  },
+  {
     "version": "6.21.6",
     "date": "2026-09-05",
     "title": "영상·전체 화면·오리지널·바로가기 아이콘 안정화",

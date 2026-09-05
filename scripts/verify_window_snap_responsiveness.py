@@ -35,17 +35,25 @@ checks += [
      "Snap 가능한 표준 최상위 창은 생성 시점부터 사용하고 FramelessWindowHint와 혼용하면 안 됩니다."),
     ("WM_NCCALCSIZE" in main_cpp and "m->wParam == TRUE" in main_cpp,
      "표준 프레임을 노출하지 않으려면 WM_NCCALCSIZE에서 클라이언트 영역을 확장해야 합니다."),
-    ("DwmDefWindowProc" in main_cpp and "HTMAXBUTTON" in main_cpp and
-     "isMaximizeControlAt" in main_cpp and "isInteractiveControlAt" in main_cpp,
-     "DWM 우선 hit test와 사용자 지정 최대화·제어 버튼 영역 처리가 필요합니다."),
+    ("DwmDefWindowProc" in main_cpp and "HTMAXBUTTON" not in main_cpp and
+     "isMaximizeControlAt" not in main_cpp and "isInteractiveControlAt" in main_cpp,
+     "사용자 지정 최대화 버튼은 HTCLIENT로 처리해 hover Snap Layout을 열면 안 됩니다."),
     ("void MainWindow::showEvent(QShowEvent* e)" in main_cpp and
      "SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |" in main_cpp and
      "SWP_NOACTIVATE | SWP_FRAMECHANGED" in main_cpp and
      "SetWindowLong" not in main_cpp and "SetWindowLongPtr" not in main_cpp,
      "프레임 재계산은 초기 표시 시 한 번만 수행하고 런타임 창 스타일 주입은 하면 안 됩니다."),
-    ("isInteractiveControlAt" in title_h and "isMaximizeControlAt" in title_h and
-     "isInteractiveControlAt" in title_cpp and "isMaximizeControlAt" in title_cpp,
-     "사용자 지정 타이틀바 제어 버튼·최대화 버튼 영역 API가 필요합니다."),
+    ("isInteractiveControlAt" in title_h and "isMaximizeControlAt" not in title_h and
+     "isInteractiveControlAt" in title_cpp and "isMaximizeControlAt" not in title_cpp,
+     "사용자 지정 타이틀바 버튼은 공통 클릭 영역으로 처리하고 최대화 hover API는 두면 안 됩니다."),
+    (all(token in title_cpp for token in (
+        "constexpr int kWindowControlSide = 40",
+        "btnMin_ = makeIconBtn",
+        "btnMax_ = makeIconBtn",
+        "btnFullscreen_ = makeIconBtn",
+        "btnClose_ = makeIconBtn",
+        "kWindowControlSide")),
+     "최소화·최대화·전체화면·닫기는 모두 40×40 정사각형 클릭 영역이어야 합니다."),
     ("revealUiForVideoEdge" in main_h and "revealUiForVideoEdge" in main_cpp,
      "비디오의 상단·하단 가장자리 전용 UI 노출 경로가 필요합니다."),
     (all(token in main_cpp for token in ("TOP_UI_REVEAL_ZONE", "BOTTOM_UI_REVEAL_ZONE", "showTopUi()", "showBottomUi()")),

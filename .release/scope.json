@@ -1,6 +1,6 @@
 {
-  "version": "6.21.6",
-  "domain": "ui,playback,renderer,installer",
-  "purpose": "영상 탭 복귀 최신 프레임, 전체 화면 가장자리 메뉴 유지, 서비스 공통 하단 재생 바, 오리지널 필터·정렬, MSIX unplated 바로가기 아이콘 안정화",
-  "base_commit": "cfb49dd2dd76151c4fab7f49f924020522f57ceb"
+  "version": "6.21.7",
+  "domain": "ui,installer",
+  "purpose": "최대화 버튼 hover Snap Layout 억제, 정사각형 창 제어, 시작 메뉴·바로가기 MSIX 고유 아이콘 경로 안정화",
+  "base_commit": "4495da367570c598b2006ad3e4759ed747e304cc"
 }
