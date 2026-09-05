@@ -1,6 +1,6 @@
 {
-  "version": "6.21.7",
+  "version": "6.21.8",
   "domain": "ui,installer",
-  "purpose": "최대화 버튼 hover Snap Layout 억제, 정사각형 창 제어, 시작 메뉴·바로가기 MSIX 고유 아이콘 경로 안정화",
+  "purpose": "최신 UI·설치 안정화 변경을 보존하면서 기존 자체 서명·자체 업데이트 서버 정책으로 안전하게 배포",
   "base_commit": "4495da367570c598b2006ad3e4759ed747e304cc"
 }
