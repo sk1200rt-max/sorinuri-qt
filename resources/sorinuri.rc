@@ -5,8 +5,8 @@ IDI_ICON1 ICON "sorinuri.ico"
 1 24 "sorinuri.manifest"
 
 VS_VERSION_INFO VERSIONINFO
-FILEVERSION 6,21,2,0
-PRODUCTVERSION 6,21,2,0
+FILEVERSION 6,21,3,0
+PRODUCTVERSION 6,21,3,0
 BEGIN
     BLOCK "StringFileInfo"
     BEGIN
@@ -14,12 +14,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName",      "Gaon Communication"
             VALUE "FileDescription",  "Sorinuri Media Player by Gaon Communication"
-            VALUE "FileVersion",      "6.21.2.0"
+            VALUE "FileVersion",      "6.21.3.0"
             VALUE "InternalName",     "Sorinuri"
             VALUE "LegalCopyright",   "Copyright (C) 2026 Gaon Communication"
             VALUE "OriginalFilename", "Sorinuri.exe"
             VALUE "ProductName",      "Sorinuri"
-            VALUE "ProductVersion",   "6.21.2.0"
+            VALUE "ProductVersion",   "6.21.3.0"
         END
     END
     BLOCK "VarFileInfo"

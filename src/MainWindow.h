@@ -107,6 +107,8 @@ private slots:
     void ensureOriginalsQueueOverlay();
     void updateOriginalsQueueOverlay();
     void updateVideoShelf();
+    void positionVideoOverlayDeck();
+    void setVideoOverlayVisible(bool visible);
     void switchToMusicMode();
     void switchToVideoMode();
 
@@ -192,6 +194,7 @@ private:
     QLabel*                originalsQueueNowLabel_ = nullptr;
     QLabel*                originalsQueueNextLabel_ = nullptr;
     QLabel*                originalsQueueCountLabel_ = nullptr;
+    QWidget*               videoOverlayDeck_ = nullptr;  // 영상 렌더 표면 위 단일 오버레이 재생 덱
     QWidget*               videoShelf_ = nullptr;
     QLabel*                videoShelfTitle_ = nullptr;
     QLabel*                videoShelfContext_ = nullptr;

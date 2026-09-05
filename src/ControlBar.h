@@ -121,10 +121,12 @@ private:
     QPushButton* btnPlay_    = nullptr;
     QPushButton* btnNext_    = nullptr;
     QPushButton* btnStop_    = nullptr;
+    QPushButton* btnTracks_  = nullptr;  // 기존 트랙 선택을 영상 오버레이에서 요청 시만 연다.
     QPushButton* btnMute_    = nullptr;
     QSlider*     volSlider_  = nullptr;
     QLabel*      volLabel_   = nullptr;
     QHBoxLayout* transportRow_ = nullptr;
+    QWidget*      trackSurface_ = nullptr;
     QHBoxLayout* trackRow_     = nullptr;
     QLabel*      audioInfoLabel_ = nullptr;
 

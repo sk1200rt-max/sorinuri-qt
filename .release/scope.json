@@ -1,6 +1,6 @@
 {
-  "version": "6.21.2",
-  "domain": "audio,ui,playback",
-  "purpose": "승인 목업 기반 독립 영상·음악·OTT·오리지널 화면 구현 및 파일·YouTube 전환 안정화",
-  "base_commit": "a6aee52cef2b547d3b08456a449da5920fd2bb81"
+  "version": "6.21.3",
+  "domain": "ui,playback",
+  "purpose": "목업 A–D 대응 영상 오버레이·공식 아이콘·독립 감상 화면 안정화",
+  "base_commit": "fe251378a6503f0199a6c441b6ba3f7de151962e"
 }

@@ -83,7 +83,9 @@ def main() -> int:
     for fragment, label in (
         ("setMinimumHeight(78)", "축소된 단일 재생 덱 높이"),
         ("transportSurface", "재생 덱 표면"),
-        ("insertWidget(4, trackSurface, 1)", "같은 덱 안의 트랙 선택"),
+        ("btnTracks_ = makeBtn(\":/icons/audio.svg\"", "기존 공식 아이콘 기반 트랙 열기"),
+        ("trackSurface_->hide();", "기본 화면에서 접힌 트랙 선택"),
+        ("insertWidget(5, trackSurface_, 1)", "같은 덱 안의 접이식 트랙 선택"),
         ("audioInfoLabel_->hide();", "빈 출력 상태 숨김"),
     ):
         require(controls, fragment, label, errors)

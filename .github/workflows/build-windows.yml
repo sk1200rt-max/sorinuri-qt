@@ -616,7 +616,7 @@ jobs:
 
       - name: Generate version-staging.json
         env:
-          APP_VERSION: "6.21.2"
+          APP_VERSION: "6.21.3"
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
         run: python3 scripts/make_version_json.py "$APP_VERSION" "$DEPLOY_HOST" staging
 
@@ -626,7 +626,7 @@ jobs:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
-          APP_VERSION: "6.21.2"
+          APP_VERSION: "6.21.3"
         run: |
           if [ -z "$SSH_KEY" ] || [ -z "$DEPLOY_HOST" ]; then
             echo "배포 Secrets 미설정 - 건너뜀"
