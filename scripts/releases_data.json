@@ -1,5 +1,14 @@
 [
   {
+    "version": "6.21.3",
+    "date": "2026-09-05",
+    "title": "목업 대응 영상 플레이어·공식 아이콘 안정화",
+    "desc": "승인 목업 A–D에 맞춘 영상 오버레이와 기존 공식 아이콘, 독립 감상 화면의 안정화를 반영한 로컬 테스트 후보입니다.",
+    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.21.3.exe",
+    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.21.3-Portable.zip",
+    "tags": []
+  },
+  {
     "version": "6.21.2",
     "date": "2026-09-04",
     "title": "독립 감상 화면 재설계 및 파일 전환 안정화",
