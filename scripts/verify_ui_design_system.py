@@ -29,6 +29,8 @@ def main() -> int:
     title = text("TitleBar.cpp")
     controls = text("ControlBar.cpp")
     music = text("MusicWidget.cpp")
+    mpv_widget = text("MpvWidget.cpp")
+    mpv_widget_header = text("MpvWidget.h")
     ott = text("OttWidget.cpp")
     originals = text("OriginalsWidget.cpp")
     main_window = text("MainWindow.cpp")
@@ -74,7 +76,9 @@ def main() -> int:
         ("void MainWindow::updateVideoShelf", "영상 재생 정보 갱신"),
         ("ORIGINALS · YOUTUBE 연속 재생", "YouTube 재생 문맥"),
         ("setFixedHeight(64)", "초슬림 하단 바 높이"),
-        ("videoOverlayDeck_->setFixedWidth(mpvWidget_->width())", "영상 전체 폭 하단 바"),
+        ("videoOverlayDeck_ = new QWidget(central)", "서비스 공통 하단 바 부모"),
+        ("videoOverlayDeck_->setFixedWidth(surface->width())", "창 전체 폭 하단 바"),
+        ("미디어 유무로 가시성을 제한하지 않는다", "최초 단독 실행 하단 바 표시"),
         ("originalsQueueOverlay_->hide();", "기존 YouTube 오버레이 숨김"),
     ):
         require(main_window, fragment, label, errors)
@@ -107,7 +111,10 @@ def main() -> int:
     for fragment, label in (
         ("UI_AUTO_HIDE_DELAY_MS = 900", "짧은 전체 화면 자동 숨김"),
         ("if (!isFullscreen_)", "창·최대화 모드 UI 상시 표시"),
-        ("if (isFullscreen_ && !isMusicMode_)", "전체 화면 영상 시작 시 메뉴 숨김"),
+        ("globalPosition().toPoint()", "상·하단 바 위 포인터 전역 좌표 감지"),
+        ("titleBar_->geometry().contains(position)", "상단 메뉴 위 포인터 유지"),
+        ("videoOverlayDeck_->geometry().contains(position)", "하단 바 위 포인터 유지"),
+        ("uiHideTimer_->stop();", "가장자리·바 위 자동 숨김 중지"),
         ("TOP_UI_REVEAL_ZONE = 48", "상단 가장자리 표시 영역"),
         ("BOTTOM_UI_REVEAL_ZONE = 48", "하단 가장자리 표시 영역"),
     ):
@@ -143,10 +150,27 @@ def main() -> int:
         ("originalsActionContext", "오리지널 선택 재생 컨텍스트"),
         ("선택 재생 (0)", "오리지널 선택 재생"),
         ("YouTube 전체 듣기", "오리지널 YouTube 재생"),
+        ("catScroll_ = new QScrollArea", "상황·장르 하부 분류 행"),
+        ("catBar_->setFixedSize(rowWidth, 28)", "하부 분류 행 폭 보장"),
+        ("listWidget_->scrollToTop()", "필터·정렬 후 목록 맨 위 표시"),
     ):
         require(originals, fragment, label, errors)
     forbid(ott, "returnBtn_ = new QPushButton", "OTT 내부 플레이어 복귀 버튼", errors)
     forbid(ott, "originalsBtn_ = new QPushButton", "OTT 내부 오리지널 이동 버튼", errors)
+    for fragment, label in (
+        ("mpvWidget_->setPresentationActive(false)", "오리지널·OTT 비가시 영상 repaint 절전"),
+        ("mpvWidget_->setPresentationActive(true)", "플레이어 복귀 현재 프레임 갱신"),
+        ("showBottomUi();", "OTT·오리지널 공통 하단 바 유지"),
+    ):
+        require(main_window, fragment, label, errors)
+    for fragment, label in (
+        ("void MpvWidget::setPresentationActive", "표시 표면 절전 API"),
+        ("presentationActive_.exchange(active)", "표시 상태 스레드 안전 전환"),
+        ("presentationRefreshPending_.store(true)", "비가시 프레임 최신 상태 기록"),
+        ("if (!w->presentationActive_.load())", "비가시 GUI 프레임 큐 차단"),
+    ):
+        require(mpv_widget, fragment, label, errors)
+    require(mpv_widget_header, "std::atomic_bool presentationActive_", "스레드 안전 표시 상태", errors)
 
     # 파일 전환 중 이전 요청·대형 이미지가 UI를 멈추지 않도록 보호한다.
     for fragment, label in (

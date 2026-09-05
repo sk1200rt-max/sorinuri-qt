@@ -134,6 +134,12 @@ function Save-Logo([int]$width, [int]$height, [string]$name) {
     } finally { $sourceImage.Dispose() }
 }
 Save-Logo 44 44 'Square44x44Logo.png'
+# Windows shell은 기본 Square44x44Logo에 배경판을 덧씌울 수 있다. 대상 크기별
+# altform-unplated 자산을 함께 제공하면 시작 메뉴·AppsFolder 바로가기·사용자가
+# 만든 바탕화면 바로가기에서도 원형 밖의 알파 투명을 그대로 사용한다.
+foreach ($targetSize in @(16, 20, 24, 30, 32, 36, 40, 44, 48, 60, 64, 72, 80, 96, 256)) {
+    Save-Logo $targetSize $targetSize ("Square44x44Logo.targetsize-{0}_altform-unplated.png" -f $targetSize)
+}
 Save-Logo 150 150 'Square150x150Logo.png'
 Save-Logo 310 150 'Wide310x150Logo.png'
 Save-Logo 50 50 'StoreLogo.png'
@@ -161,7 +167,7 @@ $manifestTypes = @($xml.SelectNodes('//uap:FileType', $namespace) | ForEach-Obje
 if ($manifestTypes.Count -ne $extensions.Count -or (Compare-Object ($extensions | Sort-Object) ($manifestTypes | Sort-Object))) {
     throw "Store MSIX 패키지 실패: AppxManifest 파일 연결 목록이 Inno Setup과 일치하지 않습니다."
 }
-foreach ($required in @('Sorinuri.exe', 'libmpv-2.dll', 'platforms/qwindows.dll', 'Assets/Square44x44Logo.png', 'Assets/Square150x150Logo.png', 'Assets/Wide310x150Logo.png', 'Assets/StoreLogo.png')) {
+foreach ($required in @('Sorinuri.exe', 'libmpv-2.dll', 'platforms/qwindows.dll', 'Assets/Square44x44Logo.png', 'Assets/Square44x44Logo.targetsize-44_altform-unplated.png', 'Assets/Square150x150Logo.png', 'Assets/Wide310x150Logo.png', 'Assets/StoreLogo.png')) {
     Require-Path (Join-Path $stagingRoot $required) "Store payload 필수 파일"
 }
 

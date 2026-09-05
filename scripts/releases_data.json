@@ -1,5 +1,14 @@
 [
   {
+    "version": "6.21.6",
+    "date": "2026-09-05",
+    "title": "영상·전체 화면·오리지널·바로가기 아이콘 안정화",
+    "desc": "서비스 탭 복귀 시 최신 영상 프레임 표시, 전체 화면 가장자리 메뉴 유지, OTT·오리지널 공통 하단 재생 바, 오리지널 상황·장르 필터·정렬, MSIX 투명 바로가기 아이콘을 보강했습니다.",
+    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.21.6.exe",
+    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.21.6-Portable.zip",
+    "tags": []
+  },
+  {
     "version": "6.21.4",
     "date": "2026-09-05",
     "title": "초슬림 하단 바 및 창 조작 안정화",
