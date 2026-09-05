@@ -125,10 +125,13 @@ TitleBar::TitleBar(QWidget* parent) : QWidget(parent) {
     btnTools_ = makeCommandBtn(QStringLiteral("도구  ▾"), QStringLiteral("플레이어 도구 및 환경 설정"));
     btnPin_ = makeIconBtn(":/icons/pin_off.svg", "항상 위에 고정", "#1A2526", 36);
     btnPin_->setCheckable(true);
-    btnMin_ = makeIconBtn(":/icons/minimize.svg", "최소화", "#1A2526", 36);
-    btnMax_ = makeIconBtn(":/icons/maximize.svg", "화면 채우기", "#1A2526", 36);
-    btnFullscreen_ = makeIconBtn(":/icons/expand.svg", "전체화면", "#063B35", 36);
-    btnClose_ = makeIconBtn(":/icons/close.svg", "닫기", SorinuriUi::Danger, 42);
+    // 표준 창 제어는 모두 같은 정사각형 클릭 영역을 사용한다. 닫기 버튼만
+    // 더 좁거나 세로로 길게 보이지 않게 해 250% HiDPI에서도 균일하게 유지한다.
+    constexpr int kWindowControlSide = 40;
+    btnMin_ = makeIconBtn(":/icons/minimize.svg", "최소화", "#1A2526", kWindowControlSide);
+    btnMax_ = makeIconBtn(":/icons/maximize.svg", "화면 채우기", "#1A2526", kWindowControlSide);
+    btnFullscreen_ = makeIconBtn(":/icons/expand.svg", "전체화면", "#063B35", kWindowControlSide);
+    btnClose_ = makeIconBtn(":/icons/close.svg", "닫기", SorinuriUi::Danger, kWindowControlSide);
 
     commandLayout->addWidget(btnOpen_);
     commandLayout->addWidget(btnTools_);
@@ -247,10 +250,6 @@ bool TitleBar::isInteractiveControlAt(const QPoint& localPos) const {
             return true;
     }
     return false;
-}
-
-bool TitleBar::isMaximizeControlAt(const QPoint& localPos) const {
-    return btnMax_ && btnMax_->isVisible() && btnMax_->rect().contains(btnMax_->mapFrom(this, localPos));
 }
 
 void TitleBar::setAlwaysOnTop(bool pinned) {

@@ -2269,12 +2269,9 @@ bool MainWindow::nativeEvent(const QByteArray& type, void* msg, qintptr* result)
 
             if (titleBar_ && titleBar_->geometry().contains(pos)) {
                 const QPoint titlePos = titleBar_->mapFrom(this, pos);
-                // Windows 11 Snap Layout은 사용자 정의 최대화 버튼에 HTMAXBUTTON을
-                // 반환해야 표시된다. 다른 실제 버튼은 Qt가 클릭을 받도록 HTCLIENT다.
-                if (titleBar_->isMaximizeControlAt(titlePos)) {
-                    *result = HTMAXBUTTON;
-                    return true;
-                }
+                // 모든 커스텀 버튼은 클라이언트 영역으로 반환한다. 최대화 버튼은
+                // Windows 11 Snap Layout용 시스템 히트 값을 사용하지 않으므로 hover로
+                // 팝업이 나타나지 않으며, Qt clicked 신호가 클릭 최대화만 처리한다.
                 if (titleBar_->isInteractiveControlAt(titlePos)) {
                     *result = HTCLIENT;
                     return true;
