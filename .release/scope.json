@@ -1,6 +1,6 @@
 {
-  "version": "6.21.1",
+  "version": "6.21.2",
   "domain": "audio,ui,playback",
-  "purpose": "독립 감상 화면 재설계, 파일 열기 전환 안정화, YouTube·음악 재생 경로 정리",
-  "base_commit": "5cd83c6811f732a2adc5a04eeb9d7af1268b0855"
+  "purpose": "승인 목업 기반 독립 영상·음악·OTT·오리지널 화면 구현 및 파일·YouTube 전환 안정화",
+  "base_commit": "a6aee52cef2b547d3b08456a449da5920fd2bb81"
 }

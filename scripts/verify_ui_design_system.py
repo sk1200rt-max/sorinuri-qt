@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""소리누리의 공통 서비스 셸과 재생 중심 UI 회귀를 정적으로 점검한다."""
+"""소리누리의 목업 대응 재설계와 공통 서비스 셸을 정적으로 점검한다."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -30,21 +30,15 @@ def main() -> int:
     controls = text("ControlBar.cpp")
     music = text("MusicWidget.cpp")
     ott = text("OttWidget.cpp")
+    originals = text("OriginalsWidget.cpp")
     main_window = text("MainWindow.cpp")
-    pro = text("ProFeaturesWidget.cpp")
+    album_art = text("AlbumArtExtractor.cpp")
 
     require(theme, "namespace SorinuriUi", "공통 UiTheme 네임스페이스", errors)
     for token in ("Mint", "Surface", "SurfaceAlt", "Border", "menuStyle"):
         require(theme, token, f"공통 디자인 토큰 {token}", errors)
 
-    for name, source in {
-        "TitleBar.cpp": title,
-        "ControlBar.cpp": controls,
-        "MusicWidget.cpp": music,
-    }.items():
-        require(source, "UiTheme.h", f"{name} 공통 디자인 토큰 사용", errors)
-
-    # 모든 서비스 화면에서 상단 하나만 공통 진입점이며, 파일·도구·창 제어를 잃지 않는다.
+    # 모든 서비스 화면은 상단 하나만 공통 진입점으로 사용한다.
     for fragment, label in (
         ("void TitleBar::setActiveService", "상단 서비스 활성 상태 API"),
         ("playerServiceClicked", "상단 플레이어 이동"),
@@ -54,6 +48,9 @@ def main() -> int:
         ("toolsClicked", "상단 도구 메뉴"),
         ("setFixedHeight(52)", "HiDPI 여유 상단바 높이"),
         ("isInteractiveControlAt", "상단바 Windows 드래그 영역 분리"),
+        ("updateResponsiveLayout", "HiDPI 반응형 상단바"),
+        ("btnOpen_->setVisible(!compact)", "HiDPI 파일 열기 메뉴 이동"),
+        ("btnClose_->setText(compact", "HiDPI 닫기 제어 유지"),
     ):
         require(title, fragment, label, errors)
 
@@ -63,61 +60,103 @@ def main() -> int:
         ("TitleBar::originalsServiceClicked", "상단 오리지널 연결"),
         ("TitleBar::openFileClicked", "상단 파일 열기 연결"),
         ("TitleBar::toolsClicked", "상단 도구 연결"),
+        ("QAction* openAction = menu.addAction(\"파일 열기\")", "HiDPI 도구 메뉴 파일 열기"),
+        ("QAction* minimizeAction = menu.addAction(\"최소화\")", "HiDPI 도구 메뉴 최소화"),
+        ("QAction* fullscreenAction", "HiDPI 도구 메뉴 전체화면"),
         ("setActiveService(TitleBar::Service::Player)", "플레이어 활성 표시"),
         ("setActiveService(TitleBar::Service::Ott)", "OTT 활성 표시"),
         ("setActiveService(TitleBar::Service::Originals)", "오리지널 활성 표시"),
     ):
         require(main_window, fragment, label, errors)
 
-    # 하단은 재생·출력 콘솔만 담당한다. 서비스와 설정 버튼이 섞여 있으면 안 된다.
-    require(controls, "setMinimumHeight(96)", "정돈된 하단 재생 콘솔 높이", errors)
-    require(controls, "transportSurface", "재생 전용 콘솔 표면", errors)
-    require(controls, "audioInfoLabel_->hide();", "빈 출력 상태 숨김", errors)
-    forbid(controls, "makeModeBtn", "하단 서비스 메뉴", errors)
-    forbid(controls, "settingsClicked", "하단 설정 메뉴", errors)
-    forbid(controls, "openFileClicked", "하단 파일 열기", errors)
+    # 영상은 오버레이가 아닌 실제 재생 선반으로 현재·다음 항목과 목록 접근을 제공한다.
+    for fragment, label in (
+        ("videoPlaybackShelf", "영상 재생 선반"),
+        ("void MainWindow::updateVideoShelf", "영상 재생 선반 상태 갱신"),
+        ("ORIGINALS  ·  YOUTUBE 연속 재생", "YouTube 재생 문맥"),
+        ("originalsQueueOverlay_->hide();", "기존 YouTube 오버레이 숨김"),
+    ):
+        require(main_window, fragment, label, errors)
+    forbid(main_window, "originalsQueueOverlay_->show();", "영상 위 YouTube 오버레이 표시", errors)
 
-    # 음악 화면에서 보조 도구가 재생 UI와 중복되지 않으며, 공통 도구 메뉴에서 접근한다.
-    require(music, "음악의 보조 도구(컴팩트·미니·환경 설정)는 공통 상단바", "음악 도구 이동 설명", errors)
-    require(music, "btn->setFocusPolicy(Qt::NoFocus);", "음악 화면 제어 버튼 NoFocus", errors)
-    require(music, "btnVolume_->setFocusPolicy(Qt::NoFocus);", "음량 버튼 NoFocus", errors)
-    forbid(music, "btnMini_=new QPushButton", "음악 본문 미니 버튼", errors)
-    forbid(music, "btnCompact_=new QPushButton", "음악 본문 컴팩트 버튼", errors)
-    forbid(music, "btnSettings_=new QPushButton", "음악 본문 설정 버튼", errors)
+    # 하단은 서비스 메뉴가 아닌 정밀 재생·출력 덱 하나로만 유지한다.
+    for fragment, label in (
+        ("setMinimumHeight(78)", "축소된 단일 재생 덱 높이"),
+        ("transportSurface", "재생 덱 표면"),
+        ("insertWidget(4, trackSurface, 1)", "같은 덱 안의 트랙 선택"),
+        ("audioInfoLabel_->hide();", "빈 출력 상태 숨김"),
+    ):
+        require(controls, fragment, label, errors)
+    for fragment, label in (
+        ("makeModeBtn", "하단 서비스 메뉴"),
+        ("settingsClicked", "하단 설정 메뉴"),
+        ("openFileClicked", "하단 파일 열기"),
+        ("root->addWidget(trackSurface);", "트랙 선택의 별도 하단 행"),
+    ):
+        forbid(controls, fragment, label, errors)
 
-    # OTT는 웹 탐색만 두고 서비스 이동은 상단 공통 바로 위임한다.
+    # 음악은 앨범아트 스테이지와 접이식 보조 패널로, 기존 고정 좌우 분할을 사용하지 않는다.
+    for fragment, label in (
+        ("musicStage", "독립 음악 감상 스테이지"),
+        ("musicAssistantPanel", "접이식 음악 보조 패널"),
+        ("assistantPanel_->hide();", "기본 음악 화면의 보조 패널 숨김"),
+        ("musicDeck", "독립 음악 재생 덱"),
+        ("현재 감상 중", "음악 감상 맥락 표기"),
+        ("btnVolume_->setFocusPolicy(Qt::NoFocus);", "음량 버튼 NoFocus"),
+    ):
+        require(music, fragment, label, errors)
+    for fragment, label in (
+        ("btnMini_=new QPushButton", "음악 본문 미니 버튼"),
+        ("btnCompact_=new QPushButton", "음악 본문 컴팩트 버튼"),
+        ("btnSettings_=new QPushButton", "음악 본문 설정 버튼"),
+    ):
+        forbid(music, fragment, label, errors)
+
+    # OTT·오리지널은 실제 탐색·카탈로그 화면을 가지며 이전 내부 서비스 메뉴를 되살리지 않는다.
+    for fragment, label in (
+        ("ottFeatureStage", "OTT 빠른 시작 스테이지"),
+        ("서비스 선택", "OTT 서비스 탐색"),
+    ):
+        require(ott, fragment, label, errors)
+    for fragment, label in (
+        ("originalsCatalogHeader", "오리지널 카탈로그 헤더"),
+        ("originalsActionContext", "오리지널 선택 재생 컨텍스트"),
+        ("선택 재생 (0)", "오리지널 선택 재생"),
+        ("YouTube 전체 듣기", "오리지널 YouTube 재생"),
+    ):
+        require(originals, fragment, label, errors)
     forbid(ott, "returnBtn_ = new QPushButton", "OTT 내부 플레이어 복귀 버튼", errors)
     forbid(ott, "originalsBtn_ = new QPushButton", "OTT 내부 오리지널 이동 버튼", errors)
 
-    # 영상 위 중복 대기열 오버레이를 다시 표시하지 않는다.
-    require(main_window, "originalsQueueOverlay_->hide();", "YouTube 오버레이 숨김", errors)
-    forbid(main_window, "originalsQueueOverlay_->show();", "영상 위 YouTube 오버레이 표시", errors)
-
-    # 손상 메타데이터 및 무거운 블러가 파일 전환을 막지 않도록 보호한다.
-    require(main_window, "path != currentFilePath_", "오래된 파일 메타데이터 무시", errors)
-    require(music, "scaled(96, 96", "경량 앨범아트 배경 처리", errors)
-    album_art = text("AlbumArtExtractor.cpp")
+    # 파일 전환 중 이전 요청·대형 이미지가 UI를 멈추지 않도록 보호한다.
+    for fragment, label in (
+        ("path != currentFilePath_", "오래된 파일 메타데이터 무시"),
+        ("playbackRequestGeneration_", "재생 요청 세대 번호"),
+        ("requestGeneration != playbackRequestGeneration_", "오래된 대기열 요청 폐기"),
+        ("pendingUrlGeneration_", "오래된 URL 준비 요청 폐기"),
+        ("kMaxExternalCoverBytes", "외부 앨범아트 크기 상한"),
+        ("QImageReader", "축소 앨범아트 디코더"),
+    ):
+        require(main_window, fragment, label, errors)
     require(album_art, "kMaxTagBytes", "ID3 앨범아트 읽기 상한", errors)
     require(album_art, "kMaxPictureBlockBytes", "FLAC 앨범아트 읽기 상한", errors)
-
-    require(pro, "setFixedHeight(124)", "HiDPI 여유를 둔 전문 기능 패널", errors)
 
     for name, source in {
         "TitleBar.cpp": title,
         "ControlBar.cpp": controls,
         "MusicWidget.cpp": music,
-        "ProFeaturesWidget.cpp": pro,
     }.items():
+        require(source, "UiTheme.h", f"{name} 공통 디자인 토큰 사용", errors)
         forbid(source, "#4fc3f7", f"{name} 구형 파란색 강조", errors)
         forbid(source, "#1565c0", f"{name} 구형 파란색 버튼", errors)
 
     if errors:
-        print("UI 디자인 시스템 검증 실패:", file=sys.stderr)
+        print("목업 대응 UI 검증 실패:", file=sys.stderr)
         for error in errors:
             print(f" - {error}", file=sys.stderr)
         return 1
 
-    print("UI 디자인 시스템 검증 통과: 상단 통합 서비스 전환·재생 전용 하단 콘솔·도구 분리·YouTube 오버레이 제거·파일 전환 보호 확인")
+    print("목업 대응 UI 검증 통과: 영상 선반·독립 음악 스테이지·OTT 탐색·오리지널 카탈로그·파일 전환 보호 확인")
     return 0
 
 

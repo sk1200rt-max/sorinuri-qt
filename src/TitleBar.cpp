@@ -160,6 +160,62 @@ TitleBar::TitleBar(QWidget* parent) : QWidget(parent) {
     connect(btnClose_, &QPushButton::clicked, this, &TitleBar::closeClicked);
 
     refreshServiceButtons();
+    updateResponsiveLayout();
+}
+
+void TitleBar::updateResponsiveLayout() {
+    // 250% HiDPI의 낮은 논리 폭에서는 창 제어·서비스 전환을 보존하고,
+    // 반복 정보(코덱 배지·파일명)와 항상 위 고정만 먼저 접어 잘림을 방지한다.
+    const bool compact = width() < 900;
+    compactLayout_ = compact;
+    if (badgeLabel_) badgeLabel_->setVisible(!compact && !badgeLabel_->text().isEmpty());
+    if (titleLabel_) titleLabel_->setVisible(!compact);
+    if (btnPin_) btnPin_->setVisible(!compact);
+    // 좁은 논리 폭에서는 창 최소화·최대화·전체화면을 도구 메뉴로 이동한다.
+    // 닫기 버튼은 항상 남겨 기본 창 동작을 즉시 수행할 수 있게 한다.
+    if (btnMin_) btnMin_->setVisible(!compact);
+    if (btnMax_) btnMax_->setVisible(!compact);
+    if (btnFullscreen_) btnFullscreen_->setVisible(!compact);
+    if (btnClose_) btnClose_->show();
+    // 파일·도구는 아이콘형으로 압축하고, 숨긴 창 제어는 도구 메뉴에서 제공한다.
+    if (btnOpen_) {
+        btnOpen_->setVisible(!compact);
+        if (!compact) { btnOpen_->setMinimumWidth(0); btnOpen_->setMaximumWidth(QWIDGETSIZE_MAX); }
+    }
+    if (btnTools_) {
+        btnTools_->setText(compact ? QStringLiteral("⋮") : QStringLiteral("도구  ▾"));
+        if (compact) btnTools_->setFixedWidth(36);
+        else { btnTools_->setMinimumWidth(0); btnTools_->setMaximumWidth(QWIDGETSIZE_MAX); }
+    }
+    if (btnClose_) {
+        btnClose_->setText(compact ? QStringLiteral("×") : QString());
+        btnClose_->setIcon(compact ? QIcon() : QIcon(":/icons/close.svg"));
+        if (compact) {
+            btnClose_->setFixedWidth(40);
+            btnClose_->setStyleSheet("QPushButton { color: #F2F7F6; font-size: 20px; background: transparent; border: none; } QPushButton:hover { background: #C42B35; }");
+        } else {
+            btnClose_->setMinimumWidth(0);
+            btnClose_->setMaximumWidth(QWIDGETSIZE_MAX);
+            btnClose_->setStyleSheet("QPushButton { background: transparent; border: 1px solid transparent; border-radius: 7px; } QPushButton:hover { background: #C42B35; border-color: #263A3C; } QPushButton:pressed { background: #102425; }");
+        }
+    }
+
+    const QString serviceStyle = compact
+        ? "QPushButton { color: #A3B1B0; background: transparent; border: none; border-bottom: 2px solid transparent; padding: 0 11px; font-size: 12px; font-weight: 700; }"
+          "QPushButton:hover { color: #F2F7F6; background: #172425; }"
+          "QPushButton[active=true] { color: #F2F7F6; border-bottom-color: #00D4B4; }"
+        : "QPushButton { color: #A3B1B0; background: transparent; border: none; border-bottom: 2px solid transparent; padding: 0 18px; font-size: 12px; font-weight: 700; }"
+          "QPushButton:hover { color: #F2F7F6; background: #172425; }"
+          "QPushButton[active=true] { color: #F2F7F6; border-bottom-color: #00D4B4; }";
+    for (QPushButton* button : {btnPlayer_, btnOtt_, btnOriginals_}) {
+        if (!button) continue;
+        button->setStyleSheet(serviceStyle);
+    }
+}
+
+void TitleBar::resizeEvent(QResizeEvent* e) {
+    QWidget::resizeEvent(e);
+    updateResponsiveLayout();
 }
 
 void TitleBar::refreshServiceButtons() {
@@ -187,14 +243,14 @@ bool TitleBar::isInteractiveControlAt(const QPoint& localPos) const {
         btnPin_, btnMin_, btnMax_, btnFullscreen_, btnClose_
     };
     for (const QWidget* control : controls) {
-        if (control && control->rect().contains(control->mapFrom(this, localPos)))
+        if (control && control->isVisible() && control->rect().contains(control->mapFrom(this, localPos)))
             return true;
     }
     return false;
 }
 
 bool TitleBar::isMaximizeControlAt(const QPoint& localPos) const {
-    return btnMax_ && btnMax_->rect().contains(btnMax_->mapFrom(this, localPos));
+    return btnMax_ && btnMax_->isVisible() && btnMax_->rect().contains(btnMax_->mapFrom(this, localPos));
 }
 
 void TitleBar::setAlwaysOnTop(bool pinned) {
@@ -226,7 +282,7 @@ void TitleBar::setAudioBadge(const QString& codec) {
     else if (d.contains("DTS-HD"))                         d = "DTS-HD MA";
     else if (d.contains("DTS"))                            d = "DTS";
     badgeLabel_->setText(d);
-    badgeLabel_->show();
+    if (!compactLayout_) badgeLabel_->show();
 }
 
 void TitleBar::setFullscreenMode(bool fs) {

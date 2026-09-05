@@ -36,6 +36,9 @@ def main() -> int:
         'core->setProperty("loop-playlist", "inf")',
         'core->setProperty("loop-file", "inf")',
         "pendingYouTubeQueue_",
+        "playbackRequestGeneration_",
+        "pendingUrlGeneration_",
+        "requestGeneration != playbackRequestGeneration_",
         "onYtdlpReady",
     )
     errors += require(
@@ -51,7 +54,7 @@ def main() -> int:
         for error in errors:
             print(f" - {error}", file=sys.stderr)
         return 1
-    print("통합 재생 대기열 검증 통과: 오리지널·YouTube·저장 재생목록·반복 모드 경로 확인")
+    print("통합 재생 대기열 검증 통과: 오리지널·YouTube·저장 재생목록·반복 모드·파일 전환 최신성 확인")
     return 0
 
 

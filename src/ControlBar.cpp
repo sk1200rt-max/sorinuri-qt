@@ -32,15 +32,15 @@ QPushButton* ControlBar::makeBtn(const QString& svg, const QString& tip, int siz
 ControlBar::ControlBar(QWidget* parent) : QWidget(parent) {
     // 하단은 모든 화면의 서비스 이동이나 환경 설정이 아닌, 현재 미디어를 조작하는
     // 정밀 콘솔이다. 화면 모드가 달라도 파일·출력·대기열의 맥락이 한 곳에 유지된다.
-    setMinimumHeight(96);
-    setMaximumHeight(110);
+    setMinimumHeight(78);
+    setMaximumHeight(88);
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     setStyleSheet(QString("background: %1; border-top: 1px solid %2;")
                   .arg(SorinuriUi::SurfaceAlt, SorinuriUi::BorderSoft));
 
     auto* root = new QVBoxLayout(this);
-    root->setContentsMargins(16, 7, 16, 6);
-    root->setSpacing(4);
+    root->setContentsMargins(22, 5, 22, 5);
+    root->setSpacing(2);
 
     auto* seekRow = new QHBoxLayout();
     seekRow->setContentsMargins(0, 0, 0, 0);
@@ -71,12 +71,11 @@ ControlBar::ControlBar(QWidget* parent) : QWidget(parent) {
 
     auto* transportSurface = new QWidget(this);
     transportSurface->setObjectName("transportSurface");
-    transportSurface->setStyleSheet(QString(
-        "QWidget#transportSurface { background: %1; border: 1px solid %2; border-radius: 8px; }")
-        .arg(SorinuriUi::SurfaceRaised, SorinuriUi::BorderSoft));
+    transportSurface->setStyleSheet(
+        "QWidget#transportSurface { background: transparent; border: none; }");
     transportRow_ = new QHBoxLayout(transportSurface);
-    transportRow_->setContentsMargins(8, 3, 8, 3);
-    transportRow_->setSpacing(4);
+    transportRow_->setContentsMargins(0, 0, 0, 0);
+    transportRow_->setSpacing(5);
 
     btnPrev_ = makeBtn(":/icons/prev.svg", "이전");
     btnPlay_ = makeBtn(":/icons/play.svg", "재생/일시정지 (Space)", 38);
@@ -127,16 +126,17 @@ ControlBar::ControlBar(QWidget* parent) : QWidget(parent) {
     root->addWidget(transportSurface);
 
     // 스트림·오디오·자막 트랙 선택은 재생 콘솔의 보조 행에만 둔다.
-    auto* trackSurface = new QWidget(this);
+    auto* trackSurface = new QWidget(transportSurface);
     trackSurface->setObjectName("trackSurface");
-    trackSurface->setStyleSheet(QString(
-        "QWidget#trackSurface { background: transparent; border: none; border-top: 1px solid %1; }")
-        .arg(SorinuriUi::BorderSoft));
+    trackSurface->setMinimumWidth(260);
+    trackSurface->setStyleSheet(
+        "QWidget#trackSurface { background: #101A1A; border: 1px solid #273B39; border-radius: 7px; }");
     trackRow_ = new QHBoxLayout(trackSurface);
-    trackRow_->setContentsMargins(2, 2, 2, 0);
-    trackRow_->setSpacing(6);
+    trackRow_->setContentsMargins(7, 1, 7, 1);
+    trackRow_->setSpacing(5);
     trackRow_->addStretch(1);
-    root->addWidget(trackSurface);
+    // 트랙 선택은 별도의 두 번째 줄이 아니라 같은 재생 덱의 컨텍스트 제어로 유지한다.
+    transportRow_->insertWidget(4, trackSurface, 1);
 }
 
 void ControlBar::embedTrackSelector(TrackSelector* selector) {

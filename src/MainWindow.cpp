@@ -12,7 +12,8 @@
 #include "UiTheme.h"
 #include <QApplication>
 #include <QGuiApplication>
-#include <QScreen>
+#include <QImage>
+#include <QImageReader>
 #include <QEvent>
 #include <QMessageBox>
 #include <QProgressDialog>
@@ -202,6 +203,44 @@ void MainWindow::setupUI() {
     // 클릭 시 MainWindow가 포커스를 유지하도록 - 키 이벤트 정상 전달
     mpvWidget_->setFocusPolicy(Qt::ClickFocus);
     videoLayout->addWidget(mpvWidget_);
+
+    // 영상 재생 화면은 전역 패널이 아닌, 현재 감상 맥락을 담은 얇은 재생 선반을 둔다.
+    // 이 선반은 음악·OTT·오리지널 페이지에는 나타나지 않아 각 서비스의 화면 역할이 섞이지 않는다.
+    videoShelf_ = new QWidget(videoContainer);
+    videoShelf_->setObjectName(QStringLiteral("videoPlaybackShelf"));
+    videoShelf_->setFixedHeight(74);
+    videoShelf_->setStyleSheet(
+        "QWidget#videoPlaybackShelf { background:#0B1213; border-top:1px solid #213131; }"
+        "QLabel { background:transparent; }");
+    auto* shelfLayout = new QHBoxLayout(videoShelf_);
+    shelfLayout->setContentsMargins(24, 8, 24, 8);
+    shelfLayout->setSpacing(12);
+    auto* shelfMeta = new QVBoxLayout();
+    shelfMeta->setContentsMargins(0, 0, 0, 0);
+    shelfMeta->setSpacing(2);
+    videoShelfContext_ = new QLabel(QStringLiteral("플레이어  ·  로컬 미디어"), videoShelf_);
+    videoShelfContext_->setStyleSheet("color:#00D4B4;font-size:10px;font-weight:750;letter-spacing:1px;");
+    videoShelfTitle_ = new QLabel(QStringLiteral("재생할 파일을 열어 주세요"), videoShelf_);
+    videoShelfTitle_->setStyleSheet("color:#F2F7F6;font-size:14px;font-weight:650;");
+    shelfMeta->addWidget(videoShelfContext_);
+    shelfMeta->addWidget(videoShelfTitle_);
+    shelfLayout->addLayout(shelfMeta, 1);
+    videoShelfNext_ = new QLabel(videoShelf_);
+    videoShelfNext_->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    videoShelfNext_->setMaximumWidth(340);
+    videoShelfNext_->setStyleSheet("color:#839793;font-size:11px;");
+    shelfLayout->addWidget(videoShelfNext_);
+    videoShelfQueueButton_ = new QPushButton(QStringLiteral("대기열"), videoShelf_);
+    videoShelfQueueButton_->setFocusPolicy(Qt::NoFocus);
+    videoShelfQueueButton_->setCursor(Qt::PointingHandCursor);
+    videoShelfQueueButton_->setFixedHeight(30);
+    videoShelfQueueButton_->setStyleSheet(
+        "QPushButton{background:#132322;color:#C8D9D5;border:1px solid #34514C;border-radius:7px;padding:0 12px;font-size:11px;font-weight:700;}"
+        "QPushButton:hover{background:#00B89D;color:#06221E;border-color:#00D4B4;}");
+    videoShelfQueueButton_->setToolTip(QStringLiteral("소리누리 오리지널 대기열과 선택 재생으로 이동"));
+    connect(videoShelfQueueButton_, &QPushButton::clicked, this, &MainWindow::showOriginalsPage);
+    shelfLayout->addWidget(videoShelfQueueButton_);
+    videoLayout->addWidget(videoShelf_);
     // ── 플레이어 페이지 내부: 영상 vs 음악 스택 ────────────────────────────
     videoPage_ = videoContainer;  // videoPage_ 멤버에 저장 (멀티뷰 전환용)
     playerStack_ = new QStackedWidget(playerPage_);
@@ -492,6 +531,9 @@ void MainWindow::setupConnections() {
     connect(titleBar_, &TitleBar::toolsClicked, this, [this]() {
         QMenu menu(this);
         menu.setStyleSheet(SorinuriUi::menuStyle());
+        QAction* openAction = menu.addAction("파일 열기");
+        connect(openAction, &QAction::triggered, this, &MainWindow::onOpenFile);
+        menu.addSeparator();
         QAction* settingsAction = menu.addAction("환경 설정");
         connect(settingsAction, &QAction::triggered, this, &MainWindow::onSettingsRequested);
         menu.addSeparator();
@@ -504,6 +546,27 @@ void MainWindow::setupConnections() {
         menu.addSeparator();
         QAction* featuresAction = menu.addAction("고급 기능");
         connect(featuresAction, &QAction::triggered, this, &MainWindow::toggleProFeatures);
+        menu.addSeparator();
+        QAction* pinAction = menu.addAction("항상 위에 고정");
+        pinAction->setCheckable(true);
+        pinAction->setChecked(windowFlags().testFlag(Qt::WindowStaysOnTopHint));
+        connect(pinAction, &QAction::toggled, this, [this](bool pinned) {
+            Qt::WindowFlags flags = windowFlags();
+            if (pinned) flags |= Qt::WindowStaysOnTopHint;
+            else flags &= ~Qt::WindowStaysOnTopHint;
+            setWindowFlags(flags);
+            show();
+            settings_.setValue("window/alwaysOnTop", pinned);
+            titleBar_->setAlwaysOnTop(pinned);
+        });
+        QAction* minimizeAction = menu.addAction("최소화");
+        connect(minimizeAction, &QAction::triggered, this, &QMainWindow::showMinimized);
+        QAction* maximizeAction = menu.addAction(isMaximized() ? "이전 크기" : "최대화");
+        connect(maximizeAction, &QAction::triggered, this, [this]() {
+            if (isMaximized()) showNormal(); else showMaximized();
+        });
+        QAction* fullscreenAction = menu.addAction(isFullscreen_ ? "전체화면 종료" : "전체화면");
+        connect(fullscreenAction, &QAction::triggered, this, &MainWindow::toggleFullscreen);
         const QPoint global = titleBar_->mapToGlobal(QPoint(titleBar_->width() - 240, titleBar_->height()));
         menu.exec(global);
     });
@@ -531,6 +594,8 @@ void MainWindow::openFiles(const QStringList& paths) {
 
 void MainWindow::playQueue(const QList<PlaybackQueue::Entry>& entries, int startIndex) {
     if (entries.isEmpty()) return;
+    // 파일 열기·대기열 선택·YouTube 준비 완료가 교차해도 가장 최근 요청만 MPV를 바꾼다.
+    const quint64 requestGeneration = ++playbackRequestGeneration_;
     playbackQueue_->replace(entries, startIndex);
     applyQueueRepeatMode();
     updateOriginalsQueueOverlay();
@@ -542,6 +607,13 @@ void MainWindow::playQueue(const QList<PlaybackQueue::Entry>& entries, int start
     if (!containsYouTube) {
         pendingYouTubeQueue_.clear();
         pendingYouTubeQueueStartIndex_ = 0;
+        pendingUrl_.clear();
+        pendingUrlGeneration_ = 0;
+        if (ytdlpProgress_) {
+            ytdlpProgress_->hide();
+            ytdlpProgress_->deleteLater();
+            ytdlpProgress_ = nullptr;
+        }
     }
     // 온라인 YouTube 재생은 Windows shared PCM으로 고정한다. 이로써 웹 스트림이
     // WASAPI 독점·bitstream 장치를 잡아 게임·브라우저를 막지 않는다. 이후 로컬
@@ -589,7 +661,8 @@ void MainWindow::playQueue(const QList<PlaybackQueue::Entry>& entries, int start
     }
 
     const QList<PlaybackQueue::Entry> queue = playbackQueue_->entries();
-    QTimer::singleShot(150, this, [this, queue, startIndex]() {
+    QTimer::singleShot(150, this, [this, queue, startIndex, requestGeneration]() {
+        if (requestGeneration != playbackRequestGeneration_) return;
         if (!mpvWidget_->isMpvInitialized() || queue.isEmpty()) return;
         const int safeIndex = qBound(0, startIndex, queue.size() - 1);
         mpvWidget_->loadFile(queue.at(safeIndex).url);
@@ -673,10 +746,36 @@ void MainWindow::ensureOriginalsQueueOverlay() {
 }
 
 void MainWindow::updateOriginalsQueueOverlay() {
-    // YouTube 대기열의 현재·다음 곡은 제목과 대기열에서 확인한다. 영상 위에 별도
-    // 좌측 패널을 겹치지 않아야 플레이어·OTT·오리지널 공통 상단 구조가 유지된다.
+    // YouTube 대기열은 영상 위의 작은 좌측 오버레이 대신 재생 선반에서 보여 준다.
     if (originalsQueueOverlay_)
         originalsQueueOverlay_->hide();
+    updateVideoShelf();
+}
+
+void MainWindow::updateVideoShelf() {
+    if (!videoShelf_ || !playbackQueue_) return;
+    const PlaybackQueue::Entry current = playbackQueue_->currentEntry();
+    const QList<PlaybackQueue::Entry> entries = playbackQueue_->entries();
+    const QString title = current.title.trimmed().isEmpty()
+        ? QFileInfo(current.url).completeBaseName() : current.title.trimmed();
+    videoShelfTitle_->setText(title.isEmpty() ? QStringLiteral("재생할 파일을 열어 주세요") : title);
+
+    const bool isYouTube = current.source == QStringLiteral("youtube");
+    const bool isOriginal = current.source == QStringLiteral("original") || isYouTube;
+    videoShelfContext_->setText(isYouTube ? QStringLiteral("ORIGINALS  ·  YOUTUBE 연속 재생")
+                               : isOriginal ? QStringLiteral("SORINURI ORIGINALS  ·  현재 재생")
+                                            : QStringLiteral("플레이어  ·  로컬 미디어"));
+
+    const int currentIndex = playbackQueue_->currentIndex();
+    QString nextTitle;
+    if (currentIndex >= 0 && currentIndex + 1 < entries.size()) {
+        const PlaybackQueue::Entry next = entries.at(currentIndex + 1);
+        nextTitle = next.title.trimmed().isEmpty() ? QFileInfo(next.url).completeBaseName() : next.title.trimmed();
+    }
+    videoShelfNext_->setText(nextTitle.isEmpty()
+        ? QStringLiteral("대기열 %1곡").arg(entries.size())
+        : QStringLiteral("다음  ·  %1").arg(nextTitle));
+    videoShelfQueueButton_->setText(isOriginal ? QStringLiteral("오리지널 목록") : QStringLiteral("대기열"));
 }
 
 void MainWindow::switchToMusicMode() {
@@ -685,6 +784,7 @@ void MainWindow::switchToMusicMode() {
     isMusicMode_ = true;
     titleBar_->setActiveService(TitleBar::Service::Player);
     playerStack_->setCurrentWidget(musicPage_);
+    if (videoShelf_) videoShelf_->hide();
     controlBar_->hide();
     // 음악 모드: 타이틀바는 항상 표시 (상단고정/최소화/종료 버튼 보여야 함)
     titleBar_->show();
@@ -709,7 +809,9 @@ void MainWindow::switchToVideoMode() {
     isMusicMode_ = false;
     titleBar_->setActiveService(TitleBar::Service::Player);
     playerStack_->setCurrentIndex(0);
+    if (videoShelf_) videoShelf_->show();
     controlBar_->show();
+    updateVideoShelf();
     // 스펙트럼 비활성화 (영상 모드에서는 불필요)
     mpvWidget_->core()->setSpectrumEnabled(false);
     if (musicPage_) {
@@ -753,9 +855,23 @@ void MainWindow::loadMusicMeta(const QString& path) {
     if (meta.albumArt.isNull()) {
         QFileInfo fi(path);
         QDir dir = fi.dir();
+        constexpr qint64 kMaxExternalCoverBytes = 12LL * 1024LL * 1024LL;
+        constexpr int kCoverRenderEdge = 1024;
         for (const QString& name : {"cover.jpg", "cover.png", "folder.jpg",
                                      "albumart.jpg", "front.jpg"}) {
-            if (dir.exists(name)) { meta.albumArt = QPixmap(dir.filePath(name)); break; }
+            const QFileInfo coverInfo(dir.filePath(name));
+            if (!coverInfo.exists() || coverInfo.size() <= 0 || coverInfo.size() > kMaxExternalCoverBytes)
+                continue;
+            QImageReader reader(coverInfo.absoluteFilePath());
+            reader.setAutoTransform(true);
+            const QSize sourceSize = reader.size();
+            if (sourceSize.isValid() && (sourceSize.width() > kCoverRenderEdge || sourceSize.height() > kCoverRenderEdge))
+                reader.setScaledSize(sourceSize.scaled(kCoverRenderEdge, kCoverRenderEdge, Qt::KeepAspectRatio));
+            const QImage coverImage = reader.read();
+            if (!coverImage.isNull()) {
+                meta.albumArt = QPixmap::fromImage(coverImage);
+                break;
+            }
         }
     }
         // MusicWidget에서 loadForTrack에 duration을 전달하기 위해
@@ -875,8 +991,15 @@ void MainWindow::showTopUi() {
 }
 
 void MainWindow::showBottomUi() {
-    // 음악 모드는 MusicWidget의 자체 컨트롤을 사용하므로 별도 하단바를 표시하지 않는다.
-    if (isMusicMode_ || !controlBar_) return;
+    // 재생 선반·하단 콘솔은 영상 플레이어 페이지 전용이다. 음악·OTT·오리지널 화면에서
+    // showUI가 호출돼도 다시 나타나면 독립 감상 화면의 정보 구조가 무너진다.
+    const bool isVideoPlayerPage = playerStack_ && playerStack_->currentWidget() == videoPage_;
+    if (isMusicMode_ || isOttMode_ || !isVideoPlayerPage || !controlBar_) {
+        if (videoShelf_) videoShelf_->hide();
+        if (controlBar_) controlBar_->hide();
+        return;
+    }
+    if (videoShelf_) videoShelf_->show();
     controlBar_->show();
     uiVisible_ = true;
 
@@ -941,6 +1064,7 @@ void MainWindow::hideUI() {
         // 전체 화면·창 모드 모두 노출 중인 상단·하단 UI만 숨긴다.
         // 레이아웃을 변경하지 않는 hide()만 사용하므로 영상 프레임과 오버레이는 유지된다.
         if (titleBar_) titleBar_->hide();
+        if (videoShelf_) videoShelf_->hide();
         if (controlBar_) controlBar_->hide();
         uiVisible_ = false;
         // 중앙 영상 영역에서는 UI만 숨긴다. 사용자가 화면을 조작할 수 있도록
@@ -1504,49 +1628,15 @@ void MainWindow::keyPressEvent(QKeyEvent* e) {
 void MainWindow::ensureOriginalsPage() {
     if (originalsPage_) return;
 
-    // OTT에서 선택한 오리지널은 하단 전문 기능 패널이 아니라 main player 영역 전체에 표시한다.
-    // 재생 컨트롤은 공통 ControlBar에 계속 남겨 재생 중인 음악도 즉시 제어할 수 있다.
+    // 오리지널은 공통 상단 서비스 바 아래에 독립 카탈로그 화면만 둔다.
+    // 이전의 얇은 내부 헤더와 ‘플레이어로 돌아가기’ 버튼은 서비스 전환을 중복해
+    // 목업의 카탈로그 헤더가 실제 화면에서 가려지지 않도록 제거한다.
     originalsPage_ = new QWidget(playerStack_);
     originalsPage_->setObjectName("originalsPage");
-    originalsPage_->setStyleSheet(
-        "QWidget#originalsPage { background: #0b1011; }"
-        "QWidget#originalsHeader { background: #101819; border-bottom: 1px solid #1d3233; }"
-        "QLabel#originalsTitle { color: #f2f7f7; font-size: 18px; font-weight: 700; }"
-        "QLabel#originalsSubtitle { color: #88a3a3; font-size: 11px; }"
-        "QPushButton#originalsBack { background: transparent; color: #b9d8d5; border: 1px solid #2a4a49;"
-        " border-radius: 6px; padding: 7px 12px; font-weight: 600; }"
-        "QPushButton#originalsBack:hover { color: #06201c; background: #00d4b4; border-color: #00d4b4; }");
-
+    originalsPage_->setStyleSheet("QWidget#originalsPage { background:#0A1011; }");
     auto* pageLayout = new QVBoxLayout(originalsPage_);
     pageLayout->setContentsMargins(0, 0, 0, 0);
     pageLayout->setSpacing(0);
-
-    auto* header = new QWidget(originalsPage_);
-    header->setObjectName("originalsHeader");
-    auto* headerLayout = new QHBoxLayout(header);
-    headerLayout->setContentsMargins(22, 12, 22, 12);
-    headerLayout->setSpacing(12);
-
-    auto* titleLayout = new QVBoxLayout();
-    titleLayout->setContentsMargins(0, 0, 0, 0);
-    titleLayout->setSpacing(2);
-    auto* title = new QLabel(QStringLiteral("소리누리 오리지널"), header);
-    title->setObjectName("originalsTitle");
-    auto* subtitle = new QLabel(QStringLiteral("장르·상황별 음악 탐색과 연속 재생"), header);
-    subtitle->setObjectName("originalsSubtitle");
-    titleLayout->addWidget(title);
-    titleLayout->addWidget(subtitle);
-
-    auto* backButton = new QPushButton(QStringLiteral("← 플레이어로 돌아가기"), header);
-    backButton->setObjectName("originalsBack");
-    backButton->setFocusPolicy(Qt::NoFocus);
-    backButton->setToolTip(QStringLiteral("일반 플레이어 화면으로 돌아가기"));
-    connect(backButton, &QPushButton::clicked, this, &MainWindow::switchToPlayerMode);
-
-    headerLayout->addLayout(titleLayout);
-    headerLayout->addStretch(1);
-    headerLayout->addWidget(backButton);
-    pageLayout->addWidget(header);
 
     originalsWidget_ = new OriginalsWidget(originalsPage_);
     pageLayout->addWidget(originalsWidget_, 1);
@@ -1599,6 +1689,9 @@ void MainWindow::showOriginalsPage() {
         isProFeaturesOpen_ = false;
     }
     playerStack_->setCurrentWidget(originalsPage_);
+    // 오리지널은 선택·탐색에 집중하는 독립 카탈로그다. 플레이어 전용 콘솔은 남기지 않는다.
+    if (videoShelf_) videoShelf_->hide();
+    if (controlBar_) controlBar_->hide();
     originalsWidget_->setCurrentFile(currentFilePath_);
     showUI();
     titleBar_->setActiveService(TitleBar::Service::Originals);
@@ -2517,7 +2610,10 @@ void MainWindow::switchToOttMode() {
         connect(ottPage_, &OttWidget::returnToPlayerRequested,
                 this, &MainWindow::switchToPlayerMode);
     }
-        mainStack_->setCurrentIndex(1);
+    mainStack_->setCurrentIndex(1);
+    // OTT는 독립 탐색 화면이다. 플레이어 전용 재생 선반·하단 콘솔을 남기지 않는다.
+    if (videoShelf_) videoShelf_->hide();
+    if (controlBar_) controlBar_->hide();
     // OTT에서도 창 상단 메뉴는 유지한다. WebView2 안으로 들어가도 앱 조작 경로를 잃지 않는다.
     showTopUi();
     // OTT 모드 진입 시 광고 요청 (비동기, 광고 없으면 표시 안 함)
@@ -2540,20 +2636,23 @@ void MainWindow::openUrl(const QString& url) {
     // yt-dlp 지연 초기화 전 URL 입력이 와도 재생 요청을 잃지 않는다.
     if (!ytdlp_) {
         pendingUrl_ = url;
-        QTimer::singleShot(550, this, [this]() {
-            if (!pendingUrl_.isEmpty()) {
-                const QString queuedUrl = pendingUrl_;
-                pendingUrl_.clear();
-                openUrl(queuedUrl);
-            }
+        pendingUrlGeneration_ = ++playbackRequestGeneration_;
+        const quint64 requestGeneration = pendingUrlGeneration_;
+        QTimer::singleShot(550, this, [this, requestGeneration]() {
+            if (requestGeneration != playbackRequestGeneration_ || pendingUrl_.isEmpty()) return;
+            const QString queuedUrl = pendingUrl_;
+            pendingUrl_.clear();
+            pendingUrlGeneration_ = 0;
+            openUrl(queuedUrl);
         });
         return;
     }
     // URL을 직접 MPV에 전달 (ytdl=yes로 자동 처리)
     // yt-dlp가 없으면 자동 다운로드
     if (!ytdlp_->isAvailable() && YtdlpManager::isSupportedUrl(url)) {
-        // yt-dlp 다운로드 후 재생
+        // yt-dlp 다운로드 후 재생. 이후 로컬 파일 요청이 오면 이 세대는 무효화된다.
         pendingUrl_ = url;
+        pendingUrlGeneration_ = ++playbackRequestGeneration_;
 
         ytdlpProgress_ = new QProgressDialog(
             "yt-dlp 다운로드 중...\n"
@@ -2569,6 +2668,7 @@ void MainWindow::openUrl(const QString& url) {
 
         connect(ytdlpProgress_, &QProgressDialog::canceled, [this]() {
             pendingUrl_.clear();
+            pendingUrlGeneration_ = 0;
         });
 
         ytdlp_->downloadOrUpdate();
@@ -2606,9 +2706,12 @@ void MainWindow::onYtdlpReady(const QString& path) {
         return;
     }
     if (!pendingUrl_.isEmpty()) {
-        QString url = pendingUrl_;
+        const QString url = pendingUrl_;
+        const quint64 requestGeneration = pendingUrlGeneration_;
         pendingUrl_.clear();
-        openUrl(url);
+        pendingUrlGeneration_ = 0;
+        if (requestGeneration == playbackRequestGeneration_)
+            openUrl(url);
     }
 }
 
@@ -2623,6 +2726,7 @@ void MainWindow::onYtdlpDownloadFailed(const QString& error) {
         ytdlpProgress_ = nullptr;
     }
     pendingUrl_.clear();
+    pendingUrlGeneration_ = 0;
     pendingYouTubeQueue_.clear();
     QMessageBox::warning(this, "yt-dlp 다운로드 실패",
         QString("yt-dlp를 다운로드할 수 없습니다.\n%1\n\n"

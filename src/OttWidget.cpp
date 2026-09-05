@@ -203,48 +203,92 @@ void OttWidget::setupUI() {
 
 // ── 홈 그리드 빌더 ─────────────────────────────────────────────────────────
 QWidget* OttWidget::buildHomeGrid() {
+    // OTT는 단순 링크 모음이 아니라, 감상할 서비스를 고르는 독립 탐색 화면이다.
     auto* scroll = new QScrollArea(this);
     scroll->setWidgetResizable(true);
     scroll->setFrameShape(QFrame::NoFrame);
     scroll->setStyleSheet(
-        "QScrollArea { background: #0b0f0f; border: none; }"
-        "QScrollBar:vertical { background: transparent; width: 6px; }"
-        "QScrollBar::handle:vertical { background: #2c3836; border-radius: 3px; }"
-        "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }");
+        "QScrollArea{background:#0A1011;border:none;}"
+        "QScrollBar:vertical{background:transparent;width:7px;}"
+        "QScrollBar::handle:vertical{background:#2A403D;border-radius:3px;}"
+        "QScrollBar::add-line:vertical,QScrollBar::sub-line:vertical{height:0;}");
 
-    auto* container = new QWidget();
-    container->setStyleSheet("background: #0b0f0f;");
+    auto* container = new QWidget(scroll);
+    container->setStyleSheet("background:#0A1011;");
     auto* pageLayout = new QVBoxLayout(container);
-    pageLayout->setContentsMargins(36, 32, 36, 40);
+    pageLayout->setContentsMargins(42, 34, 42, 44);
     pageLayout->setSpacing(24);
 
-    // OTT 진입 목적을 먼저 보여 주고, 시각적 테두리 대신 여백과 명도 차이로 계층을 만든다.
     auto* heading = new QWidget(container);
     auto* headingLayout = new QVBoxLayout(heading);
     headingLayout->setContentsMargins(0, 0, 0, 0);
     headingLayout->setSpacing(5);
-    auto* eyebrow = new QLabel("OTT & STREAMING", heading);
-    eyebrow->setStyleSheet("color: #00b89c; font-size: 11px; font-weight: 700; letter-spacing: 1px; background: transparent;");
-    auto* title = new QLabel("보고 싶은 콘텐츠를 바로 선택하세요", heading);
-    title->setStyleSheet("color: #f2f7f6; font-size: 24px; font-weight: 700; background: transparent;");
-    auto* description = new QLabel("서비스를 선택하면 소리누리 안에서 해당 웹 플레이어를 엽니다.", heading);
-    description->setStyleSheet("color: #869390; font-size: 13px; background: transparent;");
+    auto* eyebrow = new QLabel(QStringLiteral("OTT & STREAMING  ·  CINEMA AT HOME"), heading);
+    eyebrow->setStyleSheet("color:#00D4B4;font-size:10px;font-weight:800;letter-spacing:1.5px;background:transparent;");
+    auto* title = new QLabel(QStringLiteral("오늘은 무엇을 볼까요?"), heading);
+    title->setStyleSheet("color:#F1F7F5;font-size:28px;font-weight:750;letter-spacing:-0.4px;background:transparent;");
+    auto* description = new QLabel(QStringLiteral("즐겨 찾는 스트리밍 서비스를 소리누리 안에서 바로 이어서 감상하세요."), heading);
+    description->setStyleSheet("color:#8BA09C;font-size:12px;background:transparent;");
     headingLayout->addWidget(eyebrow);
     headingLayout->addWidget(title);
     headingLayout->addWidget(description);
     pageLayout->addWidget(heading);
 
+    auto* feature = new QFrame(container);
+    feature->setObjectName("ottFeatureStage");
+    feature->setFixedHeight(164);
+    feature->setStyleSheet(
+        "QFrame#ottFeatureStage{background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #163330,stop:.55 #10201F,stop:1 #0F1718);border:1px solid #284440;border-radius:14px;}"
+        "QLabel{background:transparent;}");
+    auto* featureLayout = new QHBoxLayout(feature);
+    featureLayout->setContentsMargins(28, 24, 28, 24);
+    auto* featureText = new QVBoxLayout();
+    featureText->setSpacing(5);
+    auto* featureEyebrow = new QLabel(QStringLiteral("빠른 시작"), feature);
+    featureEyebrow->setStyleSheet("color:#79D6C6;font-size:10px;font-weight:800;letter-spacing:1.2px;");
+    auto* featureTitle = new QLabel(QStringLiteral("YouTube에서 이어서 감상하기"), feature);
+    featureTitle->setStyleSheet("color:#F4FBF9;font-size:21px;font-weight:750;");
+    auto* featureBody = new QLabel(QStringLiteral("음악, 라이브, 채널 콘텐츠를 소리누리의 재생 환경에서 바로 엽니다."), feature);
+    featureBody->setStyleSheet("color:#B4C8C4;font-size:12px;");
+    auto* featureButton = new QPushButton(QStringLiteral("YouTube 열기"), feature);
+    featureButton->setFocusPolicy(Qt::NoFocus);
+    featureButton->setCursor(Qt::PointingHandCursor);
+    featureButton->setFixedSize(112, 34);
+    featureButton->setStyleSheet(
+        "QPushButton{background:#00C7AA;color:#05231E;border:1px solid #68E3D2;border-radius:8px;font-size:11px;font-weight:800;}"
+        "QPushButton:hover{background:#45E0C8;}");
+    connect(featureButton, &QPushButton::clicked, this, [this]() { navigate(QStringLiteral("https://www.youtube.com")); });
+    featureText->addWidget(featureEyebrow);
+    featureText->addWidget(featureTitle);
+    featureText->addWidget(featureBody);
+    featureText->addStretch(1);
+    featureText->addWidget(featureButton, 0, Qt::AlignLeft);
+    featureLayout->addLayout(featureText, 1);
+    auto* featureMark = new QLabel(QStringLiteral("OTT"), feature);
+    featureMark->setAlignment(Qt::AlignCenter);
+    featureMark->setFixedSize(88, 88);
+    featureMark->setStyleSheet("color:#9DE9DB;background:#0B1919;border:1px solid #38645D;border-radius:44px;font-size:18px;font-weight:800;letter-spacing:1px;");
+    featureLayout->addWidget(featureMark);
+    pageLayout->addWidget(feature);
+
+    auto* serviceHeader = new QHBoxLayout();
+    auto* serviceTitle = new QLabel(QStringLiteral("서비스 선택"), container);
+    serviceTitle->setStyleSheet("color:#EAF3F1;font-size:16px;font-weight:750;background:transparent;");
+    auto* serviceHint = new QLabel(QStringLiteral("서비스를 선택하면 웹 플레이어가 열립니다"), container);
+    serviceHint->setStyleSheet("color:#718681;font-size:11px;background:transparent;");
+    serviceHeader->addWidget(serviceTitle);
+    serviceHeader->addStretch(1);
+    serviceHeader->addWidget(serviceHint);
+    pageLayout->addLayout(serviceHeader);
+
     auto* gridHost = new QWidget(container);
-    gridHost->setStyleSheet("background: transparent;");
+    gridHost->setStyleSheet("background:transparent;");
     auto* gridLayout = new QGridLayout(gridHost);
     gridLayout->setContentsMargins(0, 0, 0, 0);
-    gridLayout->setHorizontalSpacing(10);
-    gridLayout->setVerticalSpacing(10);
-    // 3열 구성은 250% 배율에서도 카드 이름·조작 영역을 충분히 확보한다.
-    for (int column = 0; column < 3; ++column)
-        gridLayout->setColumnStretch(column, 1);
-    for (int i = 0; i < SERVICES.size(); ++i)
-        gridLayout->addWidget(buildServiceCard(SERVICES[i]), i / 3, i % 3);
+    gridLayout->setHorizontalSpacing(12);
+    gridLayout->setVerticalSpacing(12);
+    for (int column = 0; column < 3; ++column) gridLayout->setColumnStretch(column, 1);
+    for (int i = 0; i < SERVICES.size(); ++i) gridLayout->addWidget(buildServiceCard(SERVICES[i]), i / 3, i % 3);
     pageLayout->addWidget(gridHost);
     pageLayout->addStretch(1);
 
