@@ -157,13 +157,21 @@ jobs:
       # ── libmpv 다운로드 ────────────────────────────────────────────
       - name: Download libmpv
         shell: pwsh
+        env:
+          # GitHub-hosted runner의 공유 IP rate-limit을 피하기 위해 읽기 전용 Actions 토큰으로 릴리즈 목록을 조회한다.
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           # 여러 소스를 시도하는 방식으로 안정성 확보
           $downloaded = $false
+          $apiHeaders = @{
+            Authorization = "Bearer $env:GITHUB_TOKEN"
+            Accept = "application/vnd.github+json"
+            "X-GitHub-Api-Version" = "2022-11-28"
+          }
 
           # 소스 1: shinchiro
           try {
-            $releases = Invoke-RestMethod "https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/releases?per_page=5" -TimeoutSec 30
+            $releases = Invoke-RestMethod "https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/releases?per_page=5" -Headers $apiHeaders -TimeoutSec 30
             $devAsset = $null
             foreach ($rel in $releases) {
               foreach ($asset in $rel.assets) {
@@ -185,7 +193,7 @@ jobs:
           # 소스 2: zhongfly (shinchiro 실패 시 대체)
           if (-not $downloaded) {
             try {
-              $releases = Invoke-RestMethod "https://api.github.com/repos/zhongfly/mpv-winbuild/releases?per_page=5" -TimeoutSec 30
+              $releases = Invoke-RestMethod "https://api.github.com/repos/zhongfly/mpv-winbuild/releases?per_page=5" -Headers $apiHeaders -TimeoutSec 30
               $devAsset = $null
               foreach ($rel in $releases) {
                 foreach ($asset in $rel.assets) {
