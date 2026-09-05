@@ -1,5 +1,14 @@
 [
   {
+    "version": "6.21.10",
+    "date": "2026-09-06",
+    "title": "오리지널 카탈로그 갱신 및 업데이트 배포 안정화",
+    "desc": "소리누리 오리지널 카탈로그의 저장 주소 자동 복구와 네트워크 캐시 우회를 보강하고, 검증된 설치 자산과 릴리스 안내가 함께 배포되도록 정리했습니다.",
+    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.21.10.exe",
+    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.21.10-Portable.zip",
+    "tags": []
+  },
+  {
     "version": "6.21.7",
     "date": "2026-09-05",
     "title": "창 제어 및 바로가기 아이콘 안정화",
