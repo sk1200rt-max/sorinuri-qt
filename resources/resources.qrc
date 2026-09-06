@@ -1,7 +1,7 @@
 <RCC>
     <qresource prefix="/">
-        <file>icons/sorinuri.ico</file>
-        <file>sorinuri-app.png</file>
+        <file>icons/sorinuri-v62111.ico</file>
+        <file>sorinuri-app-v62111.png</file>
         <file>sorinuri-logo-center.png</file>
         <file>sorinuri-logo.png</file>
         <file>icons/play.svg</file>
