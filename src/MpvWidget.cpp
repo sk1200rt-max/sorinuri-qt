@@ -328,9 +328,10 @@ void MpvWidget::setPresentationActive(bool active) {
     // 것처럼 보이는 현상을 피한다.
     if (active && renderCtx_) {
         presentationRefreshPending_.store(false);
-        QTimer::singleShot(0, this, [this]() {
-            if (presentationActive_.load() && renderCtx_ && !window()->isMinimized()) update();
-        });
+        // 숨김 탭에서 복귀할 때도 GUI 큐에는 최신 프레임 갱신 하나만 남긴다.
+        if (!updateQueued_.exchange(true)) {
+            QTimer::singleShot(0, this, [this]() { maybeUpdate(); });
+        }
     }
 }
 
@@ -359,10 +360,16 @@ void MpvWidget::onUpdate(void* ctx) {
         w->presentationRefreshPending_.store(true);
         return;
     }
-    QMetaObject::invokeMethod(w, "maybeUpdate", Qt::QueuedConnection);
+    // 고해상도 영상은 libmpv가 Qt paint보다 빠르게 콜백할 수 있다. 이벤트를 매
+    // 프레임 적재하면 포커스 전환 후 오래된 repaint가 몰려 깜빡임·무거움을 만든다.
+    if (!w->updateQueued_.exchange(true)) {
+        QMetaObject::invokeMethod(w, "maybeUpdate", Qt::QueuedConnection);
+    }
 }
 
 void MpvWidget::maybeUpdate() {
+    // 예약 상태는 GUI 스레드에서 먼저 해제해 다음 최신 프레임 하나만 다시 예약한다.
+    updateQueued_.store(false);
     if (!renderCtx_) return;
     // 서비스 전환과 콜백 사이의 경합도 GUI 스레드에서 한 번 더 막는다.
     if (!presentationActive_.load()) {

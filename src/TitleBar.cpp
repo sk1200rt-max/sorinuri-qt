@@ -191,15 +191,16 @@ void TitleBar::updateResponsiveLayout() {
         else { btnTools_->setMinimumWidth(0); btnTools_->setMaximumWidth(QWIDGETSIZE_MAX); }
     }
     if (btnClose_) {
+        // 마지막 버튼의 너비 제한을 해제하면 Windows에서 세로로 압축될 수 있으므로,
+        // 모든 창 제어와 같은 논리 40×40 정사각형을 매 반응형 갱신에 다시 강제한다.
+        btnClose_->setFixedSize(40, 40);
+        btnClose_->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
         btnClose_->setText(compact ? QStringLiteral("×") : QString());
         btnClose_->setIcon(compact ? QIcon() : QIcon(":/icons/close.svg"));
         if (compact) {
-            btnClose_->setFixedWidth(40);
-            btnClose_->setStyleSheet("QPushButton { color: #F2F7F6; font-size: 20px; background: transparent; border: none; } QPushButton:hover { background: #C42B35; }");
+            btnClose_->setStyleSheet("QPushButton { color: #F2F7F6; font-size: 20px; background: transparent; border: none; border-radius: 0; } QPushButton:hover { background: #C42B35; }");
         } else {
-            btnClose_->setMinimumWidth(0);
-            btnClose_->setMaximumWidth(QWIDGETSIZE_MAX);
-            btnClose_->setStyleSheet("QPushButton { background: transparent; border: 1px solid transparent; border-radius: 7px; } QPushButton:hover { background: #C42B35; border-color: #263A3C; } QPushButton:pressed { background: #102425; }");
+            btnClose_->setStyleSheet("QPushButton { background: transparent; border: 1px solid transparent; border-radius: 0; } QPushButton:hover { background: #C42B35; border-color: #263A3C; } QPushButton:pressed { background: #102425; }");
         }
     }
 

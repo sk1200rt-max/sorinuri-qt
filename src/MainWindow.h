@@ -144,6 +144,7 @@ private:
     void showBottomUi();
     void revealUiForVideoEdge(const QPoint& videoPosition);
     void hideUI();
+    void syncFullscreenEdgeUi();  // 전체 화면의 숨겨진 상단 영역에서도 포인터 위치를 주기적으로 확인한다.
 
     // 이어보기 (재생 위치 저장/복원)
     void saveResumePosition();
@@ -219,6 +220,9 @@ private:
     bool   isPlaying_         = false;
     bool   uiVisible_         = true;
     QTimer* uiHideTimer_      = nullptr;
+    // 전체 화면에서 상단 바가 숨겨진 경우 Windows가 해당 비클라이언트 경계 이동을
+    // Qt MouseMove로 보내지 않아도, 가벼운 주기 확인으로 상단/하단 오버를 놓치지 않는다.
+    QTimer* fullscreenEdgePollTimer_ = nullptr;
     double totalDuration_     = 0;
     double lastPosition_      = 0;   // 이어보기용 현재 재생 위치
     QString currentFilePath_;
