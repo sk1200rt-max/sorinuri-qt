@@ -3,6 +3,7 @@
 #include <QVBoxLayout>
 #include <QLabel>
 #include <QTimer>
+#include <QElapsedTimer>
 #include <QSettings>
 #include <QStringList>
 #include <QDragEnterEvent>
@@ -107,6 +108,8 @@ private slots:
     void ensureOriginalsQueueOverlay();
     void updateOriginalsQueueOverlay();
     void updateVideoShelf();
+    void positionTitleBarOverlay();
+    void setTitleBarOverlayMode(bool fullscreenOverlay);
     void positionVideoOverlayDeck();
     void setVideoOverlayVisible(bool visible);
     void switchToMusicMode();
@@ -223,6 +226,15 @@ private:
     // 전체 화면에서 상단 바가 숨겨진 경우 Windows가 해당 비클라이언트 경계 이동을
     // Qt MouseMove로 보내지 않아도, 가벼운 주기 확인으로 상단/하단 오버를 놓치지 않는다.
     QTimer* fullscreenEdgePollTimer_ = nullptr;
+    // 숨겨진 상단 바 대신 화면 최상단의 투명 48px 트리거가 포인터 진입을 직접 받는다.
+    // 이 위젯은 레이아웃에 포함하지 않아 MPV 렌더 표면의 크기를 바꾸지 않는다.
+    QWidget* fullscreenTopEdgeTrigger_ = nullptr;
+    // 가장자리 상태가 실제로 바뀔 때만 show/hide를 수행해 전체 화면 GUI 작업을 줄인다.
+    bool fullscreenPointerOnTop_ = false;
+    bool fullscreenPointerOnBottom_ = false;
+    // Windows 작업 표시줄 COM 갱신은 재생 위치 신호마다 호출하지 않고 경량 주기로 합친다.
+    QElapsedTimer taskbarProgressClock_;
+    qint64 taskbarProgressLastUpdateMs_ = -1;
     double totalDuration_     = 0;
     double lastPosition_      = 0;   // 이어보기용 현재 재생 위치
     QString currentFilePath_;
