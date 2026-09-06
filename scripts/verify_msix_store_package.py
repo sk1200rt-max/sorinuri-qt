@@ -65,10 +65,12 @@ def main() -> int:
         'Compare-Object',
         'unsigned artifact',
         'altform-unplated',
-        'SorinuriPlayerIcon.png',
-        'SorinuriPlayerIcon.targetsize-44_altform-unplated.png',
-        'SorinuriPlayerTile150.png',
-        'SorinuriPlayerTileWide.png',
+        'sorinuri-app-v62111.png',
+        'SorinuriV62111Icon.png',
+        'SorinuriV62111Icon.targetsize-44_altform-unplated.png',
+        'SorinuriV62111Tile150.png',
+        'SorinuriV62111TileWide.png',
+        'SorinuriV62111Store.png',
     ):
         require(packer, required, "scripts/build_store_msix.ps1")
 
@@ -97,11 +99,11 @@ def main() -> int:
     if 'BackgroundColor="transparent"' not in manifest:
         raise AssertionError('MSIX 시각 요소는 투명 배경을 유지해야 합니다.')
     for required in (
-        'Assets\\SorinuriPlayerStore.png',
-        '<Logo>Assets\\SorinuriPlayerStore.png</Logo>',
-        'Assets\\SorinuriPlayerIcon.png',
-        'Assets\\SorinuriPlayerTile150.png',
-        'Assets\\SorinuriPlayerTileWide.png',
+        'Assets\\SorinuriV62111Store.png',
+        '<Logo>Assets\\SorinuriV62111Store.png</Logo>',
+        'Assets\\SorinuriV62111Icon.png',
+        'Assets\\SorinuriV62111Tile150.png',
+        'Assets\\SorinuriV62111TileWide.png',
     ):
         require(manifest, required, 'packaging/msix/AppxManifest.xml.in')
     if 'Square44x44Logo.png' in manifest:

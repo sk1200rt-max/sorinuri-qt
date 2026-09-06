@@ -1,5 +1,14 @@
 [
   {
+    "version": "6.21.11",
+    "date": "2026-09-06",
+    "title": "전체 화면 오버레이·Windows 아이콘·반응성 안정화",
+    "desc": "영상 크기를 바꾸지 않는 전체 화면 상단 오버레이, 승인 아이콘의 Windows 표시 경로 통일, 창 제어 및 MPV UI 갱신 최적화",
+    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.21.11.exe",
+    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.21.11-Portable.zip",
+    "tags": []
+  },
+  {
     "version": "6.21.10",
     "date": "2026-09-06",
     "title": "오리지널 카탈로그 갱신 및 업데이트 배포 안정화",

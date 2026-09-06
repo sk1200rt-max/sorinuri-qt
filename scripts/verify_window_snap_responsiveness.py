@@ -49,17 +49,17 @@ checks += [
      "isInteractiveControlAt" in title_cpp and "isMaximizeControlAt" not in title_cpp,
      "사용자 지정 타이틀바 버튼은 공통 클릭 영역으로 처리하고 최대화 hover API는 두면 안 됩니다."),
     (all(token in title_cpp for token in (
-        "constexpr int kWindowControlSide = 40",
+        "constexpr int kWindowControlSide = 52",
         "btnMin_ = makeIconBtn",
         "btnMax_ = makeIconBtn",
         "btnFullscreen_ = makeIconBtn",
         "btnClose_ = makeIconBtn",
         "kWindowControlSide")),
-     "최소화·최대화·전체화면·닫기는 모두 40×40 정사각형 클릭 영역이어야 합니다."),
-    ("btnClose_->setFixedSize(40, 40);" in title_cpp and
+     "최소화·최대화·전체화면·닫기는 제목 표시줄 전체 높이의 52×52 정사각형 클릭 영역이어야 합니다."),
+    ("btnClose_->setFixedSize(52, 52);" in title_cpp and
      "btnClose_->setMinimumWidth(0);" not in title_cpp and
      "btnClose_->setMaximumWidth(QWIDGETSIZE_MAX);" not in title_cpp,
-     "닫기 버튼은 반응형 갱신 후에도 너비 제한을 잃지 않는 40×40 정사각형이어야 합니다."),
+     "닫기 버튼은 반응형 갱신 후에도 너비 제한을 잃지 않는 52×52 정사각형이어야 합니다."),
     ("revealUiForVideoEdge" in main_h and "revealUiForVideoEdge" in main_cpp,
      "비디오의 상단·하단 가장자리 전용 UI 노출 경로가 필요합니다."),
     (all(token in main_cpp for token in ("TOP_UI_REVEAL_ZONE", "BOTTOM_UI_REVEAL_ZONE", "showTopUi()", "showBottomUi()")),
@@ -69,10 +69,15 @@ checks += [
     ("qApp->installEventFilter(this);" in main_cpp and
      "revealUiForVideoEdge(me->globalPosition().toPoint());" in main_cpp,
      "상·하단 메뉴 위 포인터도 전역 가장자리 노출 함수로 처리해야 합니다."),
-    ("fullscreenEdgePollTimer_->setInterval(80);" in main_cpp and
+    ("fullscreenEdgePollTimer_->setInterval(100);" in main_cpp and
+     "fullscreenEdgePollTimer_->setTimerType(Qt::CoarseTimer);" in main_cpp and
      "void MainWindow::syncFullscreenEdgeUi()" in main_cpp and
-     "globalPosition.y() <= windowRect.top() + TOP_UI_REVEAL_ZONE" in main_cpp,
-     "전체 화면의 숨겨진 상단 가장자리도 포인터 확인으로 상단 바를 반드시 표시해야 합니다."),
+     "globalPosition.y() <= windowRect.top() + TOP_UI_REVEAL_ZONE" in main_cpp and
+     "fullscreenPointerOnTop_" in main_h and "fullscreenPointerOnBottom_" in main_h and
+     "fullscreenTopEdgeTrigger_" in main_h and
+     "obj == fullscreenTopEdgeTrigger_" in main_cpp and
+     "QEvent::Enter" in main_cpp,
+     "전체 화면의 숨겨진 상단 가장자리는 투명 진입 트리거와 경량 폴링으로 표시하되 같은 상태의 UI 작업을 반복하면 안 됩니다."),
     ("WM_NCACTIVATE && isFullscreen_" in main_cpp and
      "DefWindowProc(m->hwnd, WM_NCACTIVATE, m->wParam, -1)" in main_cpp,
      "전체 화면 포커스 전환 중 표준 비클라이언트 프레임이 다시 그려져 MPV 화면이 번쩍이면 안 됩니다."),
@@ -86,12 +91,16 @@ checks += [
     ("if (cursor().shape() == Qt::BlankCursor) unsetCursor();" in main_cpp and
      "mpvWidget_->unsetCursor();" in main_cpp,
      "이전 상태에서 숨겨진 포인터를 항상 복원해야 합니다."),
-    ("if (!isFullscreen_ || !isFullScreen()) {\n        showTopUi();\n        showBottomUi();" in main_cpp and
+    ("if (!isFullscreen_) {\n        showTopUi();\n        showBottomUi();" in main_cpp and
+     "void MainWindow::positionTitleBarOverlay()" in main_cpp and
+     "void MainWindow::setTitleBarOverlayMode(bool fullscreenOverlay)" in main_cpp and
+     "if (!isFullscreen_ || isMusicMode_ || !isVisible()) return;" in main_cpp and
+     "layout->setContentsMargins(current.left(), topInset, current.right(), current.bottom());" in main_cpp and
      "titleBar_->geometry().contains(position)" in main_cpp and
      "videoOverlayDeck_->geometry().contains(position)" in main_cpp and
      "uiHideTimer_->stop();" in main_cpp and
      "UI_AUTO_HIDE_DELAY_MS = 900" in main_cpp,
-     "창·최대화 모드에서는 메뉴를 유지하고 전체 화면에서 포인터가 메뉴 위에 있는 동안 숨기지 않아야 합니다."),
+     "창·최대화 모드에서는 메뉴를 유지하고 전체 화면의 상단 메뉴는 영상 리사이즈 없는 오버레이여야 합니다."),
     ("eventTimer_" not in core_h and "eventTimer_" not in core_cpp,
      "wakeup callback과 중복되는 16ms MPV 이벤트 폴링은 없어야 합니다."),
     ("mpv_set_wakeup_callback" in core_cpp and "QTimer::singleShot(0, self, &MpvCore::onMpvEvents)" in core_cpp,
@@ -103,9 +112,10 @@ checks += [
     ("peakTimer_->start();" not in compact_cpp.split("void CompactPlayerWidget::setupUI", 1)[0],
      "CompactPlayerWidget 생성자는 유휴 피크 타이머를 즉시 시작하면 안 됩니다."),
     ("setVisualizationActive(false)" in main_cpp and "setSpectrumEnabled(false)" in main_cpp,
-     "음악 시각화은 영상 모드·일시정지·정지에서 비활성화해야 합니다."),
-    (not re.search(r"\btimeBeginPeriod\s*\(\s*1\s*\)\s*;", main_cpp),
-     "전원 상태 변경에서 timeBeginPeriod(1)을 누적 호출하면 안 됩니다."),
+     "음악 시각화는 영상 모드·일시정지·정지에서 비활성화해야 합니다."),
+    ("taskbarProgressLastUpdateMs_" in main_h and
+     "elapsedMs - taskbarProgressLastUpdateMs_ < 250" in main_cpp,
+     "재생 위치 신호마다 Windows 작업 표시줄 COM 갱신을 반복하면 안 됩니다."),
 ]
 
 failed = [message for ok, message in checks if not ok]
