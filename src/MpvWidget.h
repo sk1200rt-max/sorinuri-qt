@@ -69,6 +69,8 @@ private:
     bool  screenChangedConnected_ = false;  // 멀티모니터 감지 연결 여부
     std::atomic_bool presentationActive_{true};        // 화면에 실제로 보이는 영상 표면만 repaint
     std::atomic_bool presentationRefreshPending_{false};
+    // libmpv 프레임 콜백마다 Qt 이벤트를 적재하지 않고, GUI 큐에는 최대 한 번의 repaint만 예약한다.
+    std::atomic_bool updateQueued_{false};
     void  connectScreenChanged(QWindow* win);  // 멀티모니터 시그널 연결 헬퍼
 
     QLabel*  logoLabel_  = nullptr;

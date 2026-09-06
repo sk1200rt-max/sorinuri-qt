@@ -364,6 +364,12 @@ void MainWindow::setupConnections() {
     setMouseTracking(true);
     // 애플리케이션 전체 마우스 이동을 감지해 전체화면 UI 자동 숨김 상태를 안전하게 관리한다.
     qApp->installEventFilter(this);
+    // 숨겨진 상단 가장자리에서 Windows가 Qt MouseMove를 보내지 않는 경우가 있어,
+    // 전체 화면 동안에만 짧은 주기로 포인터를 확인한다. 재생·디코더·오디오에는 관여하지 않는다.
+    fullscreenEdgePollTimer_ = new QTimer(this);
+    fullscreenEdgePollTimer_->setInterval(80);
+    connect(fullscreenEdgePollTimer_, &QTimer::timeout,
+            this, &MainWindow::syncFullscreenEdgeUi);
 
     // HiDPI 근본 수정: mpvInitialized 시그널 연결
     // initializeGL() 완료 후 pendingStartupFiles_ 자동 처리
@@ -993,6 +999,8 @@ constexpr int UI_AUTO_HIDE_DELAY_MS = 900;
 void MainWindow::showTopUi() {
     if (!titleBar_) return;
     titleBar_->show();
+    // 하단 재생 바와 포커스가 섞여도 상단 바를 항상 전면에 보낸다.
+    titleBar_->raise();
     uiVisible_ = true;
 
     // 비디오 가장자리에서 UI를 다시 호출할 수 있도록 커서를 복원한다.
@@ -1034,23 +1042,23 @@ void MainWindow::showUI() {
 void MainWindow::revealUiForVideoEdge(const QPoint& globalPosition) {
     if (isMusicMode_ || !centralWidget()) return;
 
-    // 중앙 표면 기준의 전역 좌표를 쓴다. mpvWidget뿐 아니라 상단 메뉴·하단 재생
-    // 바의 버튼 위에서 마우스를 멈춘 상태도 같은 정책으로 처리할 수 있다.
+    // 중앙 위젯의 레이아웃 좌표는 숨겨진 상단 바의 높이에 따라 달라질 수 있다.
+    // 전체 화면 가장자리 판정은 창 전체의 전역 사각형으로만 계산해 상단 오버를 놓치지 않는다.
+    const QRect windowRect(mapToGlobal(QPoint(0, 0)), size());
+    if (!windowRect.contains(globalPosition)) return;
     const QPoint position = centralWidget()->mapFromGlobal(globalPosition);
-    const QRect surfaceRect = centralWidget()->rect();
-    if (!surfaceRect.contains(position)) return;
 
     // 창 모드와 최대화 모드에서는 상·하단 메뉴를 항상 보인다. 가장자리 트리거는
-    // 전체 화면에서만 적용해 일반 창의 리사이즈·Snap 동작과 섞이지 않는다.
-    if (!isFullscreen_) {
+    // 실제 전체 화면에서만 적용해 일반 창의 리사이즈·Snap 동작과 섞이지 않는다.
+    if (!isFullscreen_ || !isFullScreen()) {
         showTopUi();
         showBottomUi();
         return;
     }
 
-    const bool onTopEdge = position.y() <= TOP_UI_REVEAL_ZONE
+    const bool onTopEdge = globalPosition.y() <= windowRect.top() + TOP_UI_REVEAL_ZONE
         || (titleBar_ && titleBar_->isVisible() && titleBar_->geometry().contains(position));
-    const bool onBottomEdge = position.y() >= surfaceRect.height() - BOTTOM_UI_REVEAL_ZONE
+    const bool onBottomEdge = globalPosition.y() >= windowRect.bottom() - BOTTOM_UI_REVEAL_ZONE
         || (videoOverlayDeck_ && videoOverlayDeck_->isVisible()
             && videoOverlayDeck_->geometry().contains(position));
 
@@ -1067,6 +1075,11 @@ void MainWindow::revealUiForVideoEdge(const QPoint& globalPosition) {
     } else if (uiVisible_ && uiHideTimer_) {
         uiHideTimer_->start(UI_AUTO_HIDE_DELAY_MS);
     }
+}
+
+void MainWindow::syncFullscreenEdgeUi() {
+    if (!isFullscreen_ || !isFullScreen() || isMusicMode_ || !isVisible()) return;
+    revealUiForVideoEdge(QCursor::pos());
 }
 
 void MainWindow::hideUI() {
@@ -1389,6 +1402,7 @@ void MainWindow::onSubtitleSearch() {
 
 void MainWindow::toggleFullscreen() {
     if (isFullscreen_) {
+        if (fullscreenEdgePollTimer_) fullscreenEdgePollTimer_->stop();
         showNormal();
         isFullscreen_ = false;
         titleBar_->setFullscreenMode(false);
@@ -1399,6 +1413,7 @@ void MainWindow::toggleFullscreen() {
         showFullScreen();
         isFullscreen_ = true;
         titleBar_->setFullscreenMode(true);
+        if (fullscreenEdgePollTimer_) fullscreenEdgePollTimer_->start();
         // 전체 화면 진입 직후에는 메뉴를 숨긴다. 상·하단 가장자리 오버에서만 다시 표시된다.
         if (titleBar_) titleBar_->hide();
         setVideoOverlayVisible(false);
@@ -2238,6 +2253,14 @@ bool MainWindow::nativeEvent(const QByteArray& type, void* msg, qintptr* result)
         // 처리되고, 화면에는 Qt 커스텀 타이틀바만 표시된다.
         if (m->message == WM_NCCALCSIZE && m->wParam == TRUE) {
             *result = 0;
+            return true;
+        }
+
+        // 전체 화면에서 다른 창으로 포커스가 이동할 때 DefWindowProc가 표준 제목
+        // 표시줄을 잠시 다시 그리면 MPV 표면 위에 흰/밝은 프레임이 번쩍일 수 있다.
+        // 기본 활성화 상태 전환은 유지하되 lParam=-1로 비클라이언트 재그림만 억제한다.
+        if (m->message == WM_NCACTIVATE && isFullscreen_) {
+            *result = DefWindowProc(m->hwnd, WM_NCACTIVATE, m->wParam, -1);
             return true;
         }
 

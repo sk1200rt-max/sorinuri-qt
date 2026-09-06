@@ -25,6 +25,8 @@ core_cpp = text("src/MpvCore.cpp")
 music_h = text("src/MusicWidget.h")
 music_cpp = text("src/MusicWidget.cpp")
 compact_cpp = text("src/CompactPlayerWidget.cpp")
+mpv_h = text("src/MpvWidget.h")
+mpv_cpp = text("src/MpvWidget.cpp")
 
 checks += [
     ("startSystemMove()" in title_cpp,
@@ -54,6 +56,10 @@ checks += [
         "btnClose_ = makeIconBtn",
         "kWindowControlSide")),
      "최소화·최대화·전체화면·닫기는 모두 40×40 정사각형 클릭 영역이어야 합니다."),
+    ("btnClose_->setFixedSize(40, 40);" in title_cpp and
+     "btnClose_->setMinimumWidth(0);" not in title_cpp and
+     "btnClose_->setMaximumWidth(QWIDGETSIZE_MAX);" not in title_cpp,
+     "닫기 버튼은 반응형 갱신 후에도 너비 제한을 잃지 않는 40×40 정사각형이어야 합니다."),
     ("revealUiForVideoEdge" in main_h and "revealUiForVideoEdge" in main_cpp,
      "비디오의 상단·하단 가장자리 전용 UI 노출 경로가 필요합니다."),
     (all(token in main_cpp for token in ("TOP_UI_REVEAL_ZONE", "BOTTOM_UI_REVEAL_ZONE", "showTopUi()", "showBottomUi()")),
@@ -63,13 +69,24 @@ checks += [
     ("qApp->installEventFilter(this);" in main_cpp and
      "revealUiForVideoEdge(me->globalPosition().toPoint());" in main_cpp,
      "상·하단 메뉴 위 포인터도 전역 가장자리 노출 함수로 처리해야 합니다."),
+    ("fullscreenEdgePollTimer_->setInterval(80);" in main_cpp and
+     "void MainWindow::syncFullscreenEdgeUi()" in main_cpp and
+     "globalPosition.y() <= windowRect.top() + TOP_UI_REVEAL_ZONE" in main_cpp,
+     "전체 화면의 숨겨진 상단 가장자리도 포인터 확인으로 상단 바를 반드시 표시해야 합니다."),
+    ("WM_NCACTIVATE && isFullscreen_" in main_cpp and
+     "DefWindowProc(m->hwnd, WM_NCACTIVATE, m->wParam, -1)" in main_cpp,
+     "전체 화면 포커스 전환 중 표준 비클라이언트 프레임이 다시 그려져 MPV 화면이 번쩍이면 안 됩니다."),
+    ("std::atomic_bool updateQueued_{false};" in mpv_h and
+     "if (!w->updateQueued_.exchange(true))" in mpv_cpp and
+     "updateQueued_.store(false);" in mpv_cpp,
+     "libmpv 프레임 콜백은 Qt GUI 큐에 하나의 최신 repaint만 예약해야 합니다."),
     ("setCursor(Qt::BlankCursor)" not in main_cpp and
      "mpvWidget_->setCursor(Qt::BlankCursor)" not in main_cpp,
      "UI를 숨길 때 영상 영역의 마우스 포인터를 숨기면 안 됩니다."),
     ("if (cursor().shape() == Qt::BlankCursor) unsetCursor();" in main_cpp and
      "mpvWidget_->unsetCursor();" in main_cpp,
      "이전 상태에서 숨겨진 포인터를 항상 복원해야 합니다."),
-    ("if (!isFullscreen_) {\n        showTopUi();\n        showBottomUi();" in main_cpp and
+    ("if (!isFullscreen_ || !isFullScreen()) {\n        showTopUi();\n        showBottomUi();" in main_cpp and
      "titleBar_->geometry().contains(position)" in main_cpp and
      "videoOverlayDeck_->geometry().contains(position)" in main_cpp and
      "uiHideTimer_->stop();" in main_cpp and
