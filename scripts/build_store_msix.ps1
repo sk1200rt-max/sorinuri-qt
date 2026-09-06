@@ -107,7 +107,7 @@ foreach ($name in $forbiddenFiles) {
 
 $assetsPath = Join-Path $stagingRoot 'Assets'
 New-Item -ItemType Directory -Path $assetsPath -Force | Out-Null
-$sourceLogo = Join-Path $repoRoot 'resources/sorinuri-app.png'
+$sourceLogo = Join-Path $repoRoot 'resources/sorinuri-app-v62111.png'
 Require-Path $sourceLogo '소리누리 브랜드 원본 로고'
 
 # MSIX asset size variants are generated deterministically; no artwork/content is changed or cropped.
@@ -133,15 +133,15 @@ function Save-Logo([int]$width, [int]$height, [string]$name) {
         } finally { $bitmap.Dispose() }
     } finally { $sourceImage.Dispose() }
 }
-# 파일명을 제품 고유 이름으로 바꿔 Windows가 이전 Square44x44Logo 캐시를
-# 재사용하지 않게 한다. 모든 크기는 동일한 지정 원본에서 생성한다.
-Save-Logo 44 44 'SorinuriPlayerIcon.png'
+# 승인 아이콘 전용 파일명을 사용해 이전 MSIX·시작 메뉴·바로가기 아이콘 캐시와
+# 명확히 구분한다. 모든 크기는 동일한 투명 원본에서 생성한다.
+Save-Logo 44 44 'SorinuriV62111Icon.png'
 foreach ($targetSize in @(16, 20, 24, 30, 32, 36, 40, 44, 48, 60, 64, 72, 80, 96, 256)) {
-    Save-Logo $targetSize $targetSize ("SorinuriPlayerIcon.targetsize-{0}_altform-unplated.png" -f $targetSize)
+    Save-Logo $targetSize $targetSize ("SorinuriV62111Icon.targetsize-{0}_altform-unplated.png" -f $targetSize)
 }
-Save-Logo 150 150 'SorinuriPlayerTile150.png'
-Save-Logo 310 150 'SorinuriPlayerTileWide.png'
-Save-Logo 50 50 'SorinuriPlayerStore.png'
+Save-Logo 150 150 'SorinuriV62111Tile150.png'
+Save-Logo 310 150 'SorinuriV62111TileWide.png'
+Save-Logo 50 50 'SorinuriV62111Store.png'
 
 $manifest = Get-Content -LiteralPath $templatePath -Raw -Encoding UTF8
 $replacements = @{
@@ -166,7 +166,7 @@ $manifestTypes = @($xml.SelectNodes('//uap:FileType', $namespace) | ForEach-Obje
 if ($manifestTypes.Count -ne $extensions.Count -or (Compare-Object ($extensions | Sort-Object) ($manifestTypes | Sort-Object))) {
     throw "Store MSIX 패키지 실패: AppxManifest 파일 연결 목록이 Inno Setup과 일치하지 않습니다."
 }
-foreach ($required in @('Sorinuri.exe', 'libmpv-2.dll', 'platforms/qwindows.dll', 'Assets/SorinuriPlayerIcon.png', 'Assets/SorinuriPlayerIcon.targetsize-44_altform-unplated.png', 'Assets/SorinuriPlayerTile150.png', 'Assets/SorinuriPlayerTileWide.png', 'Assets/SorinuriPlayerStore.png')) {
+foreach ($required in @('Sorinuri.exe', 'libmpv-2.dll', 'platforms/qwindows.dll', 'Assets/SorinuriV62111Icon.png', 'Assets/SorinuriV62111Icon.targetsize-44_altform-unplated.png', 'Assets/SorinuriV62111Tile150.png', 'Assets/SorinuriV62111TileWide.png', 'Assets/SorinuriV62111Store.png')) {
     Require-Path (Join-Path $stagingRoot $required) "Store payload 필수 파일"
 }
 

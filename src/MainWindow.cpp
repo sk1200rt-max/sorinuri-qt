@@ -174,12 +174,23 @@ void MainWindow::setupUI() {
     setCentralWidget(central);
 
     auto* mainLayout = new QVBoxLayout(central);
-    mainLayout->setContentsMargins(0, 0, 0, 0);
     mainLayout->setSpacing(0);
 
-    // ── 타이틀바 ─────────────────────────────────────────────
-    titleBar_ = new TitleBar(this);
-    mainLayout->addWidget(titleBar_);
+    // 상단 바는 중앙 표면의 직접 자식으로 유지한다. 일반 창에서는 레이아웃의 상단
+    // 여백만 예약하고, 전체 화면에서는 여백을 0으로 바꿔 영상 위 오버레이로 표시한다.
+    // 따라서 전체 화면에서 상단 바 show/hide가 MPV 렌더 표면의 크기를 바꾸지 않는다.
+    titleBar_ = new TitleBar(central);
+    mainLayout->setContentsMargins(0, titleBar_->height(), 0, 0);
+
+    // 전체 화면에서 숨겨진 상단 제목 표시줄 대신 포인터 진입을 직접 받는 투명 트리거다.
+    // central의 직접 자식이며 레이아웃에는 넣지 않으므로 영상 렌더 표면을 축소하지 않는다.
+    fullscreenTopEdgeTrigger_ = new QWidget(central);
+    fullscreenTopEdgeTrigger_->setObjectName(QStringLiteral("fullscreenTopEdgeTrigger"));
+    fullscreenTopEdgeTrigger_->setFixedHeight(48);
+    fullscreenTopEdgeTrigger_->setMouseTracking(true);
+    fullscreenTopEdgeTrigger_->setStyleSheet(QStringLiteral("background: transparent; border: none;"));
+    fullscreenTopEdgeTrigger_->hide();
+    fullscreenTopEdgeTrigger_->installEventFilter(this);
 
     // 모드 버튼은 ControlBar에 통합됨 (modeBar 제거)
 
@@ -257,6 +268,7 @@ void MainWindow::setupUI() {
     if (auto* deckLayout = qobject_cast<QVBoxLayout*>(videoOverlayDeck_->layout()))
         deckLayout->addWidget(controlBar_);
     QTimer::singleShot(0, this, [this]() {
+        positionTitleBarOverlay();
         positionVideoOverlayDeck();
         showBottomUi();
     });
@@ -367,7 +379,10 @@ void MainWindow::setupConnections() {
     // 숨겨진 상단 가장자리에서 Windows가 Qt MouseMove를 보내지 않는 경우가 있어,
     // 전체 화면 동안에만 짧은 주기로 포인터를 확인한다. 재생·디코더·오디오에는 관여하지 않는다.
     fullscreenEdgePollTimer_ = new QTimer(this);
-    fullscreenEdgePollTimer_->setInterval(80);
+    // 정상 MouseMove가 즉시 처리하므로, 숨겨진 상단 경계의 Windows 입력 누락만
+    // 보완하는 폴링은 10Hz coarse timer로 제한해 불필요한 GUI 깨우기를 줄인다.
+    fullscreenEdgePollTimer_->setInterval(100);
+    fullscreenEdgePollTimer_->setTimerType(Qt::CoarseTimer);
     connect(fullscreenEdgePollTimer_, &QTimer::timeout,
             this, &MainWindow::syncFullscreenEdgeUi);
 
@@ -769,6 +784,26 @@ void MainWindow::updateVideoShelf() {
     controlBar_->setMediaDetails(context, title, nextTitle);
 }
 
+void MainWindow::positionTitleBarOverlay() {
+    if (!titleBar_ || !centralWidget()) return;
+    QWidget* surface = centralWidget();
+    titleBar_->setGeometry(0, 0, surface->width(), titleBar_->height());
+    if (fullscreenTopEdgeTrigger_)
+        fullscreenTopEdgeTrigger_->setGeometry(0, 0, surface->width(), fullscreenTopEdgeTrigger_->height());
+    titleBar_->raise();
+}
+
+void MainWindow::setTitleBarOverlayMode(bool fullscreenOverlay) {
+    if (!titleBar_ || !centralWidget()) return;
+    if (auto* layout = qobject_cast<QVBoxLayout*>(centralWidget()->layout())) {
+        const QMargins current = layout->contentsMargins();
+        const int topInset = fullscreenOverlay ? 0 : titleBar_->height();
+        if (current.top() != topInset)
+            layout->setContentsMargins(current.left(), topInset, current.right(), current.bottom());
+    }
+    positionTitleBarOverlay();
+}
+
 void MainWindow::positionVideoOverlayDeck() {
     if (!videoOverlayDeck_ || !centralWidget()) return;
     // 전체 폭 하단 재생 바는 중앙 표면의 직접 자식이다. 서비스 페이지의 내부
@@ -998,6 +1033,8 @@ constexpr int UI_AUTO_HIDE_DELAY_MS = 900;
 
 void MainWindow::showTopUi() {
     if (!titleBar_) return;
+    positionTitleBarOverlay();
+    if (fullscreenTopEdgeTrigger_) fullscreenTopEdgeTrigger_->hide();
     titleBar_->show();
     // 하단 재생 바와 포커스가 섞여도 상단 바를 항상 전면에 보낸다.
     titleBar_->raise();
@@ -1050,7 +1087,7 @@ void MainWindow::revealUiForVideoEdge(const QPoint& globalPosition) {
 
     // 창 모드와 최대화 모드에서는 상·하단 메뉴를 항상 보인다. 가장자리 트리거는
     // 실제 전체 화면에서만 적용해 일반 창의 리사이즈·Snap 동작과 섞이지 않는다.
-    if (!isFullscreen_ || !isFullScreen()) {
+    if (!isFullscreen_) {
         showTopUi();
         showBottomUi();
         return;
@@ -1062,23 +1099,38 @@ void MainWindow::revealUiForVideoEdge(const QPoint& globalPosition) {
         || (videoOverlayDeck_ && videoOverlayDeck_->isVisible()
             && videoOverlayDeck_->geometry().contains(position));
 
-    // 포인터가 표시된 메뉴 위에 있는 동안에는 절대 자동 숨김 타이머를 실행하지
-    // 않는다. 메뉴를 벗어난 후에만 짧은 지연으로 다시 몰입 화면으로 돌아간다.
+    // 포인터가 표시된 메뉴 위에 있는 동안에는 자동 숨김을 멈춘다. 10Hz 보조
+    // 폴링에서 같은 상태의 show/raise/hide를 반복하지 않고, 상·하단 영역 전환 때만
+    // 오버레이를 바꿔 영상 렌더와 경쟁하는 GUI 작업을 최소화한다.
     if (onTopEdge) {
-        if (videoOverlayDeck_) videoOverlayDeck_->hide();
-        showTopUi();
+        if (!fullscreenPointerOnTop_) {
+            if (videoOverlayDeck_) videoOverlayDeck_->hide();
+            showTopUi();
+        }
+        fullscreenPointerOnTop_ = true;
+        fullscreenPointerOnBottom_ = false;
         if (uiHideTimer_) uiHideTimer_->stop();
     } else if (onBottomEdge) {
-        if (titleBar_) titleBar_->hide();
-        showBottomUi();
+        if (!fullscreenPointerOnBottom_) {
+            if (titleBar_) titleBar_->hide();
+            showBottomUi();
+        }
+        fullscreenPointerOnTop_ = false;
+        fullscreenPointerOnBottom_ = true;
         if (uiHideTimer_) uiHideTimer_->stop();
-    } else if (uiVisible_ && uiHideTimer_) {
-        uiHideTimer_->start(UI_AUTO_HIDE_DELAY_MS);
+    } else {
+        const bool leftRevealZone = fullscreenPointerOnTop_ || fullscreenPointerOnBottom_;
+        fullscreenPointerOnTop_ = false;
+        fullscreenPointerOnBottom_ = false;
+        if (uiVisible_ && uiHideTimer_ && (leftRevealZone || !uiHideTimer_->isActive()))
+            uiHideTimer_->start(UI_AUTO_HIDE_DELAY_MS);
     }
 }
 
 void MainWindow::syncFullscreenEdgeUi() {
-    if (!isFullscreen_ || !isFullScreen() || isMusicMode_ || !isVisible()) return;
+    // showFullScreen() 직후에는 Qt의 windowStateChanged가 한 이벤트 턴 늦게 반영될 수 있다.
+    // 사용자가 누른 전체 화면 상태 플래그를 기준으로 포인터를 확인해 숨겨진 상단 메뉴를 놓치지 않는다.
+    if (!isFullscreen_ || isMusicMode_ || !isVisible()) return;
     revealUiForVideoEdge(QCursor::pos());
 }
 
@@ -1116,10 +1168,19 @@ void MainWindow::hideUI() {
         return;
     }
     if (uiVisible_ && isPlaying_) {
-        // 전체 화면·창 모드 모두 노출 중인 상단·하단 UI만 숨긴다.
-        // 레이아웃을 변경하지 않는 hide()만 사용하므로 영상 프레임과 오버레이는 유지된다.
+        fullscreenPointerOnTop_ = false;
+        fullscreenPointerOnBottom_ = false;
+        // 전체 화면의 상단 바는 레이아웃을 변경하지 않는 오버레이로만 숨기며,
+        // 같은 좌표의 투명 트리거가 다음 포인터 진입을 직접 받는다.
         if (titleBar_) titleBar_->hide();
+        positionTitleBarOverlay();
+        if (fullscreenTopEdgeTrigger_) {
+            fullscreenTopEdgeTrigger_->show();
+            fullscreenTopEdgeTrigger_->raise();
+        }
         setVideoOverlayVisible(false);
+        fullscreenPointerOnTop_ = false;
+        fullscreenPointerOnBottom_ = false;
         uiVisible_ = false;
         // 중앙 영상 영역에서는 UI만 숨긴다. 사용자가 화면을 조작할 수 있도록
         // 전체 화면·창 모드·팝업 복귀 상태 모두에서 마우스 포인터는 유지한다.
@@ -1146,6 +1207,8 @@ void MainWindow::onPlaybackStarted() {
         // 있으면 해당 메뉴는 계속 표시한다.
         if (titleBar_) titleBar_->hide();
         setVideoOverlayVisible(false);
+        fullscreenPointerOnTop_ = false;
+        fullscreenPointerOnBottom_ = false;
         uiVisible_ = false;
         QTimer::singleShot(0, this, [this]() {
             revealUiForVideoEdge(QCursor::pos());
@@ -1258,6 +1321,17 @@ void MainWindow::initTaskbarList() {
 
 void MainWindow::updateTaskbarProgress(double pos, double dur, bool paused, bool stopped) {
 #ifdef Q_OS_WIN
+    // 재생 위치 신호는 UI보다 자주 올 수 있다. 작업 표시줄 COM 갱신은 4Hz면
+    // 충분히 부드럽고, 포커스 전환·고해상도 영상 중 반복 IPC 부담을 줄인다.
+    if (!taskbarProgressClock_.isValid()) taskbarProgressClock_.start();
+    const qint64 elapsedMs = taskbarProgressClock_.elapsed();
+    const bool stateTransition = paused || stopped || dur <= 0;
+    if (!stateTransition && taskbarProgressLastUpdateMs_ >= 0
+        && elapsedMs - taskbarProgressLastUpdateMs_ < 250) {
+        return;
+    }
+    taskbarProgressLastUpdateMs_ = elapsedMs;
+
     if (!taskbarList_) initTaskbarList();
     if (!taskbarList_) return;
     ITaskbarList3* tbl = static_cast<ITaskbarList3*>(taskbarList_);
@@ -1403,23 +1477,40 @@ void MainWindow::onSubtitleSearch() {
 void MainWindow::toggleFullscreen() {
     if (isFullscreen_) {
         if (fullscreenEdgePollTimer_) fullscreenEdgePollTimer_->stop();
+        // 일반·최대화 창에서는 상단 여백을 한 번만 복원하고 두 바를 계속 표시한다.
+        setTitleBarOverlayMode(false);
+        if (fullscreenTopEdgeTrigger_) fullscreenTopEdgeTrigger_->hide();
         showNormal();
         isFullscreen_ = false;
         titleBar_->setFullscreenMode(false);
-        // 일반 창과 최대화 상태에서는 두 메뉴를 항상 보인다.
         showUI();
-        QTimer::singleShot(0, this, [this]() { positionVideoOverlayDeck(); });
+        QTimer::singleShot(0, this, [this]() {
+            positionTitleBarOverlay();
+            positionVideoOverlayDeck();
+        });
     } else {
+        // 전체 화면으로 전환할 때만 레이아웃 상단 여백을 제거한다. 이후 상단 메뉴의
+        // show/hide는 MPV 표면 크기와 무관한 오버레이만 사용한다.
+        setTitleBarOverlayMode(true);
         showFullScreen();
         isFullscreen_ = true;
         titleBar_->setFullscreenMode(true);
         if (fullscreenEdgePollTimer_) fullscreenEdgePollTimer_->start();
-        // 전체 화면 진입 직후에는 메뉴를 숨긴다. 상·하단 가장자리 오버에서만 다시 표시된다.
         if (titleBar_) titleBar_->hide();
+        positionTitleBarOverlay();
+        if (fullscreenTopEdgeTrigger_) {
+            fullscreenTopEdgeTrigger_->show();
+            fullscreenTopEdgeTrigger_->raise();
+        }
         setVideoOverlayVisible(false);
+        fullscreenPointerOnTop_ = false;
+        fullscreenPointerOnBottom_ = false;
         uiVisible_ = false;
         if (uiHideTimer_) uiHideTimer_->stop();
-        QTimer::singleShot(0, this, [this]() { positionVideoOverlayDeck(); });
+        QTimer::singleShot(0, this, [this]() {
+            positionTitleBarOverlay();
+            positionVideoOverlayDeck();
+        });
     }
 }
 
@@ -2103,12 +2194,16 @@ void MainWindow::resizeEvent(QResizeEvent* e) {
     if (shortcutOverlay_ && mpvWidget_) {
         shortcutOverlay_->setGeometry(mpvWidget_->rect());
     }
+    positionTitleBarOverlay();
     positionVideoOverlayDeck();
 }
 
 void MainWindow::showEvent(QShowEvent* e) {
     QMainWindow::showEvent(e);
-    QTimer::singleShot(0, this, [this]() { positionVideoOverlayDeck(); });
+    QTimer::singleShot(0, this, [this]() {
+        positionTitleBarOverlay();
+        positionVideoOverlayDeck();
+    });
 #ifdef Q_OS_WIN
     // Qt::Window가 만든 표준 WS_THICKFRAME/WS_MAXIMIZEBOX 스타일을 사후에
     // 변경하지 않는다. WM_NCCALCSIZE를 즉시 발생시켜 프레임만 클라이언트로
@@ -2290,7 +2385,9 @@ bool MainWindow::nativeEvent(const QByteArray& type, void* msg, qintptr* result)
                 return true;
             }
 
-            if (titleBar_ && titleBar_->geometry().contains(pos)) {
+            // 숨겨진 전체 화면 상단 바는 캡션 히트 영역을 차지하면 안 된다.
+            // 그렇지 않으면 Windows가 MouseMove를 가로채 상단 오버레이 표시가 늦거나 누락될 수 있다.
+            if (titleBar_ && titleBar_->isVisible() && titleBar_->geometry().contains(pos)) {
                 const QPoint titlePos = titleBar_->mapFrom(this, pos);
                 // 모든 커스텀 버튼은 클라이언트 영역으로 반환한다. 최대화 버튼은
                 // Windows 11 Snap Layout용 시스템 히트 값을 사용하지 않으므로 hover로
@@ -2329,6 +2426,15 @@ void MainWindow::mousePressEvent(QMouseEvent* e) {
 }
 
 bool MainWindow::eventFilter(QObject* obj, QEvent* event) {
+    // 숨겨진 상단 제목 표시줄을 대신하는 투명 트리거는 Windows 비클라이언트 경계의
+    // MouseMove 유무와 관계없이 Enter만으로 상단 오버레이를 즉시 표시한다.
+    if (obj == fullscreenTopEdgeTrigger_ && isFullscreen_ && !isMusicMode_
+        && (event->type() == QEvent::Enter || event->type() == QEvent::MouseMove)) {
+        fullscreenPointerOnTop_ = false;
+        showTopUi();
+        return true;
+    }
+
     // qApp 레벨 필터에서 처리한다. 전체 화면에 표시된 상단바·하단바의 자식 버튼 위에
     // 마우스를 그대로 두어도 숨김 타이머가 다시 시작되지 않도록 전역 좌표를 사용한다.
     if (event->type() == QEvent::MouseMove && isFullscreen_ && !isMusicMode_) {

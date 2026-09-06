@@ -1,6 +1,6 @@
 {
-  "version": "6.21.10",
+  "version": "6.21.11",
   "domain": "ui,renderer,installer",
-  "purpose": "Windows 실제 검증에서 확인된 제목 표시줄·전체 화면 상단 메뉴·MPV 렌더 갱신·투명 앱 아이콘·MSIX 설치 안정화",
-  "base_commit": "4495da367570c598b2006ad3e4759ed747e304cc"
+  "purpose": "전체 화면 상단 오버레이, Windows 아이콘 경로, 창 제어 및 반응성 안정화",
+  "base_commit": "5dcb07b57cc96a1875891c0a3112a7d459eb75ec"
 }

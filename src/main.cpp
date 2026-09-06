@@ -97,9 +97,9 @@ int main(int argc, char* argv[])
     QApplication app(argc, argv);
     app.setApplicationName("Sorinuri");
     app.setApplicationDisplayName("소리누리");
-    app.setApplicationVersion("6.21.10");
+    app.setApplicationVersion("6.21.11");
     app.setOrganizationName("Sorinuri");
-    app.setWindowIcon(QIcon(":/icons/sorinuri.ico"));
+    app.setWindowIcon(QIcon(":/icons/sorinuri-v62111.ico"));
 
     QCommandLineParser parser;
     parser.addHelpOption();

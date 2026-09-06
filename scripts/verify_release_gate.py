@@ -40,6 +40,8 @@ DOMAINS: dict[str, tuple[str, ...]] = {
         "src/OttWidget.cpp", "src/OttWidget.h",
         # 설치·창·인앱 공통 아이콘은 UI 승인 범위에서만 교체할 수 있다.
         "resources/sorinuri-app.png", "resources/sorinuri.ico", "resources/icons/sorinuri.ico",
+        "resources/sorinuri-app-v62111.png", "resources/sorinuri-v62111.ico",
+        "resources/icons/sorinuri-v62111.ico", "resources/resources.qrc",
     ),
     "playback": (
         "src/PlaybackQueue.cpp", "src/PlaybackQueue.h", "src/PlaylistWidget.cpp",

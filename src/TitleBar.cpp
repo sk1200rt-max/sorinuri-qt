@@ -10,7 +10,7 @@ QPushButton* TitleBar::makeIconBtn(const QString& svgPath, const QString& toolti
                                     const QString& hoverBg, int w) {
     auto* btn = new QPushButton();
     btn->setToolTip(tooltip);
-    btn->setFixedSize(w, 40);
+    btn->setFixedSize(w, w);
     btn->setFlat(true);
     btn->setCursor(Qt::ArrowCursor);
     btn->setFocusPolicy(Qt::NoFocus);
@@ -76,7 +76,7 @@ TitleBar::TitleBar(QWidget* parent) : QWidget(parent) {
     auto* logoIcon = new QLabel(identity);
     logoIcon->setFixedSize(26, 26);
     logoIcon->setStyleSheet("background: transparent; border: none;");
-    QPixmap logoPixmap(":/sorinuri-app.png");
+    QPixmap logoPixmap(":/sorinuri-app-v62111.png");
     if (!logoPixmap.isNull()) {
         logoIcon->setPixmap(logoPixmap.scaled(26, 26,
             Qt::KeepAspectRatio, Qt::SmoothTransformation));
@@ -125,9 +125,9 @@ TitleBar::TitleBar(QWidget* parent) : QWidget(parent) {
     btnTools_ = makeCommandBtn(QStringLiteral("도구  ▾"), QStringLiteral("플레이어 도구 및 환경 설정"));
     btnPin_ = makeIconBtn(":/icons/pin_off.svg", "항상 위에 고정", "#1A2526", 36);
     btnPin_->setCheckable(true);
-    // 표준 창 제어는 모두 같은 정사각형 클릭 영역을 사용한다. 닫기 버튼만
-    // 더 좁거나 세로로 길게 보이지 않게 해 250% HiDPI에서도 균일하게 유지한다.
-    constexpr int kWindowControlSide = 40;
+    // 표준 창 제어는 제목 표시줄 전체 높이와 같은 정사각형을 사용한다. 닫기만
+    // 더 좁거나 세로로 길게 보이지 않게 해 모든 DPI에서 균일한 클릭 영역을 유지한다.
+    constexpr int kWindowControlSide = 52;
     btnMin_ = makeIconBtn(":/icons/minimize.svg", "최소화", "#1A2526", kWindowControlSide);
     btnMax_ = makeIconBtn(":/icons/maximize.svg", "화면 채우기", "#1A2526", kWindowControlSide);
     btnFullscreen_ = makeIconBtn(":/icons/expand.svg", "전체화면", "#063B35", kWindowControlSide);
@@ -192,8 +192,8 @@ void TitleBar::updateResponsiveLayout() {
     }
     if (btnClose_) {
         // 마지막 버튼의 너비 제한을 해제하면 Windows에서 세로로 압축될 수 있으므로,
-        // 모든 창 제어와 같은 논리 40×40 정사각형을 매 반응형 갱신에 다시 강제한다.
-        btnClose_->setFixedSize(40, 40);
+        // 모든 창 제어와 같은 제목 표시줄 높이 52×52 정사각형을 매 갱신에 강제한다.
+        btnClose_->setFixedSize(52, 52);
         btnClose_->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
         btnClose_->setText(compact ? QStringLiteral("×") : QString());
         btnClose_->setIcon(compact ? QIcon() : QIcon(":/icons/close.svg"));
