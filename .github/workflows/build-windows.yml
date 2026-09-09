@@ -563,6 +563,19 @@ jobs:
           }
           Write-Host "설치파일 생성: $($installer.Name) ($([math]::Round($installer.Length/1MB,1)) MB)"
 
+      # ── Windows runner 설치·실행 smoke test ─────────────────────
+      # 설치 파일이 실제로 배포 payload를 풀고 실행·제거되는지를 artifact 업로드 전에 확인한다.
+      # 사용자 PC·서버의 설치 상태나 기본 앱 선택에는 영향을 주지 않는다.
+      - name: Smoke test installer install launch and uninstall
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem dist -Filter "Sorinuri-Setup-*.exe" | Select-Object -First 1
+          if (-not $installer) { throw '설치 smoke test 중단: Inno Setup EXE가 없습니다' }
+          & .\scripts\verify_installer_smoke.ps1 `
+            -InstallerPath $installer.FullName `
+            -ExpectedVersion '${{ env.APP_VERSION }}'
+          if ($LASTEXITCODE -ne 0) { throw "설치 smoke test 실패 (exit $LASTEXITCODE)" }
+
       # ── Artifact 업로드 (포터블 + 설치파일) ─────────────────────
       - name: Upload Portable
         uses: actions/upload-artifact@v4
