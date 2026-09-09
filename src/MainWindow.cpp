@@ -176,9 +176,9 @@ void MainWindow::setupUI() {
     auto* mainLayout = new QVBoxLayout(central);
     mainLayout->setSpacing(0);
 
-    // 상단 바는 중앙 표면의 직접 자식으로 유지한다. 일반 창에서는 레이아웃의 상단
-    // 여백만 예약하고, 전체 화면에서는 여백을 0으로 바꿔 영상 위 오버레이로 표시한다.
-    // 따라서 전체 화면에서 상단 바 show/hide가 MPV 렌더 표면의 크기를 바꾸지 않는다.
+    // 상단 바는 중앙 표면의 직접 자식으로 유지한다. 일반·최대화 창에서는 제목 바와
+    // 하단 재생 바의 높이를 콘텐츠 여백으로 예약해 영상·자막이 가려지지 않게 한다.
+    // 실제 전체 화면에서만 양쪽 여백을 0으로 전환해 edge-reveal overlay로 동작시킨다.
     titleBar_ = new TitleBar(central);
     mainLayout->setContentsMargins(0, titleBar_->height(), 0, 0);
 
@@ -796,13 +796,25 @@ void MainWindow::positionTitleBarOverlay() {
 
 void MainWindow::setTitleBarOverlayMode(bool fullscreenOverlay) {
     if (!titleBar_ || !centralWidget()) return;
-    if (auto* layout = qobject_cast<QVBoxLayout*>(centralWidget()->layout())) {
-        const QMargins current = layout->contentsMargins();
-        const int topInset = fullscreenOverlay ? 0 : titleBar_->height();
-        if (current.top() != topInset)
-            layout->setContentsMargins(current.left(), topInset, current.right(), current.bottom());
-    }
+    updateContentSafeInsets(fullscreenOverlay);
     positionTitleBarOverlay();
+}
+
+void MainWindow::updateContentSafeInsets(bool fullscreenOverlay) {
+    if (!titleBar_ || !videoOverlayDeck_ || !centralWidget()) return;
+    auto* layout = qobject_cast<QVBoxLayout*>(centralWidget()->layout());
+    if (!layout) return;
+
+    // 일반·최대화 창에서 직접 자식으로 올린 title/control UI가 video stack 위를
+    // 덮지 않도록 양쪽 높이를 레이아웃 안전 여백으로 확보한다. fullscreen edge
+    // reveal일 때만 0으로 전환하므로 MPV 렌더 표면·vo=libmpv 초기화는 바꾸지 않는다.
+    const int topInset = fullscreenOverlay ? 0 : titleBar_->height();
+    const int bottomInset = (!fullscreenOverlay && videoOverlayDeck_->isVisible())
+        ? videoOverlayDeck_->height() : 0;
+    const QMargins current = layout->contentsMargins();
+    if (current.top() != topInset || current.bottom() != bottomInset) {
+        layout->setContentsMargins(current.left(), topInset, current.right(), bottomInset);
+    }
 }
 
 void MainWindow::positionVideoOverlayDeck() {
@@ -822,9 +834,11 @@ void MainWindow::setVideoOverlayVisible(bool visible) {
     if (visible) {
         positionVideoOverlayDeck();
         videoOverlayDeck_->show();
+        updateContentSafeInsets(isFullscreen_);
         videoOverlayDeck_->raise();
     } else {
         videoOverlayDeck_->hide();
+        updateContentSafeInsets(isFullscreen_);
     }
 }
 
@@ -2195,6 +2209,7 @@ void MainWindow::resizeEvent(QResizeEvent* e) {
     if (shortcutOverlay_ && mpvWidget_) {
         shortcutOverlay_->setGeometry(mpvWidget_->rect());
     }
+    updateContentSafeInsets(isFullscreen_);
     positionTitleBarOverlay();
     positionVideoOverlayDeck();
 }
@@ -2202,6 +2217,7 @@ void MainWindow::resizeEvent(QResizeEvent* e) {
 void MainWindow::showEvent(QShowEvent* e) {
     QMainWindow::showEvent(e);
     QTimer::singleShot(0, this, [this]() {
+        updateContentSafeInsets(isFullscreen_);
         positionTitleBarOverlay();
         positionVideoOverlayDeck();
     });

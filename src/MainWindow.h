@@ -110,6 +110,7 @@ private slots:
     void updateVideoShelf();
     void positionTitleBarOverlay();
     void setTitleBarOverlayMode(bool fullscreenOverlay);
+    void updateContentSafeInsets(bool fullscreenOverlay);
     void positionVideoOverlayDeck();
     void setVideoOverlayVisible(bool visible);
     void switchToMusicMode();
