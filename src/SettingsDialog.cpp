@@ -154,8 +154,8 @@ void SettingsDialog::setupAudioTab(QTabWidget* tabs) {
         "background:#1a1200;border:1px solid #4a3800;border-radius:6px;"
         "color:#e8c84a;font-size:11px;padding:8px 12px;margin-top:2px;");
     exclusiveHintLabel_->setText(
-        "⚠️  독점 모드 활성화 시 다른 앱의 소리가 일시적으로 차단될 수 있습니다.\n"
-        "Dolby Atmos / DTS:X 패스스루 및 Bit-Perfect 재생에는 이 모드가 필요합니다.");
+        "독점 모드에서는 다른 앱의 소리가 일시적으로 차단될 수 있습니다.\n"
+        "HDMI AV 리시버의 Dolby Atmos / DTS:X bitstream, 또는 공유 PCM에서 5.1 / 7.1 출력 문제가 있을 때만 사용하세요.");
     exclusiveHintLabel_->setVisible(false);
     deviceForm->addRow("", exclusiveHintLabel_);
 
@@ -166,9 +166,9 @@ void SettingsDialog::setupAudioTab(QTabWidget* tabs) {
         "background:#001a0e;border:1px solid #004d22;border-radius:6px;"
         "color:#4ade80;font-size:11px;padding:8px 12px;margin-top:2px;");
     sharedHintLabel_->setText(
-        "✅  공유 모드: 다른 앱과 동시에 소리를 재생할 수 있습니다.\n"
-        "5.1 / 7.1 서라운드는 Windows 사운드 설정에서 치널 수를 설정하면 지원됩니다.\n"
-        "⚠️  Dolby Atmos / DTS:X 패스스루는 지원되지 않습니다. (독점 모드 필요)");
+        "공유 모드 기본값: 다른 앱과 동시에 소리를 재생합니다.\n"
+        "5.1 / 7.1 PCM 서라운드는 Windows 사운드 설정에서 채널 수를 구성하면 지원됩니다.\n"
+        "HDMI AV 리시버의 Dolby Atmos / DTS:X bitstream 또는 채널 문제가 있으면 독점 모드를 켜세요.");
     sharedHintLabel_->setVisible(true);
     deviceForm->addRow("", sharedHintLabel_);
 
@@ -212,6 +212,23 @@ void SettingsDialog::setupAudioTab(QTabWidget* tabs) {
 
     ptLayout->addWidget(codecWidget);
     layout->addWidget(ptGroup);
+
+    // Shared PCM에서는 bitstream을 열지 않는다. 사용자가 exclusive를 명시적으로
+    // 선택했을 때만 HDMI/AVR codec 선택을 활성화해 예측 가능한 복구 경로를 제공한다.
+    const auto syncPassthroughControls = [this]() {
+        const bool exclusive = exclusiveModeCheck_->isChecked();
+        const bool enableCodecs = exclusive && passthroughCheck_->isChecked();
+        passthroughCheck_->setEnabled(exclusive);
+        ptAC3_->setEnabled(enableCodecs);
+        ptEAC3_->setEnabled(enableCodecs);
+        ptDTS_->setEnabled(enableCodecs);
+        ptDTSHD_->setEnabled(enableCodecs);
+        ptTrueHD_->setEnabled(enableCodecs);
+    };
+    connect(exclusiveModeCheck_, &QCheckBox::toggled, this,
+            [syncPassthroughControls](bool) { syncPassthroughControls(); });
+    connect(passthroughCheck_, &QCheckBox::toggled, this,
+            [syncPassthroughControls](bool) { syncPassthroughControls(); });
 
     // ── 볼륨 ─────────────────────────────────────────────────────
     QGroupBox* volGroup = new QGroupBox("볼륨", page);
@@ -276,9 +293,11 @@ void SettingsDialog::setupAudioTab(QTabWidget* tabs) {
     layout->addStretch();
     tabs->addTab(page, "오디오");
 
-    // 기본값 설정: 독점 모드 (true) - 멀티채널 자동 인식을 위해 기본 독점 모드
-    exclusiveModeCheck_->setChecked(true);
-    passthroughCheck_->setChecked(true);
+    // 신규 설치 기본값: shared PCM. Windows mix format이 5.1/7.1이면 PCM 서라운드는
+    // audio-channels=auto로 협상한다. HDMI bitstream은 exclusive를 명시적으로 켠 뒤 선택한다.
+    exclusiveModeCheck_->setChecked(false);
+    passthroughCheck_->setChecked(false);
+    syncPassthroughControls();
     ptAC3_->setChecked(true);
     ptEAC3_->setChecked(true);
     ptDTS_->setChecked(true);
@@ -685,13 +704,10 @@ void SettingsDialog::refreshAudioDevices() {
 }
 
 void SettingsDialog::loadSettings() {
-    // 기본값: 노트북=false(공유 모드), 데스크톱=true(독점 모드)
-    // mpv_에서 isLaptop()을 읽어 적절한 기본값 설정
-    {
-        const bool defaultExclusive = mpv_ ? !mpv_->isLaptop() : true;
-        exclusiveModeCheck_->setChecked(settings_.value("audio/exclusive", defaultExclusive).toBool());
-    }
-    passthroughCheck_->setChecked(settings_.value("audio/passthrough", true).toBool());
+    // 신규 설치는 기기 종류와 무관하게 shared PCM을 기본값으로 사용한다.
+    // 이미 저장된 사용자의 explicit 선택은 그대로 보존한다.
+    exclusiveModeCheck_->setChecked(settings_.value("audio/exclusive", false).toBool());
+    passthroughCheck_->setChecked(settings_.value("audio/passthrough", false).toBool());
     ptAC3_->setChecked(settings_.value("audio/pt_ac3", true).toBool());
     ptEAC3_->setChecked(settings_.value("audio/pt_eac3", true).toBool());
     ptDTS_->setChecked(settings_.value("audio/pt_dts", true).toBool());
@@ -779,10 +795,12 @@ void SettingsDialog::applyToMpv() {
     // 관리하므로 현재 세션과 영구 단일 고음질 선호 값을 모두 보존한다.
     if (!multiInstanceAudioLocked_) {
         const QString devName = audioDeviceCombo_->currentData().toString();
+        const bool exclusive = exclusiveModeCheck_->isChecked();
+        const bool passthrough = exclusive && passthroughCheck_->isChecked();
         mpv_->setAudioDevice(devName.isEmpty() ? QStringLiteral("auto") : devName);
-        mpv_->setAudioExclusive(exclusiveModeCheck_->isChecked());
+        mpv_->setAudioExclusive(exclusive);
 
-        if (passthroughCheck_->isChecked()) {
+        if (passthrough) {
             QStringList codecs;
             if (ptAC3_->isChecked())    codecs << "ac3";
             if (ptEAC3_->isChecked())   codecs << "eac3";

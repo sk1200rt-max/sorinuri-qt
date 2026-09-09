@@ -23,8 +23,8 @@ DOMAINS: dict[str, tuple[str, ...]] = {
         # 조정하는 오디오 안전 구성요소다. 파일 전달 IPC와 별개로 취급하면
         # 오디오 릴리즈의 실제 변경 범위를 검증하지 못한다.
         "src/InstanceCoordinator.cpp", "src/InstanceCoordinator.h",
-        "src/MpvCore.cpp", "src/MpvCore.h", "src/AudioAdvancedWidget.cpp",
-        "src/AudioAdvancedWidget.h", "src/HiFiEngine.cpp", "src/HiFiEngine.h",
+        "src/MpvCore.cpp", "src/MpvCore.h", "src/Settings.cpp", "src/Settings.h",
+        "src/AudioAdvancedWidget.cpp", "src/AudioAdvancedWidget.h", "src/HiFiEngine.cpp", "src/HiFiEngine.h",
         "src/AudioInfoBar.cpp", "src/AudioInfoBar.h", "src/AlbumArtExtractor.cpp",
     ),
     "renderer": (

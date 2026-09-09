@@ -58,7 +58,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "바탕화면에 아이콘 만들기(&D)"; GroupDescription: "추가 아이콘:"
 Name: "quicklaunchicon"; Description: "빠른 실행에 아이콘 만들기(&Q)"; GroupDescription: "추가 아이콘:"; Flags: unchecked; OnlyBelowVersion: 6.1; Check: not IsAdminInstallMode
 ; ── 파일 형식 연결 ──────────────────────────────────────────────────────────
-Name: "fileassoc"; Description: "호환 파일 형식을 소리누리로 연결(&F)"; GroupDescription: "파일 형식 연결:"; Flags: unchecked
+Name: "fileassoc"; Description: "호환 파일 형식을 ‘연결 프로그램’ 목록에 추가(&F)"; GroupDescription: "파일 형식 연결:"; Flags: unchecked
 
 [Files]
 Source: "..\dist\Sorinuri-Portable\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
@@ -87,12 +87,10 @@ Type: files; Name: "{group}\소리누리 제거.lnk"
 [Run]
 ; Visual C++ 런타임 자동 설치 (이미 설치되어 있으면 건너뜀)
 Filename: "{tmp}\vc_redist.x64.exe"; Parameters: "/install /quiet /norestart"; StatusMsg: "Visual C++ 런타임 설치 중..."; Flags: skipifdoesntexist waituntilterminated
-; Windows 10/11의 UserChoice 기본값은 설치 프로그램이 강제할 수 없다.
-; 다만 사용자가 '호환 파일 형식을 소리누리로 연결'을 선택한 경우에는 레지스트리
-; 등록·Explorer 갱신이 끝난 뒤 해당 기본 앱 화면을 열어 한 번의 '기본값으로 설정'으로
-; 전체 지원 형식을 소리누리로 확정할 수 있게 한다. 원래 사용자 컨텍스트로 실행해
-; 관리자 권한 Settings 프로세스와 ShellExecute 오류를 피한다.
-Filename: "{app}\{#MyAppExeName}"; Parameters: "--register-file-associations"; Flags: nowait skipifsilent runasoriginaluser; Tasks: fileassoc
+; Windows 10/11의 기본 앱 선택(UserChoice)은 사용자 동의가 있는 시스템 UI에서만
+; 변경할 수 있다. 설치 시에는 지원 형식을 ‘연결 프로그램’ 후보로만 등록한다.
+; 설정 창을 자동 실행하거나 레지스트리 우회로 기본 앱을 강제하지 않아 사용자의 기존
+; 기본 앱 선택을 보존하고, 설치 완료 후 불필요한 Windows 설정 화면도 표시하지 않는다.
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 
 [Registry]

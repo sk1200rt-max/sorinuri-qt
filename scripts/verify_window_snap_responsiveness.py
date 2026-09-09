@@ -94,13 +94,16 @@ checks += [
     ("if (!isFullscreen_) {\n        showTopUi();\n        showBottomUi();" in main_cpp and
      "void MainWindow::positionTitleBarOverlay()" in main_cpp and
      "void MainWindow::setTitleBarOverlayMode(bool fullscreenOverlay)" in main_cpp and
+     "void MainWindow::updateContentSafeInsets(bool fullscreenOverlay)" in main_cpp and
+     "const int bottomInset = (!fullscreenOverlay && videoOverlayDeck_->isVisible())" in main_cpp and
+     "layout->setContentsMargins(current.left(), topInset, current.right(), bottomInset);" in main_cpp and
+     "updateContentSafeInsets(isFullscreen_);" in main_cpp and
      "if (!isFullscreen_ || isMusicMode_ || !isVisible()) return;" in main_cpp and
-     "layout->setContentsMargins(current.left(), topInset, current.right(), current.bottom());" in main_cpp and
      "titleBar_->geometry().contains(position)" in main_cpp and
      "videoOverlayDeck_->geometry().contains(position)" in main_cpp and
      "uiHideTimer_->stop();" in main_cpp and
      "UI_AUTO_HIDE_DELAY_MS = 900" in main_cpp,
-     "창·최대화 모드에서는 메뉴를 유지하고 전체 화면의 상단 메뉴는 영상 리사이즈 없는 오버레이여야 합니다."),
+     "일반·최대화 창에서는 상단 제목바와 하단 컨트롤바 안전 여백을 예약하고, 실제 전체 화면에서만 overlay가 영상 위에 표시되어야 합니다."),
     ("eventTimer_" not in core_h and "eventTimer_" not in core_cpp,
      "wakeup callback과 중복되는 16ms MPV 이벤트 폴링은 없어야 합니다."),
     ("mpv_set_wakeup_callback" in core_cpp and "QTimer::singleShot(0, self, &MpvCore::onMpvEvents)" in core_cpp,

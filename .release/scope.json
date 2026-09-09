@@ -1,6 +1,6 @@
 {
   "version": "6.21.11",
-  "domain": "ui,renderer,installer",
-  "purpose": "전체 화면 상단 오버레이, Windows 아이콘 경로, 창 제어 및 반응성 안정화",
+  "domain": "audio,ui,renderer,installer",
+  "purpose": "전체 화면 상단 오버레이·Windows 아이콘·창 반응성 안정화 및 WASAPI 공유 기본 정책",
   "base_commit": "5dcb07b57cc96a1875891c0a3112a7d459eb75ec"
 }

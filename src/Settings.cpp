@@ -11,8 +11,8 @@ Settings* Settings::instance() {
 }
 
 int     Settings::volume()           const { return s_.value("audio/volume", 100).toInt(); }
-bool    Settings::wasapiExclusive()  const { return s_.value("audio/exclusive", true).toBool(); }
-bool    Settings::audioPassthrough() const { return s_.value("audio/passthrough", true).toBool(); }
+bool    Settings::wasapiExclusive()  const { return s_.value("audio/exclusive", false).toBool(); }
+bool    Settings::audioPassthrough() const { return s_.value("audio/passthrough", false).toBool(); }
 QString Settings::audioDevice()      const { return s_.value("audio/device", "").toString(); }
 QString Settings::hwdec()            const { return s_.value("video/hwdec", "d3d11va").toString(); }
 

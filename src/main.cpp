@@ -41,26 +41,9 @@ extern "C" {
 #include <QPalette>
 #include <QSurfaceFormat>
 #include <QThread>
-#include <QUrl>
 
 #include "InstanceCoordinator.h"
 #include "MainWindow.h"
-
-#ifdef _WIN32
-// Windows 10/11은 UserChoice 해시로 보호되므로 설치 프로그램이 레지스트리만
-// 써서 기본 앱을 강제할 수 없다. 최신 Windows에서 호환되는 기본 앱 설정 화면을
-// 열어 사용자가 소리누리를 명시적으로 기본 재생 프로그램으로 선택하게 한다.
-static void launchFileAssociationUI()
-{
-    const QString uri = QStringLiteral("ms-settings:defaultapps?registeredAppMachine=")
-        + QString::fromLatin1(QUrl::toPercentEncoding(QStringLiteral("소리누리")));
-    const auto result = ShellExecuteW(
-        nullptr, L"open", reinterpret_cast<LPCWSTR>(uri.utf16()), nullptr, nullptr, SW_SHOWNORMAL);
-    if (reinterpret_cast<INT_PTR>(result) <= 32) {
-        ShellExecuteW(nullptr, L"open", L"ms-settings:defaultapps", nullptr, nullptr, SW_SHOWNORMAL);
-    }
-}
-#endif
 
 static bool sendToExistingCoordinator(
     InstanceCoordinator& coordinator,
@@ -106,22 +89,9 @@ int main(int argc, char* argv[])
     QCommandLineOption newWindowOption(
         QStringList() << "n" << "new-window",
         "새 플레이어 창을 열고 모든 소리누리를 공유 PCM 다중 재생 세션으로 전환합니다.");
-    QCommandLineOption registerAssociationsOption(
-        "register-file-associations",
-        "Windows 기본 앱 선택 화면을 열어 소리누리 파일 연결을 설정합니다.");
     parser.addOption(newWindowOption);
-    parser.addOption(registerAssociationsOption);
     parser.addPositionalArgument("file", "재생할 파일 경로");
     parser.process(app);
-
-    // 설치 프로그램의 파일 연결 작업 전용 경로: 메인 창·IPC·MPV는 생성하지 않는다.
-    if (parser.isSet(registerAssociationsOption)) {
-#ifdef _WIN32
-        launchFileAssociationUI();
-        timeEndPeriod(1);
-#endif
-        return 0;
-    }
 
     const QStringList positional = parser.positionalArguments();
     const bool requestedNewWindow = parser.isSet(newWindowOption);
