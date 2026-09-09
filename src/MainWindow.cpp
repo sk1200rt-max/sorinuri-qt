@@ -396,9 +396,10 @@ void MainWindow::setupConnections() {
         // 여기서 저장된 exclusive/bitstream을 덮어쓰지 않는다.
         auto* core = mpvWidget_->core();
         if (!multiInstanceSharedAudio_) {
-            if (settings_.value("audio/exclusive", true).toBool())
+            const bool exclusive = settings_.value("audio/exclusive", false).toBool();
+            if (exclusive)
                 core->setAudioExclusive(true);
-            if (settings_.value("audio/passthrough", true).toBool()) {
+            if (exclusive && settings_.value("audio/passthrough", false).toBool()) {
                 QStringList codecs;
                 if (settings_.value("audio/pt_ac3",    true).toBool()) codecs << "ac3";
                 if (settings_.value("audio/pt_eac3",   true).toBool()) codecs << "eac3";
@@ -3011,9 +3012,10 @@ void MainWindow::loadSettings() {
     // 다중 재생 세션은 런타임 shared PCM 정책이 최우선이다. 저장된 단일 고음질
     // 선호 값은 다음 단일 실행을 위해 보존하되 현재 shared 세션에 재적용하지 않는다.
     if (!multiInstanceSharedAudio_) {
-        if (settings_.value("audio/exclusive", true).toBool())
+        const bool exclusive = settings_.value("audio/exclusive", false).toBool();
+        if (exclusive)
             mpvWidget_->core()->setAudioExclusive(true);
-        if (settings_.value("audio/passthrough", true).toBool()) {
+        if (exclusive && settings_.value("audio/passthrough", false).toBool()) {
             QStringList codecs;
             if (settings_.value("audio/pt_ac3",    true).toBool()) codecs << "ac3";
             if (settings_.value("audio/pt_eac3",   true).toBool()) codecs << "eac3";

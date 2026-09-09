@@ -192,8 +192,10 @@ bool MpvCore::initialize(WId windowId) {
         QSettings s("Sorinuri", "SorinuriPlayer");
         QString savedDevice = s.value("audio/device", "auto").toString().trimmed();
         if (savedDevice.isEmpty()) savedDevice = QStringLiteral("auto");
-        const bool savedExclusive = s.value("audio/exclusive", true).toBool();
-        const bool savedPassthrough = s.value("audio/passthrough", true).toBool();
+        // 신규 설치는 shared PCM을 기본으로 시작한다. 기존 사용자가 저장한 명시적
+        // 선택은 그대로 존중하며, bitstream은 exclusive를 선택한 경우에만 연다.
+        const bool savedExclusive = s.value("audio/exclusive", false).toBool();
+        const bool savedPassthrough = s.value("audio/passthrough", false).toBool();
 
         QStringList codecs;
         if (s.value("audio/pt_ac3", true).toBool()) codecs << QStringLiteral("ac3");
@@ -208,7 +210,9 @@ bool MpvCore::initialize(WId windowId) {
         // 반드시 shared PCM으로 시작하며, 사용자의 단일 고음질 선호 설정은 보존한다.
         const bool multiShared = audioSessionPolicy_ == AudioSessionPolicy::MultiShared;
         const bool effectiveExclusive = !multiShared && savedExclusive;
-        passthroughEnabled_ = !multiShared && savedPassthrough;
+        // Windows shared mixer는 non-PCM bitstream을 안전하게 믹싱할 수 없으므로,
+        // Dolby/DTS passthrough는 사용자가 exclusive를 명시적으로 켠 경우에만 연다.
+        passthroughEnabled_ = effectiveExclusive && savedPassthrough;
 
         check_error(mpv_set_option_string(mpv_, "ao", "wasapi"));
         check_error(mpv_set_option_string(mpv_, "audio-device",
@@ -927,8 +931,9 @@ void MpvCore::applyAudioSessionPolicy(bool reloadOutput) {
     QString device = settings.value("audio/device", "auto").toString().trimmed();
     if (device.isEmpty()) device = QStringLiteral("auto");
     const bool sharedPcm = audioSessionPolicy_ != AudioSessionPolicy::SinglePreferred;
-    const bool exclusive = !sharedPcm && settings.value("audio/exclusive", true).toBool();
-    const bool passthrough = !sharedPcm && settings.value("audio/passthrough", true).toBool();
+    const bool exclusive = !sharedPcm && settings.value("audio/exclusive", false).toBool();
+    // Shared PCM은 5.1/7.1 PCM 채널 협상을 유지하지만 bitstream은 열지 않는다.
+    const bool passthrough = exclusive && settings.value("audio/passthrough", false).toBool();
     QStringList codecs;
     if (settings.value("audio/pt_ac3", true).toBool()) codecs << "ac3";
     if (settings.value("audio/pt_eac3", true).toBool()) codecs << "eac3";
@@ -976,15 +981,34 @@ void MpvCore::setAudioExclusive(bool exclusive) {
         qInfo() << "[MPV] shared PCM 세션에서 exclusive 전환 차단";
         return;
     }
+
     mpv_set_property_string(mpv_, "audio-exclusive", exclusive ? "yes" : "no");
+    if (!exclusive) {
+        // 공유 모드에서는 PCM 채널 협상만 허용하고 non-PCM passthrough는 즉시 닫는다.
+        passthroughEnabled_ = false;
+        mpv_set_property_string(mpv_, "audio-spdif", "");
+        return;
+    }
+
+    // 사용자가 HDMI/AVR·bitstream 문제 해결을 위해 exclusive를 명시적으로 켠 경우에만
+    // 저장된 codec 선택을 복원한다. shared→exclusive 전환은 사용자의 의도된 조작이다.
+    QSettings settings("Sorinuri", "SorinuriPlayer");
+    const bool restorePassthrough = settings.value("audio/passthrough", false).toBool();
+    passthroughEnabled_ = restorePassthrough;
+    mpv_set_property_string(mpv_, "audio-spdif",
+        restorePassthrough ? spdifCodecs_.toUtf8().constData() : "");
 }
 
 void MpvCore::setAudioPassthrough(bool passthrough) {
-    if (audioSessionPolicy_ != AudioSessionPolicy::SinglePreferred && passthrough) {
-        qInfo() << "[MPV] shared PCM 세션에서 bitstream 패스스루 전환 차단";
-        passthroughEnabled_ = false;
-        if (initialized_) mpv_set_property_string(mpv_, "audio-spdif", "");
-        return;
+    if (passthrough) {
+        int exclusive = 0;
+        if (!initialized_ || audioSessionPolicy_ != AudioSessionPolicy::SinglePreferred ||
+            mpv_get_property(mpv_, "audio-exclusive", MPV_FORMAT_FLAG, &exclusive) < 0 || !exclusive) {
+            qInfo() << "[MPV] shared PCM에서 bitstream 패스스루 전환 차단";
+            passthroughEnabled_ = false;
+            if (initialized_) mpv_set_property_string(mpv_, "audio-spdif", "");
+            return;
+        }
     }
     passthroughEnabled_ = passthrough;
     if (!initialized_) return;
