@@ -75,7 +75,10 @@ try {
     # GitHub hosted runner는 비대화형 Session 0이어서 Qt/OpenGL 앱의 실제 창 생성은
     # Windows desktop shell 조건을 재현하지 못한다. 이 환경에서는 위 --help 로더 검증까지를
     # 통과 기준으로 하고, 대화형 Windows 세션에서만 실제 MainWindow 생존 검사를 수행한다.
-    $isInteractiveDesktop = [Environment]::UserInteractive -and ((Get-Process -Id $PID).SessionId -ne 0)
+    # GitHub hosted runner는 UserInteractive가 true여도 실제 사용자 desktop 렌더링 세션이 아니다.
+    # GitHub Actions에서는 installer·registry·loader 검증까지만 수행하고 GUI 표시는 실제 desktop에서만 검사한다.
+    $isGitHubActions = $env:GITHUB_ACTIONS -eq 'true'
+    $isInteractiveDesktop = [Environment]::UserInteractive -and (-not $isGitHubActions)
     if ($isInteractiveDesktop) {
         $launchStartedAt = Get-Date
         $launchStdout = Join-Path $root 'launch.stdout.txt'
@@ -107,7 +110,7 @@ try {
         $app.WaitForExit(10000) | Out-Null
         Write-Host '대화형 Windows 세션의 첫 창 생성 확인 완료'
     } else {
-        Write-Host '비대화형 CI Session 0: GUI 창 생성은 검사하지 않음; 실행 파일 로더 검증 완료'
+        Write-Host '비대화형 GitHub Actions: GUI 창 생성은 검사하지 않음; 실행 파일 로더 검증 완료'
     }
 
     Write-Host '=== 5/5 제거 프로그램 확인 ==='
