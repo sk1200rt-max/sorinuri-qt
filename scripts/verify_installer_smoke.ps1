@@ -37,9 +37,16 @@ try {
             throw "설치 payload 누락: $path"
         }
     }
-    $productVersion = (Get-Item -LiteralPath (Join-Path $installDir 'Sorinuri.exe')).VersionInfo.ProductVersion
-    if ([string]::IsNullOrWhiteSpace($productVersion) -or -not $productVersion.StartsWith($ExpectedVersion)) {
-        throw "설치된 실행 파일 버전 불일치: expected=$ExpectedVersion, actual=$productVersion"
+    # 실행 파일 resource의 ProductVersion 문자열은 빌드 도구 조합에 따라 비어 있을 수 있다.
+    # 설치 프로그램이 실제로 Windows에 등록한 DisplayVersion을 기준으로 패키지 버전을 판정한다.
+    $uninstallRoot = 'Registry::HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Uninstall'
+    $uninstallRecord = Get-ChildItem -LiteralPath $uninstallRoot | ForEach-Object {
+        Get-ItemProperty -LiteralPath $_.PSPath
+    } | Where-Object {
+        $_.DisplayName -eq '소리누리' -and $_.DisplayVersion -like "$ExpectedVersion*"
+    } | Select-Object -First 1
+    if ($null -eq $uninstallRecord) {
+        throw "설치 버전 등록을 확인할 수 없습니다. expected=$ExpectedVersion"
     }
 
     Write-Host '=== 3/5 선택된 파일 연결 후보 등록 확인 ==='
