@@ -74,11 +74,23 @@ try {
 
     # 실제 창 생성 경로도 짧게 시작한다. 정상적으로 살아 있음을 확인한 뒤 강제 종료가 아닌
     # window close 메시지를 보내며, CI 세션 제약으로 즉시 끝나면 별도 실패로 표시한다.
-    $app = Start-Process -FilePath (Join-Path $installDir 'Sorinuri.exe') -PassThru
+    $launchStartedAt = Get-Date
+    $launchStdout = Join-Path $root 'launch.stdout.txt'
+    $launchStderr = Join-Path $root 'launch.stderr.txt'
+    $app = Start-Process -FilePath (Join-Path $installDir 'Sorinuri.exe') `
+        -RedirectStandardOutput $launchStdout `
+        -RedirectStandardError $launchStderr `
+        -PassThru
     Start-Sleep -Seconds 5
     $app.Refresh()
     if ($app.HasExited) {
-        throw "첫 실행 창이 5초 안에 종료됐습니다. exit code=$($app.ExitCode)"
+        $stdout = Get-Content -LiteralPath $launchStdout -Raw -ErrorAction SilentlyContinue
+        $stderr = Get-Content -LiteralPath $launchStderr -Raw -ErrorAction SilentlyContinue
+        $appEvents = Get-WinEvent -FilterHashtable @{ LogName = 'Application'; StartTime = $launchStartedAt.AddSeconds(-2) } `
+            -ErrorAction SilentlyContinue | Where-Object {
+                $_.ProviderName -eq 'Application Error' -or $_.Message -match 'Sorinuri\.exe'
+            } | Select-Object -First 3 | Format-List TimeCreated, ProviderName, Id, Message | Out-String
+        throw "첫 실행 창이 5초 안에 종료됐습니다. exit code=$($app.ExitCode)`nstdout=$stdout`nstderr=$stderr`napplication_events=$appEvents"
     }
     $closed = $false
     try {
