@@ -578,7 +578,7 @@ jobs:
           & .\scripts\verify_installer_smoke.ps1 `
             -InstallerPath $installer.FullName `
             -ExpectedVersion $Matches[1]
-          if ($LASTEXITCODE -ne 0) { throw "설치 smoke test 실패 (exit $LASTEXITCODE)" }
+          if (-not $?) { throw '설치 smoke test 실패' }
 
       # ── Artifact 업로드 (포터블 + 설치파일) ─────────────────────
       - name: Upload Portable
