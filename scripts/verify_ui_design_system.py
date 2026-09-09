@@ -49,6 +49,7 @@ def main() -> int:
         ("openFileClicked", "상단 파일 열기"),
         ("toolsClicked", "상단 도구 메뉴"),
         ("setFixedHeight(52)", "HiDPI 여유 상단바 높이"),
+        ("setAttribute(Qt::WA_StyledBackground, true);", "상단 메뉴 전체의 불투명 배경"),
         ("isInteractiveControlAt", "상단바 Windows 드래그 영역 분리"),
         ("updateResponsiveLayout", "HiDPI 반응형 상단바"),
         ("btnOpen_->setVisible(!compact)", "HiDPI 파일 열기 메뉴 이동"),
