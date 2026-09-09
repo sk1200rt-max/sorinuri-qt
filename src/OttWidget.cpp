@@ -353,10 +353,30 @@ bool OttWidget::eventFilter(QObject* obj, QEvent* event) {
 // ── showEvent ─────────────────────────────────────────────────────────────
 void OttWidget::showEvent(QShowEvent* e) {
     QWidget::showEvent(e);
+#ifdef Q_OS_WIN
+#ifndef WEBVIEW2_NOT_AVAILABLE
+    // 서비스 탭을 다시 열면 유지하던 페이지를 그 시점에만 재개한다.
+    // Controller의 IsVisible=false는 페이지 렌더·일부 타이머·캐시 사용을 줄이지만
+    // 탐색 상태와 로그인 세션은 보존한다.
+    if (webCtrl_) updateWebViewBounds();
+#endif
+#endif
     if (!initAttempted_) {
         initAttempted_ = true;
         QTimer::singleShot(200, this, &OttWidget::initWebView2);
     }
+}
+
+void OttWidget::hideEvent(QHideEvent* e) {
+#ifdef Q_OS_WIN
+#ifndef WEBVIEW2_NOT_AVAILABLE
+    // QStackedWidget 전환으로 OTT 페이지가 숨겨져도 native WebView2 controller는
+    // 자동으로 비가시 상태가 되지 않는다. 공식 IsVisible 정책을 적용해 비가시
+    // Chromium 렌더링·캐시 압력을 줄이고, showEvent에서 같은 세션을 재개한다.
+    if (webCtrl_) webCtrl_->put_IsVisible(FALSE);
+#endif
+#endif
+    QWidget::hideEvent(e);
 }
 
 // ── WebView2 초기화 ────────────────────────────────────────────────────────
