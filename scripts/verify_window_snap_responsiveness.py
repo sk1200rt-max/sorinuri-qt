@@ -85,6 +85,13 @@ checks += [
      "if (!w->updateQueued_.exchange(true))" in mpv_cpp and
      "updateQueued_.store(false);" in mpv_cpp,
      "libmpv 프레임 콜백은 Qt GUI 큐에 하나의 최신 repaint만 예약해야 합니다."),
+    ("void discardHiddenFrame();" in mpv_h and
+     "std::atomic_bool hiddenFrameDiscardQueued_{false};" in mpv_h and
+     "void MpvWidget::discardHiddenFrame()" in mpv_cpp and
+     "MPV_RENDER_PARAM_SKIP_RENDERING" in mpv_cpp and
+     "QMetaObject::invokeMethod(w, \"discardHiddenFrame\", Qt::QueuedConnection);" in mpv_cpp and
+     "mpv_render_context_render(renderCtx_, params);" in mpv_cpp,
+     "오리지널·OTT처럼 영상이 비가시인 탭에서는 libmpv 프레임을 skip-render로 소비해 복귀 뒤 누적 프레임이 빠르게 소진되면 안 됩니다."),
     ("setCursor(Qt::BlankCursor)" not in main_cpp and
      "mpvWidget_->setCursor(Qt::BlankCursor)" not in main_cpp,
      "UI를 숨길 때 영상 영역의 마우스 포인터를 숨기면 안 됩니다."),
