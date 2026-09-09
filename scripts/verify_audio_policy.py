@@ -12,8 +12,10 @@ required = {
     "WASAPI 출력 사용": 'mpv_set_option_string(mpv_, "ao", "wasapi")',
     "저장 출력 장치 적용": 's.value("audio/device", "auto")',
     "빈 장치값 auto 정규화": 'if (savedDevice.isEmpty()) savedDevice = QStringLiteral("auto")',
-    "독점 모드 기본값": 's.value("audio/exclusive", true)',
-    "패스스루 기본값": 's.value("audio/passthrough", true)',
+    "공유 모드 신규 기본값": 's.value("audio/exclusive", false)',
+    "패스스루 신규 기본값": 's.value("audio/passthrough", false)',
+    "독점 모드에서만 bitstream 허용": 'passthroughEnabled_ = effectiveExclusive && savedPassthrough',
+    "runtime 독점 모드에서만 bitstream 허용": 'const bool passthrough = exclusive && settings.value("audio/passthrough", false).toBool()',
     "DD+ E-AC3 코덱": 'codecs << QStringLiteral("eac3")',
     "원본 우선 자동 채널 협상": 'mpv_set_property_string(mpv_, "audio-channels", "auto")',
     "디코더 선행 다운믹스 차단": 'mpv_set_property_string(mpv_, "ad-lavc-downmix", "no")',
@@ -48,6 +50,48 @@ if 'mpv_set_property_string(mpv_, "audio-channels", "7.1,5.1,stereo")' in text:
 if 'mpv_set_property_string(mpv_, "audio-normalize-downmix", "yes")' in text:
     print("오디오 정책 검증 실패: 스테레오 다운믹스 정규화를 강제 활성화하면 안 됩니다.", file=sys.stderr)
     sys.exit(1)
+
+# Shared PCM은 일반 5.1/7.1 PCM 협상을 유지하되, bitstream은 exclusive를 명시적으로
+# 선택한 경우에만 열어야 한다. Ctrl+Shift+E나 SettingsDialog에서 shared로 돌아오면
+# audio-spdif를 즉시 비운다.
+shared_guard = 'mpv_set_property_string(mpv_, "audio-spdif", "");'
+setter_start = text.find('void MpvCore::setAudioExclusive(bool exclusive)')
+setter_end = text.find('void MpvCore::setAudioPassthrough(bool passthrough)', setter_start)
+if setter_start < 0 or setter_end < 0 or shared_guard not in text[setter_start:setter_end]:
+    print("오디오 정책 검증 실패: shared PCM 전환 시 bitstream 차단 경로가 없습니다.", file=sys.stderr)
+    sys.exit(1)
+
+# 신규 설치의 기본값은 Settings wrapper·초기화 후 재적용·설정 UI 모두에서 shared여야 한다.
+companions = {
+    "Settings wrapper shared 기본값": (
+        source.parent / "Settings.cpp",
+        's_.value("audio/exclusive", false)' ,
+    ),
+    "Settings wrapper bitstream 기본 비활성": (
+        source.parent / "Settings.cpp",
+        's_.value("audio/passthrough", false)' ,
+    ),
+    "MainWindow 초기화 후 shared 기본값": (
+        source.parent / "MainWindow.cpp",
+        'settings_.value("audio/exclusive", false)' ,
+    ),
+    "SettingsDialog shared 기본값": (
+        source.parent / "SettingsDialog.cpp",
+        'settings_.value("audio/exclusive", false)' ,
+    ),
+    "SettingsDialog bitstream 기본 비활성": (
+        source.parent / "SettingsDialog.cpp",
+        'settings_.value("audio/passthrough", false)' ,
+    ),
+    "SettingsDialog exclusive-gated bitstream": (
+        source.parent / "SettingsDialog.cpp",
+        'const bool passthrough = exclusive && passthroughCheck_->isChecked()' ,
+    ),
+}
+for name, (path, needle) in companions.items():
+    if needle not in path.read_text(encoding="utf-8"):
+        print(f"오디오 정책 검증 실패: {name} 규칙이 없습니다.", file=sys.stderr)
+        sys.exit(1)
 
 # HDMI/AVR로 추정되는 출력에서 워치독·AO 실패 복구가 audio-spdif를 무조건 지우면 안 된다.
 for marker in ('워치독: 재생 멈춤', 'AO 초기화 실패 감지'):

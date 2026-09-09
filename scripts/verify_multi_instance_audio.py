@@ -57,8 +57,8 @@ policy_end = core_cpp.find("void MpvCore::setAudioDevice", policy_start)
 policy_section = core_cpp[policy_start:policy_end]
 for needle in (
     'const bool sharedPcm = audioSessionPolicy_ != AudioSessionPolicy::SinglePreferred',
-    'const bool exclusive = !sharedPcm && settings.value("audio/exclusive", true).toBool()',
-    'const bool passthrough = !sharedPcm && settings.value("audio/passthrough", true).toBool()',
+    'const bool exclusive = !sharedPcm && settings.value("audio/exclusive", false).toBool()',
+    'const bool passthrough = exclusive && settings.value("audio/passthrough", false).toBool()',
     'mpv_set_property_string(mpv_, "audio-exclusive", exclusive ? "yes" : "no")',
     'mpv_set_property_string(mpv_, "audio-spdif",',
     'mpv_set_property_string(mpv_, "audio-channels", "auto")',
