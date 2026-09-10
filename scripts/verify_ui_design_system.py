@@ -49,6 +49,7 @@ def main() -> int:
         ("openFileClicked", "상단 파일 열기"),
         ("toolsClicked", "상단 도구 메뉴"),
         ("setFixedHeight(52)", "HiDPI 여유 상단바 높이"),
+        ("setAttribute(Qt::WA_StyledBackground, true);", "상단 메뉴 전체의 불투명 배경"),
         ("isInteractiveControlAt", "상단바 Windows 드래그 영역 분리"),
         ("updateResponsiveLayout", "HiDPI 반응형 상단바"),
         ("btnOpen_->setVisible(!compact)", "HiDPI 파일 열기 메뉴 이동"),
@@ -71,11 +72,12 @@ def main() -> int:
     ):
         require(main_window, fragment, label, errors)
 
-    # 영상은 중앙 카드가 아닌 영상 하단 전체 폭의 초슬림 재생 바로 현재·다음 항목과 목록 접근을 제공한다.
+    # 영상은 중앙 카드가 아닌 영상 하단 전체 폭의 재생 바로 현재·다음 항목과 목록 접근을 제공한다.
+    # 진행바는 정확한 클릭·드래그를 위해 20px 입력 영역을 확보한다.
     for fragment, label in (
         ("void MainWindow::updateVideoShelf", "영상 재생 정보 갱신"),
         ("ORIGINALS · YOUTUBE 연속 재생", "YouTube 재생 문맥"),
-        ("setFixedHeight(64)", "초슬림 하단 바 높이"),
+        ("videoOverlayDeck_->setFixedHeight(78)", "확장형 하단 바 높이"),
         ("videoOverlayDeck_ = new QWidget(central)", "서비스 공통 하단 바 부모"),
         ("videoOverlayDeck_->setFixedWidth(surface->width())", "창 전체 폭 하단 바"),
         ("미디어 유무로 가시성을 제한하지 않는다", "최초 단독 실행 하단 바 표시"),
@@ -87,7 +89,10 @@ def main() -> int:
 
     # 하단은 서비스 메뉴가 아닌 한 줄 재생·출력·대기열 덱으로만 유지한다.
     for fragment, label in (
-        ("setFixedHeight(64)", "초슬림 단일 재생 바 높이"),
+        ("setFixedHeight(78)", "확장형 단일 재생 바 높이"),
+        ("seekSlider_->setFixedHeight(20)", "20px 진행바 클릭·드래그 영역"),
+        ("QSlider::groove:horizontal { height: 6px;", "6px 진행바 시각 트랙"),
+        ("QSlider::handle:horizontal { width: 16px; height: 16px;", "16px 진행바 handle"),
         ("transportSurface", "재생 바 표면"),
         ("btnPrev_ = makeBtn(\":/icons/prev.svg\"", "이전 항목"),
         ("btnPlay_ = makeBtn(\":/icons/play.svg\"", "단일 재생·일시정지 토글"),

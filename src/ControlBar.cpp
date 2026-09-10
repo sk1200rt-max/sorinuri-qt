@@ -5,12 +5,12 @@
 #include <QStyle>
 
 static const char* SEEK_STYLE =
-    "QSlider::groove:horizontal { height: 2px; background: #2A3233; border: none; }"
-    "QSlider::handle:horizontal { width: 10px; height: 10px; margin: -4px 0;"
-    "  background: #00D4B4; border: 1px solid #0A0F10; border-radius: 5px; }"
-    "QSlider::handle:horizontal:hover { width: 12px; height: 12px; margin: -5px 0;"
-    "  background: #2AE2C5; border-radius: 6px; }"
-    "QSlider::sub-page:horizontal { background: #00D4B4; border: none; }";
+    "QSlider::groove:horizontal { height: 6px; background: #2A3233; border: none; border-radius: 3px; }"
+    "QSlider::handle:horizontal { width: 16px; height: 16px; margin: -5px 0;"
+    "  background: #00D4B4; border: 2px solid #0A0F10; border-radius: 8px; }"
+    "QSlider::handle:horizontal:hover { width: 18px; height: 18px; margin: -6px 0;"
+    "  background: #2AE2C5; border-color: #153B36; border-radius: 9px; }"
+    "QSlider::sub-page:horizontal { background: #00D4B4; border: none; border-radius: 3px; }";
 static const char* VOL_STYLE =
     "QSlider::groove:horizontal { height: 2px; background: #3A4546; border: none; }"
     "QSlider::handle:horizontal { width: 9px; height: 9px; margin: -3.5px 0;"
@@ -47,7 +47,9 @@ QPushButton* ControlBar::makeBtn(const QString& svg, const QString& tip, int siz
 ControlBar::ControlBar(QWidget* parent) : QWidget(parent) {
     // 기본 상태는 전체 폭의 한 줄이며, 영상 화면의 하단에만 붙는다.
     // 재생/오디오 제어의 기존 signal 연결과 공식 SVG 리소스는 유지한다.
-    setFixedHeight(64);
+    // 시각 트랙은 6px로 선명하게 표시하고, 위젯 높이는 20px로 확보해
+    // 고해상도·고배율 환경에서도 진행 위치를 바로 클릭·드래그할 수 있게 한다.
+    setFixedHeight(78);
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     setStyleSheet("background: transparent; border: none;");
 
@@ -58,7 +60,7 @@ ControlBar::ControlBar(QWidget* parent) : QWidget(parent) {
     seekSlider_ = new ClickSeekSlider(Qt::Horizontal, this);
     seekSlider_->setRange(0, 10000);
     seekSlider_->setValue(0);
-    seekSlider_->setFixedHeight(6);
+    seekSlider_->setFixedHeight(20);
     seekSlider_->setStyleSheet(SEEK_STYLE);
     seekSlider_->setFocusPolicy(Qt::NoFocus);
     seekSlider_->setCursor(Qt::PointingHandCursor);

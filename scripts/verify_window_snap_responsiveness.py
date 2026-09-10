@@ -27,6 +27,7 @@ music_cpp = text("src/MusicWidget.cpp")
 compact_cpp = text("src/CompactPlayerWidget.cpp")
 mpv_h = text("src/MpvWidget.h")
 mpv_cpp = text("src/MpvWidget.cpp")
+control_cpp = text("src/ControlBar.cpp")
 
 checks += [
     ("startSystemMove()" in title_cpp,
@@ -85,6 +86,13 @@ checks += [
      "if (!w->updateQueued_.exchange(true))" in mpv_cpp and
      "updateQueued_.store(false);" in mpv_cpp,
      "libmpv 프레임 콜백은 Qt GUI 큐에 하나의 최신 repaint만 예약해야 합니다."),
+    ("void discardHiddenFrame();" in mpv_h and
+     "std::atomic_bool hiddenFrameDiscardQueued_{false};" in mpv_h and
+     "void MpvWidget::discardHiddenFrame()" in mpv_cpp and
+     "MPV_RENDER_PARAM_SKIP_RENDERING" in mpv_cpp and
+     "QMetaObject::invokeMethod(w, \"discardHiddenFrame\", Qt::QueuedConnection);" in mpv_cpp and
+     "mpv_render_context_render(renderCtx_, params);" in mpv_cpp,
+     "오리지널·OTT처럼 영상이 비가시인 탭에서는 libmpv 프레임을 skip-render로 소비해 복귀 뒤 누적 프레임이 빠르게 소진되면 안 됩니다."),
     ("setCursor(Qt::BlankCursor)" not in main_cpp and
      "mpvWidget_->setCursor(Qt::BlankCursor)" not in main_cpp,
      "UI를 숨길 때 영상 영역의 마우스 포인터를 숨기면 안 됩니다."),
@@ -104,6 +112,13 @@ checks += [
      "uiHideTimer_->stop();" in main_cpp and
      "UI_AUTO_HIDE_DELAY_MS = 900" in main_cpp,
      "일반·최대화 창에서는 상단 제목바와 하단 컨트롤바 안전 여백을 예약하고, 실제 전체 화면에서만 overlay가 영상 위에 표시되어야 합니다."),
+    (all(token in control_cpp for token in (
+        "setFixedHeight(78);",
+        "seekSlider_->setFixedHeight(20);",
+        "QSlider::groove:horizontal { height: 6px;",
+        "QSlider::handle:horizontal { width: 16px; height: 16px;",
+        "QSlider::handle:horizontal:hover { width: 18px; height: 18px;")),
+     "공통 영상 진행바는 6px 시각 트랙과 20px 클릭·드래그 hit 영역을 유지해야 합니다."),
     ("eventTimer_" not in core_h and "eventTimer_" not in core_cpp,
      "wakeup callback과 중복되는 16ms MPV 이벤트 폴링은 없어야 합니다."),
     ("mpv_set_wakeup_callback" in core_cpp and "QTimer::singleShot(0, self, &MpvCore::onMpvEvents)" in core_cpp,

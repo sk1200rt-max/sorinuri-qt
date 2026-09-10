@@ -218,13 +218,14 @@ void MainWindow::setupUI() {
     mpvWidget_->setFocusPolicy(Qt::ClickFocus);
     videoLayout->addWidget(mpvWidget_, 1);
 
-    // 승인 목업: 서비스와 관계없이 창 하단에 유지하는 전체 폭 64px 단일 재생 바.
+    // 서비스와 관계없이 창 하단에 유지하는 전체 폭 78px 단일 재생 바.
+    // 상단 20px 진행바 hit 영역과 하단 58px transport row를 모두 표시한다.
     // central의 직접 자식으로 두어 영상·OTT·오리지널 화면 전환에도 재생 상태와
     // 대기열 접근이 사라지지 않는다. 콘텐츠 레이아웃은 바 뒤에서 유지된다.
     videoOverlayDeck_ = new QWidget(central);
     videoOverlayDeck_->setObjectName(QStringLiteral("videoOverlayDeck"));
     videoOverlayDeck_->setAttribute(Qt::WA_StyledBackground, true);
-    videoOverlayDeck_->setFixedHeight(64);
+    videoOverlayDeck_->setFixedHeight(78);
     videoOverlayDeck_->setStyleSheet(
         "QWidget#videoOverlayDeck { background:#171717; border:none; border-top:1px solid #303839; }"
         "QLabel { background:transparent; }");

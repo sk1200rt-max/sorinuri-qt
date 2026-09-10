@@ -335,6 +335,29 @@ void MpvWidget::setPresentationActive(bool active) {
     }
 }
 
+void MpvWidget::discardHiddenFrame() {
+    // GUI 스레드에서만 OpenGL context를 current로 만들고 render API를 호출한다.
+    // callback thread는 이 작업을 예약만 하므로 tab 전환 중에도 UI thread 안전성이 유지된다.
+    hiddenFrameDiscardQueued_.store(false);
+    if (shutdownStarted_ || presentationActive_.load() || !renderCtx_ || !presentationRefreshPending_.exchange(false)) {
+        return;
+    }
+
+    makeCurrent();
+    // MPV_RENDER_PARAM_SKIP_RENDERING은 화면 target/FBO를 사용하지 않으면서 현재
+    // 프레임을 소비됐다고 libmpv에 알린다. 따라서 오리지널·OTT 탐색 중에도
+    // 프레임이 쌓였다가 플레이어 복귀 순간 빠르게 소진되지 않는다.
+    if (!shutdownStarted_ && !presentationActive_.load() && renderCtx_) {
+        int skipRendering = 1;
+        mpv_render_param params[] = {
+            { MPV_RENDER_PARAM_SKIP_RENDERING, &skipRendering },
+            { MPV_RENDER_PARAM_INVALID,        nullptr }
+        };
+        mpv_render_context_render(renderCtx_, params);
+    }
+    doneCurrent();
+}
+
 void MpvWidget::showLogo(bool show) {
     if (!logoLabel_) return;
     logoLabel_->setVisible(show);
@@ -358,6 +381,11 @@ void MpvWidget::onUpdate(void* ctx) {
     if (!w) return;
     if (!w->presentationActive_.load()) {
         w->presentationRefreshPending_.store(true);
+        // 비가시 탭도 최신 프레임 하나를 skip-render로 소비한다. 이벤트는 최대
+        // 하나만 적재하므로 카탈로그 탐색 중 GUI 큐가 프레임별로 팽창하지 않는다.
+        if (!w->hiddenFrameDiscardQueued_.exchange(true)) {
+            QMetaObject::invokeMethod(w, "discardHiddenFrame", Qt::QueuedConnection);
+        }
         return;
     }
     // 고해상도 영상은 libmpv가 Qt paint보다 빠르게 콜백할 수 있다. 이벤트를 매

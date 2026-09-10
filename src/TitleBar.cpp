@@ -57,6 +57,9 @@ QPushButton* TitleBar::makeServiceBtn(const QString& text, const QString& toolti
 
 TitleBar::TitleBar(QWidget* parent) : QWidget(parent) {
     setFixedHeight(52);
+    // 서비스 버튼 사이의 빈 영역도 항상 배경을 그려 영상 표면이 비치지 않게 한다.
+    // 일반·최대화·전체 화면의 overlay 위치 계산은 건드리지 않는다.
+    setAttribute(Qt::WA_StyledBackground, true);
     setStyleSheet(QString("background: %1; border-bottom: 1px solid %2;")
                   .arg(SorinuriUi::Surface, SorinuriUi::BorderSoft));
 

@@ -67,6 +67,7 @@ signals:
 protected:
     void resizeEvent(QResizeEvent* e) override;
     void showEvent(QShowEvent* e) override;
+    void hideEvent(QHideEvent* e) override;
     bool eventFilter(QObject* obj, QEvent* event) override;
 
 private slots:

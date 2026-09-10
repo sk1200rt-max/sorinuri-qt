@@ -50,6 +50,8 @@ protected:
 
 private slots:
     void maybeUpdate();
+    // 보이지 않는 서비스 탭에서는 새 프레임을 FBO에 그리지 않고 libmpv에 소비됐음을 알린다.
+    void discardHiddenFrame();
     // Qt6 공식 권장: OpenGL 컨텍스트 파괴 시 renderCtx_ 안전 해제
     // 절전 복귀, 외부 모니터 연결/해제, reparent 시 컨텍스트가 파괴될 수 있음
     // aboutToBeDestroyed 시그널에 연결하여 리소스 정리
@@ -69,6 +71,8 @@ private:
     bool  screenChangedConnected_ = false;  // 멀티모니터 감지 연결 여부
     std::atomic_bool presentationActive_{true};        // 화면에 실제로 보이는 영상 표면만 repaint
     std::atomic_bool presentationRefreshPending_{false};
+    // 비가시 탭에서도 callback마다 작업을 쌓지 않고 최신 프레임 폐기 작업은 한 번만 예약한다.
+    std::atomic_bool hiddenFrameDiscardQueued_{false};
     // libmpv 프레임 콜백마다 Qt 이벤트를 적재하지 않고, GUI 큐에는 최대 한 번의 repaint만 예약한다.
     std::atomic_bool updateQueued_{false};
     void  connectScreenChanged(QWindow* win);  // 멀티모니터 시그널 연결 헬퍼
