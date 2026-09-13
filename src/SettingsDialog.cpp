@@ -122,6 +122,18 @@ SettingsDialog::SettingsDialog(MpvCore* mpv, QWidget* parent)
 
 void SettingsDialog::setupAudioTab(QTabWidget* tabs) {
     QWidget* page = new QWidget();
+    page->setObjectName("settingsAudioPage");
+    // QScrollArea viewport가 플랫폼의 밝은 팔레트를 물려받아 비활성 오디오
+    // 선택지를 흐리게 만들지 않도록, 오디오 탭만 공통 다크 테마 표면으로 고정한다.
+    // bitstream 선택은 계속 비활성화하지만 HiDPI에서도 설명과 항목명이 읽혀야 한다.
+    page->setStyleSheet(QString(
+        "QWidget#settingsAudioPage { background: %1; }"
+        "QGroupBox { background: %2; color: %3; }"
+        "QGroupBox::title { background: %2; color: %3; }"
+        "QCheckBox:disabled { color: %4; }"
+        "QCheckBox::indicator:disabled { border-color: %4; background: %5; }")
+        .arg(SorinuriUi::Surface, SorinuriUi::SurfaceAlt, SorinuriUi::Text,
+             SorinuriUi::TextMuted, SorinuriUi::SurfaceRaised));
     QVBoxLayout* layout = new QVBoxLayout(page);
     layout->setContentsMargins(16, 16, 16, 16);
     layout->setSpacing(12);
@@ -189,7 +201,8 @@ void SettingsDialog::setupAudioTab(QTabWidget* tabs) {
     ptLayout->addWidget(passthroughCheck_);
 
     QLabel* ptHint = new QLabel("활성화 시 아래 선택한 포맷을 디코딩 없이 AV 리시버로 전송합니다.", page);
-    ptHint->setStyleSheet("color: #666; font-size: 11px;");
+    ptHint->setStyleSheet(QString("color: %1; font-size: 11px;")
+                              .arg(SorinuriUi::TextMuted));
     ptLayout->addWidget(ptHint);
 
     QWidget* codecWidget = new QWidget(page);
@@ -267,7 +280,8 @@ void SettingsDialog::setupAudioTab(QTabWidget* tabs) {
     QLabel* dsdHint = new QLabel(
         "DoP: WASAPI 독점 모드 + DSD 지원 DAC 필요.\n"
         "DSD Direct: ASIO 드라이버 설치 필요 (전문가용).", page);
-    dsdHint->setStyleSheet("color: #666; font-size: 11px;");
+    dsdHint->setStyleSheet(QString("color: %1; font-size: 11px;")
+                               .arg(SorinuriUi::TextMuted));
     dsdHint->setWordWrap(true);
     dsdForm->addRow("", dsdHint);
 
@@ -284,7 +298,8 @@ void SettingsDialog::setupAudioTab(QTabWidget* tabs) {
     QLabel* remoteHint = new QLabel(
         "활성화 후 같은 Wi-Fi의 스마트폰 브라우저에서\n"
         "http://[PC IP]:7373 접속 → 재생/일시정지/볼륨 제어 가능.", page);
-    remoteHint->setStyleSheet("color: #666; font-size: 11px;");
+    remoteHint->setStyleSheet(QString("color: %1; font-size: 11px;")
+                                  .arg(SorinuriUi::TextMuted));
     remoteHint->setWordWrap(true);
     remoteForm->addRow("", remoteHint);
 
