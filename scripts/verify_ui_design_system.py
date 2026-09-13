@@ -35,6 +35,7 @@ def main() -> int:
     originals = text("OriginalsWidget.cpp")
     main_window = text("MainWindow.cpp")
     album_art = text("AlbumArtExtractor.cpp")
+    settings_dialog = text("SettingsDialog.cpp")
 
     require(theme, "namespace SorinuriUi", "공통 UiTheme 네임스페이스", errors)
     for token in ("Mint", "Surface", "SurfaceAlt", "Border", "menuStyle"):
@@ -126,6 +127,17 @@ def main() -> int:
         require(main_window, fragment, label, errors)
 
     require(theme, "toolTipStyle", "고대비 호버 안내문 테마", errors)
+
+    # 공유 WASAPI 기본값에서는 bitstream 선택지가 비활성화된다. 비활성 상태여도
+    # HiDPI 환경에서 설명과 코덱 이름을 읽을 수 있는 대비를 유지해야 한다.
+    for fragment, label in (
+        ("settingsAudioPage", "오디오 설정 전용 테마 표면"),
+        ("QWidget#settingsAudioPage { background: %1; }", "오디오 탭 다크 배경"),
+        ("QCheckBox:disabled { color: %4; }", "비활성 패스스루 텍스트 대비"),
+        ("QCheckBox::indicator:disabled", "비활성 패스스루 표시자 대비"),
+        ("SorinuriUi::TextMuted", "오디오 안내 텍스트 대비 토큰"),
+    ):
+        require(settings_dialog, fragment, label, errors)
 
     # 음악은 앨범아트 스테이지와 접이식 보조 패널로, 기존 고정 좌우 분할을 사용하지 않는다.
     for fragment, label in (
