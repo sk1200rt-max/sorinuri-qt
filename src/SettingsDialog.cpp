@@ -15,6 +15,47 @@
 
 static const QString DIALOG_STYLE = SorinuriUi::dialogStyle();
 
+namespace {
+
+QWidget* makeSettingsPage(const char* objectName)
+{
+    auto* page = new QWidget;
+    page->setObjectName(QString::fromLatin1(objectName));
+    page->setAttribute(Qt::WA_StyledBackground, true);
+    return page;
+}
+
+void prepareSettingsForm(QFormLayout* form)
+{
+    form->setSpacing(8);
+    form->setRowWrapPolicy(QFormLayout::WrapLongRows);
+    form->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
+    form->setLabelAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+}
+
+void prepareSettingsButton(QPushButton* button)
+{
+    button->setFocusPolicy(Qt::NoFocus);
+}
+
+QString settingsHintStyle(int fontSize = 11)
+{
+    return QString("color: %1; font-size: %2px; background: transparent;")
+        .arg(SorinuriUi::TextMuted)
+        .arg(fontSize);
+}
+
+QString settingsNoticeStyle(const QString& background,
+                            const QString& border,
+                            const QString& color)
+{
+    return QString("background: %1; border: 1px solid %2; border-radius: 8px;"
+                   " color: %3; font-size: 11px; padding: 8px 12px; margin-top: 2px;")
+        .arg(background, border, color);
+}
+
+} // namespace
+
 SettingsDialog::SettingsDialog(MpvCore* mpv, QWidget* parent)
     : QDialog(parent), mpv_(mpv), settings_("Sorinuri", "SorinuriPlayer")
 {
@@ -121,19 +162,7 @@ SettingsDialog::SettingsDialog(MpvCore* mpv, QWidget* parent)
 }
 
 void SettingsDialog::setupAudioTab(QTabWidget* tabs) {
-    QWidget* page = new QWidget();
-    page->setObjectName("settingsAudioPage");
-    // QScrollArea viewport가 플랫폼의 밝은 팔레트를 물려받아 비활성 오디오
-    // 선택지를 흐리게 만들지 않도록, 오디오 탭만 공통 다크 테마 표면으로 고정한다.
-    // bitstream 선택은 계속 비활성화하지만 HiDPI에서도 설명과 항목명이 읽혀야 한다.
-    page->setStyleSheet(QString(
-        "QWidget#settingsAudioPage { background: %1; }"
-        "QGroupBox { background: %2; color: %3; }"
-        "QGroupBox::title { background: %2; color: %3; }"
-        "QCheckBox:disabled { color: %4; }"
-        "QCheckBox::indicator:disabled { border-color: %4; background: %5; }")
-        .arg(SorinuriUi::Surface, SorinuriUi::SurfaceAlt, SorinuriUi::Text,
-             SorinuriUi::TextMuted, SorinuriUi::SurfaceRaised));
+    QWidget* page = makeSettingsPage("settingsAudioPage");
     QVBoxLayout* layout = new QVBoxLayout(page);
     layout->setContentsMargins(16, 16, 16, 16);
     layout->setSpacing(12);
@@ -141,12 +170,13 @@ void SettingsDialog::setupAudioTab(QTabWidget* tabs) {
     // ── 출력 장치 ────────────────────────────────────────────────
     QGroupBox* deviceGroup = new QGroupBox("오디오 출력 장치", page);
     QFormLayout* deviceForm = new QFormLayout(deviceGroup);
-    deviceForm->setSpacing(8);
+    prepareSettingsForm(deviceForm);
 
     audioDeviceCombo_ = new QComboBox(page);
     audioDeviceCombo_->addItem("기본 장치 (auto)");
 
     QPushButton* refreshBtn = new QPushButton("새로고침", page);
+    prepareSettingsButton(refreshBtn);
     refreshBtn->setFixedWidth(80);
     connect(refreshBtn, &QPushButton::clicked, this, &SettingsDialog::refreshAudioDevices);
 
@@ -162,9 +192,8 @@ void SettingsDialog::setupAudioTab(QTabWidget* tabs) {
     // 독점 모드 활성화 시 안내 (노란 배경)
     exclusiveHintLabel_ = new QLabel(page);
     exclusiveHintLabel_->setWordWrap(true);
-    exclusiveHintLabel_->setStyleSheet(
-        "background:#1a1200;border:1px solid #4a3800;border-radius:6px;"
-        "color:#e8c84a;font-size:11px;padding:8px 12px;margin-top:2px;");
+    exclusiveHintLabel_->setStyleSheet(settingsNoticeStyle(
+        "#1A140A", "#70531C", SorinuriUi::Warning));
     exclusiveHintLabel_->setText(
         "독점 모드에서는 다른 앱의 소리가 일시적으로 차단될 수 있습니다.\n"
         "HDMI AV 리시버의 Dolby Atmos / DTS:X bitstream, 또는 공유 PCM에서 5.1 / 7.1 출력 문제가 있을 때만 사용하세요.");
@@ -174,9 +203,8 @@ void SettingsDialog::setupAudioTab(QTabWidget* tabs) {
     // 공유 모드 안내 (녹색 배경)
     sharedHintLabel_ = new QLabel(page);
     sharedHintLabel_->setWordWrap(true);
-    sharedHintLabel_->setStyleSheet(
-        "background:#001a0e;border:1px solid #004d22;border-radius:6px;"
-        "color:#4ade80;font-size:11px;padding:8px 12px;margin-top:2px;");
+    sharedHintLabel_->setStyleSheet(settingsNoticeStyle(
+        SorinuriUi::MintDark, "#176A5D", SorinuriUi::MintHover));
     sharedHintLabel_->setText(
         "공유 모드 기본값: 다른 앱과 동시에 소리를 재생합니다.\n"
         "5.1 / 7.1 PCM 서라운드는 Windows 사운드 설정에서 채널 수를 구성하면 지원됩니다.\n"
@@ -246,6 +274,7 @@ void SettingsDialog::setupAudioTab(QTabWidget* tabs) {
     // ── 볼륨 ─────────────────────────────────────────────────────
     QGroupBox* volGroup = new QGroupBox("볼륨", page);
     QFormLayout* volForm = new QFormLayout(volGroup);
+    prepareSettingsForm(volForm);
 
     volumeSlider_ = new QSlider(Qt::Horizontal, page);
     volumeSlider_->setRange(0, 200);
@@ -267,7 +296,7 @@ void SettingsDialog::setupAudioTab(QTabWidget* tabs) {
     // ── DSD 네이티브 재생 ──────────────────────────────────────────────────────────
     QGroupBox* dsdGroup = new QGroupBox("DSD 네이티브 재생 (.dsf / .dff)", page);
     QFormLayout* dsdForm = new QFormLayout(dsdGroup);
-    dsdForm->setSpacing(8);
+    prepareSettingsForm(dsdForm);
 
     dsdModeCombo_ = new QComboBox(page);
     dsdModeCombo_->addItems({
@@ -290,7 +319,7 @@ void SettingsDialog::setupAudioTab(QTabWidget* tabs) {
     // ── 스마트폰 리모컨 ──────────────────────────────────────────────────────────
     QGroupBox* remoteGroup = new QGroupBox("스마트폰 리모컨 (Wi-Fi)", page);
     QFormLayout* remoteForm = new QFormLayout(remoteGroup);
-    remoteForm->setSpacing(8);
+    prepareSettingsForm(remoteForm);
 
     remoteEnabledCheck_ = new QCheckBox("리모컨 서버 활성화 (포트 7373)", page);
     remoteForm->addRow("", remoteEnabledCheck_);
@@ -323,7 +352,7 @@ void SettingsDialog::setupAudioTab(QTabWidget* tabs) {
 }
 
 void SettingsDialog::setupVideoTab(QTabWidget* tabs) {
-    QWidget* page = new QWidget();
+    QWidget* page = makeSettingsPage("settingsVideoPage");
     QVBoxLayout* layout = new QVBoxLayout(page);
     layout->setContentsMargins(16, 16, 16, 16);
     layout->setSpacing(12);
@@ -331,7 +360,7 @@ void SettingsDialog::setupVideoTab(QTabWidget* tabs) {
     // ── 디코딩 ───────────────────────────────────────────────────
     QGroupBox* decodeGroup = new QGroupBox("비디오 디코딩", page);
     QFormLayout* decodeForm = new QFormLayout(decodeGroup);
-    decodeForm->setSpacing(8);
+    prepareSettingsForm(decodeForm);
 
     hwdecCombo_ = new QComboBox(page);
     hwdecCombo_->addItems({"d3d11va (DirectX 11)", "d3d11va-copy", "dxva2", "dxva2-copy",
@@ -350,9 +379,8 @@ void SettingsDialog::setupVideoTab(QTabWidget* tabs) {
     // 재시작 필요 항목 안내 (주황색 배너)
     QLabel* restartHint = new QLabel(
         "⚠️  하드웨어 디코딩 및 비디오 출력 변경은 <b>다음 실행 시 적용</b>됩니다.", page);
-    restartHint->setStyleSheet(
-        "background:#1a0e00; border:1px solid #4a2800; border-radius:4px;"
-        "color:#ff9800; font-size:11px; padding:6px 10px;");
+    restartHint->setStyleSheet(settingsNoticeStyle(
+        "#1A140A", "#70531C", SorinuriUi::Warning));
     restartHint->setWordWrap(true);
     restartHint->setTextFormat(Qt::RichText);
     decodeForm->addRow("", restartHint);
@@ -361,7 +389,7 @@ void SettingsDialog::setupVideoTab(QTabWidget* tabs) {
     QLabel* gpuNextHint = new QLabel(
         "D3D12/libplacebo: 4K 환경에서 GPU 부하 20~30% 감소. NVIDIA RTX/AMD RDNA2+ 권장.\n"
         "변경은 다음 실행 시 적용됩니다.", page);
-    gpuNextHint->setStyleSheet("color: #888; font-size: 11px;");
+    gpuNextHint->setStyleSheet(settingsHintStyle());
     gpuNextHint->setWordWrap(true);
     decodeForm->addRow("", gpuNextHint);
 
@@ -370,7 +398,7 @@ void SettingsDialog::setupVideoTab(QTabWidget* tabs) {
     // ── GPU 렌더링 프로파일 ─────────────────────────────────────────────
     QGroupBox* profileGroup = new QGroupBox("GPU 렌더링 프로파일", page);
     QFormLayout* profileForm = new QFormLayout(profileGroup);
-    profileForm->setSpacing(8);
+    prepareSettingsForm(profileForm);
 
     renderProfileCombo_ = new QComboBox(page);
     renderProfileCombo_->addItems({
@@ -384,7 +412,7 @@ void SettingsDialog::setupVideoTab(QTabWidget* tabs) {
 
     QLabel* profileHint = new QLabel(
         "Eco: bilinear | Balanced: spline36 | Quality: ewa_lanczossharp | HiEnd: ewa_lanczossharp4sharpest", page);
-    profileHint->setStyleSheet("color: #666; font-size: 10px;");
+    profileHint->setStyleSheet(settingsHintStyle(10));
     profileHint->setWordWrap(true);
     profileForm->addRow("", profileHint);
 
@@ -393,7 +421,7 @@ void SettingsDialog::setupVideoTab(QTabWidget* tabs) {
     // ── 화질 ─────────────────────────────────────────────────────────
     QGroupBox* qualityGroup = new QGroupBox("화질 세부 설정 (Advanced)", page);
     QFormLayout* qualityForm = new QFormLayout(qualityGroup);
-    qualityForm->setSpacing(8);
+    prepareSettingsForm(qualityForm);
 
     scalingCombo_ = new QComboBox(page);
     scalingCombo_->addItems({"bilinear (빠름)", "bicubic", "lanczos", "spline36",
@@ -417,7 +445,7 @@ void SettingsDialog::setupVideoTab(QTabWidget* tabs) {
     motionSmoothingCheck_ = new QCheckBox("모션 스무딩 (프레임 보간, 24fps→매끄러운 재생)", page);
     motionSmoothingCheck_->setChecked(false);
     QLabel* smoothHint = new QLabel("주의: 일부 영상에서 아티팩트가 생길 수 있습니다.", page);
-    smoothHint->setStyleSheet("color: #666; font-size: 11px;");
+    smoothHint->setStyleSheet(settingsHintStyle());
     qualityForm->addRow("", motionSmoothingCheck_);
     qualityForm->addRow("", smoothHint);
 
@@ -428,14 +456,14 @@ void SettingsDialog::setupVideoTab(QTabWidget* tabs) {
 }
 
 void SettingsDialog::setupSubtitleTab(QTabWidget* tabs) {
-    QWidget* page = new QWidget();
+    QWidget* page = makeSettingsPage("settingsSubtitlePage");
     QVBoxLayout* layout = new QVBoxLayout(page);
     layout->setContentsMargins(16, 16, 16, 16);
     layout->setSpacing(12);
 
     QGroupBox* subGroup = new QGroupBox("자막 스타일", page);
     QFormLayout* subForm = new QFormLayout(subGroup);
-    subForm->setSpacing(8);
+    prepareSettingsForm(subForm);
 
     subFontCombo_ = new QComboBox(page);
     subFontCombo_->addItems({"맑은 고딕", "나눔고딕", "Segoe UI", "Arial", "Noto Sans KR"});
@@ -473,7 +501,7 @@ void SettingsDialog::setupSubtitleTab(QTabWidget* tabs) {
     subPreviewLabel_->setMinimumHeight(60);
     subPreviewLabel_->setStyleSheet(
         "background:#000; color:#fff; padding:10px 16px;"
-        "border:1px solid #2a2a2a; border-radius:4px;"
+        "border:1px solid #2B3B3C; border-radius:8px;"
         "font-family:'맑은 고딕'; font-size:24px;");
     subPreviewLabel_->setWordWrap(true);
     subForm->addRow("미리보기:", subPreviewLabel_);
@@ -504,7 +532,7 @@ void SettingsDialog::setupSubtitleTab(QTabWidget* tabs) {
             : "";
         subPreviewLabel_->setStyleSheet(QString(
             "background:#000; color:%1; padding:10px 16px;"
-            "border:1px solid #2a2a2a; border-radius:4px;"
+            "border:1px solid #2B3B3C; border-radius:8px;"
             "font-family:'%2'; font-size:%3px; %4 %5")
             .arg(colorStr)
             .arg(fontFamily)
@@ -526,6 +554,7 @@ void SettingsDialog::setupSubtitleTab(QTabWidget* tabs) {
 
     QGroupBox* autoSubGroup = new QGroupBox("자막 자동 로드", page);
     QFormLayout* autoSubForm = new QFormLayout(autoSubGroup);
+    prepareSettingsForm(autoSubForm);
 
     autoLoadSubCheck_ = new QCheckBox("동영상과 같은 폴더에서 자막 자동 로드", page);
     autoLoadSubCheck_->setChecked(true);
@@ -538,14 +567,14 @@ void SettingsDialog::setupSubtitleTab(QTabWidget* tabs) {
     QVBoxLayout* apiLay = new QVBoxLayout(apiGroup);
     apiLay->setSpacing(6);
 
-    auto* apiDesc = new QLabel(
-        "<a href='https://www.opensubtitles.com/consumers' style='color:#00D4B4;'>"
+    auto* apiDesc = new QLabel(QString(
+        "<a href='https://www.opensubtitles.com/consumers' style='color:%1;'>"
         "OpenSubtitles.com</a>에서 API 키를 발급받아 입력하세요."
-        "<br><small style='color:#666;'>로그인 → 프로필 → API 섹션 → Consumer Key</small>",
-        page);
+        "<br><small style='color:%2;'>로그인 → 프로필 → API 섹션 → Consumer Key</small>")
+        .arg(SorinuriUi::Mint, SorinuriUi::TextMuted), page);
     apiDesc->setOpenExternalLinks(true);
     apiDesc->setWordWrap(true);
-    apiDesc->setStyleSheet("color:#aaa; font-size:11px; background:transparent;");
+    apiDesc->setStyleSheet(settingsHintStyle());
     apiLay->addWidget(apiDesc);
 
     auto* apiRow = new QHBoxLayout();
@@ -554,12 +583,9 @@ void SettingsDialog::setupSubtitleTab(QTabWidget* tabs) {
     subApiKeyEdit_ = new QLineEdit(page);
     subApiKeyEdit_->setPlaceholderText("여기에 API 키를 입력하세요...");
     subApiKeyEdit_->setEchoMode(QLineEdit::Password);
-    subApiKeyEdit_->setStyleSheet(
-        "QLineEdit { background:#252525; color:#ddd; border:1px solid #333;"
-        "border-radius:3px; padding:4px 8px; }"
-        "QLineEdit:focus { border-color:#00D4B4; }");
     auto* showKeyBtn = new QPushButton("표시", page);
-    showKeyBtn->setFixedWidth(44);
+    prepareSettingsButton(showKeyBtn);
+    showKeyBtn->setFixedWidth(52);
     showKeyBtn->setCheckable(true);
     connect(showKeyBtn, &QPushButton::toggled, [this](bool on) {
         subApiKeyEdit_->setEchoMode(on ? QLineEdit::Normal : QLineEdit::Password);
@@ -574,22 +600,18 @@ void SettingsDialog::setupSubtitleTab(QTabWidget* tabs) {
     // ── 자동 번역 API 설정 ───────────────────────────────────────────────
     QGroupBox* transGroup = new QGroupBox("자동 번역 API", page);
     QFormLayout* transForm = new QFormLayout(transGroup);
-    transForm->setSpacing(8);
+    prepareSettingsForm(transForm);
 
     QLabel* transHint = new QLabel(
         "자막 다운로드 후 한국어로 자동 번역 시 사용합니다.\n"
         "DeepL 또는 파파고 중 하나를 입력하세요.", page);
-    transHint->setStyleSheet("color: #666; font-size: 11px;");
+    transHint->setStyleSheet(settingsHintStyle());
     transHint->setWordWrap(true);
     transForm->addRow("", transHint);
 
     deeplApiKeyEdit_ = new QLineEdit(page);
     deeplApiKeyEdit_->setPlaceholderText("DeepL API Key (api-free.deepl.com)");
     deeplApiKeyEdit_->setEchoMode(QLineEdit::Password);
-    deeplApiKeyEdit_->setStyleSheet(
-        "QLineEdit { background:#1a1a1a; border:1px solid #2a2a2a; border-radius:3px;"
-        "  padding:4px 8px; color:#e0e0e0; }"
-        "QLineEdit:focus { border-color:#00D4B4; }");
     transForm->addRow("DeepL API Key:", deeplApiKeyEdit_);
 
     papagoClientIdEdit_ = new QLineEdit(page);
@@ -610,14 +632,14 @@ void SettingsDialog::setupSubtitleTab(QTabWidget* tabs) {
 }
 
 void SettingsDialog::setupGeneralTab(QTabWidget* tabs) {
-    QWidget* page = new QWidget();
+    QWidget* page = makeSettingsPage("settingsGeneralPage");
     QVBoxLayout* layout = new QVBoxLayout(page);
     layout->setContentsMargins(16, 16, 16, 16);
     layout->setSpacing(12);
 
     QGroupBox* playGroup = new QGroupBox("재생 설정", page);
     QFormLayout* playForm = new QFormLayout(playGroup);
-    playForm->setSpacing(8);
+    prepareSettingsForm(playForm);
 
     rememberPosCheck_ = new QCheckBox("재생 위치 기억 (이어보기)", page);
     rememberPosCheck_->setChecked(true);
@@ -630,13 +652,14 @@ void SettingsDialog::setupGeneralTab(QTabWidget* tabs) {
 
     QGroupBox* langGroup = new QGroupBox("언어 설정", page);
     QFormLayout* langForm = new QFormLayout(langGroup);
+    prepareSettingsForm(langForm);
 
     langCombo_ = new QComboBox(page);
     langCombo_->addItems({"한국어", "English", "日本語", "中文"});
     langForm->addRow("인터페이스 언어:", langCombo_);
 
     QLabel* langHint = new QLabel("* 언어 변경은 재시작 후 적용됩니다.", page);
-    langHint->setStyleSheet("color: #666; font-size: 11px;");
+    langHint->setStyleSheet(settingsHintStyle());
     langForm->addRow("", langHint);
 
         layout->addWidget(langGroup);
@@ -644,15 +667,13 @@ void SettingsDialog::setupGeneralTab(QTabWidget* tabs) {
     // ── 스크린샷 설정 ──────────────────────────────────────────────────────────
     QGroupBox* shotGroup = new QGroupBox("스크린샷 설정", page);
     QFormLayout* shotForm = new QFormLayout(shotGroup);
-    shotForm->setSpacing(8);
+    prepareSettingsForm(shotForm);
 
     QHBoxLayout* dirLay = new QHBoxLayout();
     screenshotDirEdit_ = new QLineEdit(page);
     screenshotDirEdit_->setReadOnly(true);
-    screenshotDirEdit_->setStyleSheet(
-        "QLineEdit { background:#1a1a1a; border:1px solid #2a2a2a; border-radius:3px;"
-        "  padding:4px 8px; color:#e0e0e0; }");
     QPushButton* btnBrowseDir = new QPushButton("찾아보기...", page);
+    prepareSettingsButton(btnBrowseDir);
     connect(btnBrowseDir, &QPushButton::clicked, this, [this]() {
         QString dir = QFileDialog::getExistingDirectory(this, "스크린샷 저장 폴더 선택",
             screenshotDirEdit_->text().isEmpty() ? QStandardPaths::writableLocation(QStandardPaths::PicturesLocation) : screenshotDirEdit_->text());
@@ -671,20 +692,16 @@ void SettingsDialog::setupGeneralTab(QTabWidget* tabs) {
     // ── SORINURI ORIGINALS API ─────────────────────────────────────────────────────────
     QGroupBox* origGroup = new QGroupBox("SORINURI ORIGINALS", page);
     QFormLayout* origForm = new QFormLayout(origGroup);
-    origForm->setSpacing(8);
+    prepareSettingsForm(origForm);
 
     originalsApiUrlEdit_ = new QLineEdit(page);
     originalsApiUrlEdit_->setPlaceholderText("https://sorinuri.com/api/songs.json");
-    originalsApiUrlEdit_->setStyleSheet(
-        "QLineEdit { background:#1a1a1a; border:1px solid #2a2a2a; border-radius:3px;"
-        "  padding:4px 8px; color:#e0e0e0; }"
-        "QLineEdit:focus { border-color: #00D4B4; }");
     origForm->addRow("API URL:", originalsApiUrlEdit_);
 
     QLabel* origHint = new QLabel(
         "기본값: https://sorinuri.com/api/songs.json\n"
         "변경 시 적용 버튼을 누르면 즉시 갱신됩니다.", page);
-    origHint->setStyleSheet("color: #666; font-size: 11px;");
+    origHint->setStyleSheet(settingsHintStyle());
     origHint->setWordWrap(true);
     origForm->addRow("", origHint);
 
@@ -956,43 +973,47 @@ void SettingsDialog::onOk() {
 
 // ─── Last.fm 설정 탭 (v6.18.0 신규) ─────────────────────────────────────────
 void SettingsDialog::setupLastfmTab(QTabWidget* tabs) {
-    auto* page   = new QWidget;
+    auto* page = makeSettingsPage("settingsLastfmPage");
     auto* layout = new QVBoxLayout(page);
     layout->setContentsMargins(16, 16, 16, 16);
     layout->setSpacing(12);
 
     // 헤더
-    auto* lblHdr = new QLabel("📻  Last.fm 스크로블링");
-    lblHdr->setStyleSheet("font-size: 13px; font-weight: bold; color: #e0e0e0;");
+    auto* lblHdr = new QLabel("Last.fm 스크로블링", page);
+    lblHdr->setStyleSheet(QString("font-size: 14px; font-weight: 700; color: %1;")
+                              .arg(SorinuriUi::Text));
     layout->addWidget(lblHdr);
 
     auto* lblDesc = new QLabel(
         "재생한 음악을 Last.fm에 자동으로 기록합니다.\n"
         "재생 시간이 50% 이상이거나 4분 이상이면 스크로블됩니다.");
-    lblDesc->setStyleSheet("color: #888; font-size: 11px;");
+    lblDesc->setStyleSheet(settingsHintStyle());
     lblDesc->setWordWrap(true);
     layout->addWidget(lblDesc);
 
     // 활성화 토글
-    lastfmEnabledCheck_ = new QCheckBox("Last.fm 스크로블링 활성화");
+    lastfmEnabledCheck_ = new QCheckBox("Last.fm 스크로블링 활성화", page);
     lastfmEnabledCheck_->setChecked(settings_.value("lastfm/enabled", false).toBool());
     layout->addWidget(lastfmEnabledCheck_);
 
     // 연결 상태 그룹
-    auto* grpAuth = new QGroupBox("계정 연결");
+    auto* grpAuth = new QGroupBox("계정 연결", page);
     auto* authLayout = new QVBoxLayout(grpAuth);
 
-    lastfmStatusLabel_ = new QLabel("연결되지 않음");
-    lastfmStatusLabel_->setStyleSheet("color: #888; font-size: 11px;");
+    lastfmStatusLabel_ = new QLabel("연결되지 않음", grpAuth);
+    lastfmStatusLabel_->setStyleSheet(settingsHintStyle());
     authLayout->addWidget(lastfmStatusLabel_);
 
     auto* rowBtns = new QHBoxLayout;
-    btnLastfmAuth_ = new QPushButton("🔗  Last.fm 계정 연결");
-    btnLastfmAuth_->setStyleSheet(
-        "QPushButton { background: #c3000d; color: #fff; border: none;"
-        "  border-radius: 4px; padding: 7px 16px; font-size: 12px; }"
-        "QPushButton:hover { background: #e0001a; }");
-    btnLastfmLogout_ = new QPushButton("로그아웃");
+    btnLastfmAuth_ = new QPushButton("Last.fm 계정 연결", grpAuth);
+    btnLastfmAuth_->setObjectName("btnLastfmAuth");
+    btnLastfmAuth_->setStyleSheet(QString(
+        "QPushButton#btnLastfmAuth { background: %1; border-color: %2; color: %2; font-weight: 700; }"
+        "QPushButton#btnLastfmAuth:hover { background: %3; color: %4; }")
+        .arg(SorinuriUi::MintDark, SorinuriUi::Mint, SorinuriUi::SurfacePress, SorinuriUi::Text));
+    btnLastfmLogout_ = new QPushButton("로그아웃", grpAuth);
+    prepareSettingsButton(btnLastfmAuth_);
+    prepareSettingsButton(btnLastfmLogout_);
     btnLastfmLogout_->setEnabled(false);
     rowBtns->addWidget(btnLastfmAuth_);
     rowBtns->addWidget(btnLastfmLogout_);
@@ -1002,27 +1023,28 @@ void SettingsDialog::setupLastfmTab(QTabWidget* tabs) {
     auto* lblHelp = new QLabel(
         "연결 버튼을 누르면 브라우저에서 Last.fm 인증 페이지가 열립니다.\n"
         "로그인 후 소리누리로 돌아오면 자동으로 연결됩니다.");
-    lblHelp->setStyleSheet("color: #555; font-size: 10px;");
+    lblHelp->setStyleSheet(settingsHintStyle(10));
     lblHelp->setWordWrap(true);
     authLayout->addWidget(lblHelp);
     layout->addWidget(grpAuth);
 
     // API 키 설정 (고급)
-    auto* grpApi = new QGroupBox("고급 설정 (선택 사항)");
+    auto* grpApi = new QGroupBox("고급 설정 (선택 사항)", page);
     auto* apiLayout = new QFormLayout(grpApi);
-    lastfmApiKeyEdit_ = new QLineEdit;
+    prepareSettingsForm(apiLayout);
+    lastfmApiKeyEdit_ = new QLineEdit(grpApi);
     lastfmApiKeyEdit_->setPlaceholderText("기본값 사용 (비워두면 소리누리 앱 키 사용)");
     lastfmApiKeyEdit_->setText(settings_.value("lastfm/api_key").toString());
     apiLayout->addRow("API 키:", lastfmApiKeyEdit_);
     layout->addWidget(grpApi);
 
     // 최근 스크로블 이력
-    layout->addWidget(new QLabel("최근 스크로블 이력:"));
-    lastfmHistoryList_ = new QListWidget;
-    lastfmHistoryList_->setMaximumHeight(150);
-    lastfmHistoryList_->setStyleSheet(
-        "QListWidget { background: #0d0d0d; border: 1px solid #1e1e1e; border-radius: 4px; }"
-        "QListWidget::item { padding: 4px 8px; border-bottom: 1px solid #1a1a1a; font-size: 11px; }");
+    auto* historyLabel = new QLabel("최근 스크로블 이력:", page);
+    historyLabel->setStyleSheet(QString("font-weight: 700; color: %1;").arg(SorinuriUi::Text));
+    layout->addWidget(historyLabel);
+    lastfmHistoryList_ = new QListWidget(page);
+    lastfmHistoryList_->setMinimumHeight(120);
+    lastfmHistoryList_->setMaximumHeight(180);
     layout->addWidget(lastfmHistoryList_);
     layout->addStretch();
 
@@ -1052,7 +1074,8 @@ void SettingsDialog::onLastfmAuth() {
     QDesktopServices::openUrl(QUrl(scrobbleMgr_->authUrl()));
     if (lastfmStatusLabel_) {
         lastfmStatusLabel_->setText("브라우저에서 Last.fm 로그인 후 돌아오세요...");
-        lastfmStatusLabel_->setStyleSheet("color: #f0c040; font-size: 11px;");
+        lastfmStatusLabel_->setStyleSheet(QString("color: %1; font-size: 11px;")
+                                              .arg(SorinuriUi::Warning));
     }
 }
 
@@ -1070,7 +1093,9 @@ void SettingsDialog::updateLastfmStatus() {
     if (lastfmStatusLabel_) {
         lastfmStatusLabel_->setText(connected ? "✅ Last.fm 계정 연결됨" : "연결되지 않음");
         lastfmStatusLabel_->setStyleSheet(
-            connected ? "color: #00D4B4; font-size: 11px;" : "color: #888; font-size: 11px;");
+            connected
+                ? QString("color: %1; font-size: 11px; font-weight: 700;").arg(SorinuriUi::Mint)
+                : settingsHintStyle());
     }
     if (btnLastfmAuth_)   btnLastfmAuth_->setText(connected ? "재인증" : "🔗  Last.fm 계정 연결");
     if (btnLastfmLogout_) btnLastfmLogout_->setEnabled(connected);

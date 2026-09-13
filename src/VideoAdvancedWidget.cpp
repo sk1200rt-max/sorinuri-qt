@@ -1,28 +1,14 @@
 #include "VideoAdvancedWidget.h"
+#include "UiTheme.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QGroupBox>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QTimer>
+#include <QStyle>
 
-static const QString STYLE =
-    "QWidget { background: #111; color: #ddd; }"
-    "QGroupBox { border:1px solid #2a2a2a; border-radius:4px; margin-top:10px;"
-    "  color:#888; font-size:11px; padding-top:6px; }"
-    "QGroupBox::title { subcontrol-origin:margin; left:8px; padding:0 4px; }"
-    "QCheckBox { color:#ddd; spacing:6px; }"
-    "QCheckBox::indicator { width:14px; height:14px; border:1px solid #444;"
-    "  border-radius:3px; background:#1e1e1e; }"
-    "QCheckBox::indicator:checked { background:#4fc3f7; border-color:#4fc3f7; }"
-    "QPushButton { background:#1e1e1e; color:#ccc; border:1px solid #2a2a2a;"
-    "  border-radius:3px; padding:5px 12px; font-size:11px; }"
-    "QPushButton:hover { background:#2a2a2a; border-color:#4fc3f7; }"
-    "QComboBox { background:#1e1e1e; color:#ddd; border:1px solid #2a2a2a;"
-    "  border-radius:3px; padding:4px 8px; }"
-    "QComboBox::drop-down { border:none; }"
-    "QComboBox QAbstractItemView { background:#1e1e1e; color:#ddd;"
-    "  selection-background-color:#1565c0; }";
+static const QString STYLE = SorinuriUi::settingsPanelStyle();
 
 VideoAdvancedWidget::VideoAdvancedWidget(MpvCore* core, QWidget* parent)
     : QWidget(parent)
@@ -45,7 +31,7 @@ void VideoAdvancedWidget::setupUI()
         "디스플레이 캘리브레이션 장비(i1Display, Spyder 등)로 생성한 3D LUT 파일(.cube)을\n"
         "로드하여 전문가 수준의 정확한 색상 재현을 구현합니다.",
         this);
-    descLabel->setStyleSheet("color:#888; font-size:11px; background:transparent;");
+    descLabel->setObjectName("settingsDescription");
     descLabel->setWordWrap(true);
     layout->addWidget(descLabel);
 
@@ -56,11 +42,11 @@ void VideoAdvancedWidget::setupUI()
 
     auto* fileRow = new QHBoxLayout();
     lutPathLabel_ = new QLabel("LUT 파일을 선택하세요...", this);
-    lutPathLabel_->setStyleSheet(
-        "color:#666; font-size:11px; background:#1a1a1a; border:1px solid #2a2a2a;"
-        "border-radius:3px; padding:4px 8px;");
+    lutPathLabel_->setObjectName("settingsPath");
+    lutPathLabel_->setProperty("ready", false);
     browseLutBtn_ = new QPushButton("찾아보기...", this);
-    browseLutBtn_->setFixedWidth(80);
+    browseLutBtn_->setFocusPolicy(Qt::NoFocus);
+    browseLutBtn_->setFixedWidth(96);
     connect(browseLutBtn_, &QPushButton::clicked, this, &VideoAdvancedWidget::onBrowseLut);
     fileRow->addWidget(lutPathLabel_, 1);
     fileRow->addWidget(browseLutBtn_);
@@ -97,7 +83,7 @@ void VideoAdvancedWidget::setupUI()
 
     // 상태
     statusLabel_ = new QLabel("3D LUT 비활성", this);
-    statusLabel_->setStyleSheet("color:#666; font-size:11px; background:transparent;");
+    statusLabel_->setObjectName("settingsStatusMuted");
     layout->addWidget(statusLabel_);
     layout->addStretch();
 }
@@ -111,9 +97,9 @@ void VideoAdvancedWidget::onBrowseLut()
 
     activeLutPath_ = path;
     lutPathLabel_->setText(QFileInfo(path).fileName());
-    lutPathLabel_->setStyleSheet(
-        "color:#ddd; font-size:11px; background:#1a1a1a; border:1px solid #2a2a2a;"
-        "border-radius:3px; padding:4px 8px;");
+    lutPathLabel_->setProperty("ready", true);
+    lutPathLabel_->style()->unpolish(lutPathLabel_);
+    lutPathLabel_->style()->polish(lutPathLabel_);
     lutPathLabel_->setToolTip(path);
     lutEnableCheck_->setEnabled(true);
     saveSettings();
@@ -167,7 +153,8 @@ void VideoAdvancedWidget::applyLut()
     core_->setProperty("lut3d", lutPath);
 
     statusLabel_->setText("3D LUT 적용됨: " + QFileInfo(activeLutPath_).fileName());
-    statusLabel_->setStyleSheet("color:#4caf50; font-size:11px; background:transparent;");
+    statusLabel_->setObjectName("settingsStatusActive");
+    statusLabel_->setStyleSheet("font-size:11px;");
     emit lutChanged(true, activeLutPath_);
     saveSettings();
 }
@@ -177,7 +164,8 @@ void VideoAdvancedWidget::disableLut()
     if (!core_) return;
     core_->setProperty("lut3d", QString(""));
     statusLabel_->setText("3D LUT 비활성화됨");
-    statusLabel_->setStyleSheet("color:#666; font-size:11px; background:transparent;");
+    statusLabel_->setObjectName("settingsStatusMuted");
+    statusLabel_->setStyleSheet("font-size:11px;");
     emit lutChanged(false, QString());
 }
 
@@ -192,9 +180,9 @@ void VideoAdvancedWidget::loadSettings()
     if (!activeLutPath_.isEmpty() && QFileInfo::exists(activeLutPath_)) {
         lutPathLabel_->setText(QFileInfo(activeLutPath_).fileName());
         lutPathLabel_->setToolTip(activeLutPath_);
-        lutPathLabel_->setStyleSheet(
-            "color:#ddd; font-size:11px; background:#1a1a1a; border:1px solid #2a2a2a;"
-            "border-radius:3px; padding:4px 8px;");
+        lutPathLabel_->setProperty("ready", true);
+        lutPathLabel_->style()->unpolish(lutPathLabel_);
+        lutPathLabel_->style()->polish(lutPathLabel_);
         lutEnableCheck_->setEnabled(true);
     }
 

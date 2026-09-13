@@ -1,4 +1,5 @@
 #include "AudioAdvancedWidget.h"
+#include "UiTheme.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QFormLayout>
@@ -8,33 +9,10 @@
 #include <QFileInfo>
 #include <QMessageBox>
 #include <QLabel>
+#include <QStyle>
 #include <cmath>
 
-static const QString WIDGET_STYLE =
-    "QWidget { background: #111; color: #ddd; }"
-    "QGroupBox { border: 1px solid #2a2a2a; border-radius: 4px; margin-top: 10px;"
-    "  color: #888; font-size: 11px; padding-top: 6px; }"
-    "QGroupBox::title { subcontrol-origin: margin; left: 8px; padding: 0 4px; }"
-    "QCheckBox { color: #ddd; spacing: 6px; }"
-    "QCheckBox::indicator { width:14px; height:14px; border:1px solid #444;"
-    "  border-radius:3px; background:#1e1e1e; }"
-    "QCheckBox::indicator:checked { background:#4fc3f7; border-color:#4fc3f7; }"
-    "QPushButton { background:#1e1e1e; color:#ccc; border:1px solid #2a2a2a;"
-    "  border-radius:3px; padding:5px 12px; font-size:11px; }"
-    "QPushButton:hover { background:#2a2a2a; border-color:#4fc3f7; }"
-    "QPushButton:pressed { background:#1565c0; }"
-    "QSlider::groove:horizontal { height:3px; background:#2a2a2a; border-radius:1px; }"
-    "QSlider::handle:horizontal { width:10px; height:10px; margin:-4px 0;"
-    "  background:#4fc3f7; border-radius:5px; }"
-    "QSlider::sub-page:horizontal { background:#1565c0; border-radius:1px; }"
-    "QListWidget { background:#1a1a1a; color:#ddd; border:1px solid #2a2a2a;"
-    "  border-radius:3px; }"
-    "QListWidget::item:selected { background:#1565c0; }"
-    "QTabWidget::pane { border:1px solid #2a2a2a; background:#111; }"
-    "QTabBar::tab { background:#0d0d0d; color:#888; padding:5px 14px;"
-    "  border:1px solid #1a1a1a; border-bottom:none; font-size:11px; }"
-    "QTabBar::tab:selected { background:#111; color:#4fc3f7; border-color:#4fc3f7; }"
-    "QTabBar::tab:hover { color:#ccc; }";
+static const QString WIDGET_STYLE = SorinuriUi::settingsPanelStyle();
 
 AudioAdvancedWidget::AudioAdvancedWidget(MpvCore* core, QWidget* parent)
     : QWidget(parent)
@@ -79,7 +57,7 @@ void AudioAdvancedWidget::buildConvolutionTab(QWidget* parent)
         "REW(Room EQ Wizard) 등에서 생성한 임펄스 응답(IR) WAV 파일을 로드하여\n"
         "실내 음향 특성을 보정합니다. 스테레오 또는 모노 IR 파일을 지원합니다.",
         parent);
-    descLabel->setStyleSheet("color:#888; font-size:11px; background:transparent;");
+    descLabel->setObjectName("settingsDescription");
     descLabel->setWordWrap(true);
     layout->addWidget(descLabel);
 
@@ -90,12 +68,12 @@ void AudioAdvancedWidget::buildConvolutionTab(QWidget* parent)
 
     auto* fileRow = new QHBoxLayout();
     irPathLabel_ = new QLabel("파일을 선택하세요...", parent);
-    irPathLabel_->setStyleSheet(
-        "color:#666; font-size:11px; background:#1a1a1a; border:1px solid #2a2a2a;"
-        "border-radius:3px; padding:4px 8px;");
+    irPathLabel_->setObjectName("settingsPath");
+    irPathLabel_->setProperty("ready", false);
     irPathLabel_->setWordWrap(false);
     browseIrBtn_ = new QPushButton("찾아보기...", parent);
-    browseIrBtn_->setFixedWidth(80);
+    browseIrBtn_->setFocusPolicy(Qt::NoFocus);
+    browseIrBtn_->setFixedWidth(96);
     connect(browseIrBtn_, &QPushButton::clicked, this, &AudioAdvancedWidget::onBrowseIrFile);
     fileRow->addWidget(irPathLabel_, 1);
     fileRow->addWidget(browseIrBtn_);
@@ -123,7 +101,8 @@ void AudioAdvancedWidget::buildConvolutionTab(QWidget* parent)
     gainSlider_->setTickInterval(3);
     gainLabel_ = new QLabel("0 dB", parent);
     gainLabel_->setFixedWidth(48);
-    gainLabel_->setStyleSheet("color:#4fc3f7; font-family:Consolas; background:transparent;");
+    gainLabel_->setStyleSheet(QString("color:%1; font-family:Consolas; font-weight:700; background:transparent;")
+                                  .arg(SorinuriUi::Mint));
     connect(gainSlider_, &QSlider::valueChanged,
             this, &AudioAdvancedWidget::onGainChanged);
     gainLay->addWidget(gainTitleLbl);
@@ -133,8 +112,8 @@ void AudioAdvancedWidget::buildConvolutionTab(QWidget* parent)
 
     // 상태 표시
     statusLabel_ = new QLabel("비활성", parent);
-    statusLabel_->setStyleSheet(
-        "color:#666; font-size:11px; background:transparent; padding:4px 0;");
+    statusLabel_->setObjectName("settingsStatusMuted");
+    statusLabel_->setStyleSheet("padding:4px 0;");
     layout->addWidget(statusLabel_);
     layout->addStretch();
 }
@@ -151,7 +130,7 @@ void AudioAdvancedWidget::buildVstTab(QWidget* parent)
         "Windows 전용: .dll (VST2) / .vst3 (VST3) 파일을 지원합니다.\n"
         "플러그인 적용 순서는 드래그로 변경할 수 있습니다.",
         parent);
-    infoLabel->setStyleSheet("color:#888; font-size:11px; background:transparent;");
+    infoLabel->setObjectName("settingsDescription");
     infoLabel->setWordWrap(true);
     layout->addWidget(infoLabel);
 
@@ -166,6 +145,8 @@ void AudioAdvancedWidget::buildVstTab(QWidget* parent)
     auto* btnRow = new QHBoxLayout();
     addVstBtn_ = new QPushButton("+ 플러그인 추가", parent);
     removeVstBtn_ = new QPushButton("- 제거", parent);
+    addVstBtn_->setFocusPolicy(Qt::NoFocus);
+    removeVstBtn_->setFocusPolicy(Qt::NoFocus);
     removeVstBtn_->setEnabled(false);
     connect(addVstBtn_, &QPushButton::clicked, this, [this]() {
         QString path = QFileDialog::getOpenFileName(
@@ -193,19 +174,21 @@ void AudioAdvancedWidget::buildVstTab(QWidget* parent)
 
     vstStatusLabel_ = new QLabel(
         "플러그인 적용: MPV af 체인을 통해 실시간 처리됩니다. 재생 중 적용 시 잠시 끊길 수 있습니다.", parent);
-    vstStatusLabel_->setStyleSheet("color:#555; font-size:10px; background:transparent;");
+    vstStatusLabel_->setObjectName("settingsStatusMuted");
+    vstStatusLabel_->setStyleSheet("font-size:10px;");
     vstStatusLabel_->setWordWrap(true);
     layout->addWidget(vstStatusLabel_);
 
     // VST 체인 활성화 토글
     auto* applyRow = new QHBoxLayout();
     auto* vstEnableCheck = new QCheckBox("VST 플러그인 체인 활성화", parent);
-    vstEnableCheck->setStyleSheet("color:#e0e0e0;");
     auto* vstApplyBtn = new QPushButton("지금 적용", parent);
-    vstApplyBtn->setStyleSheet(
-        "QPushButton { background:#1a3a5c; color:#4fc3f7; border:1px solid #4fc3f7;"
-        "  border-radius:4px; padding:5px 14px; font-size:12px; }"
-        "QPushButton:hover { background:#1e4a6e; }");
+    vstApplyBtn->setObjectName("vstApplyButton");
+    vstApplyBtn->setFocusPolicy(Qt::NoFocus);
+    vstApplyBtn->setStyleSheet(QString(
+        "QPushButton#vstApplyButton { background:%1; color:%2; border-color:%2; font-weight:700; }"
+        "QPushButton#vstApplyButton:hover { background:%3; color:%4; }")
+        .arg(SorinuriUi::MintDark, SorinuriUi::Mint, SorinuriUi::SurfacePress, SorinuriUi::Text));
     applyRow->addWidget(vstEnableCheck);
     applyRow->addStretch();
     applyRow->addWidget(vstApplyBtn);
@@ -236,7 +219,8 @@ void AudioAdvancedWidget::buildVstTab(QWidget* parent)
             QString afStr = afParts.join(",");
             core_->setProperty("af", afStr);
             vstStatusLabel_->setText(QString("VST 체인 적용됨: %1개 플러그인").arg(afParts.size()));
-            vstStatusLabel_->setStyleSheet("color:#4caf50; font-size:10px; background:transparent;");
+            vstStatusLabel_->setObjectName("settingsStatusActive");
+            vstStatusLabel_->setStyleSheet("font-size:10px;");
         } else {
             vstStatusLabel_->setText("적용 가능한 플러그인이 없습니다.");
         }
@@ -256,9 +240,9 @@ void AudioAdvancedWidget::onBrowseIrFile()
 
     activeIrPath_ = path;
     irPathLabel_->setText(QFileInfo(path).fileName());
-    irPathLabel_->setStyleSheet(
-        "color:#ddd; font-size:11px; background:#1a1a1a; border:1px solid #2a2a2a;"
-        "border-radius:3px; padding:4px 8px;");
+    irPathLabel_->setProperty("ready", true);
+    irPathLabel_->style()->unpolish(irPathLabel_);
+    irPathLabel_->style()->polish(irPathLabel_);
     irPathLabel_->setToolTip(path);
     convEnableCheck_->setEnabled(true);
     saveSettings();
@@ -303,7 +287,8 @@ void AudioAdvancedWidget::disableConvolution()
     // 안전을 위해 af=""로만 초기화
     core_->setProperty("af", QString(""));
     statusLabel_->setText("컨볼루션 비활성화됨");
-    statusLabel_->setStyleSheet("color:#666; font-size:11px; background:transparent;");
+    statusLabel_->setObjectName("settingsStatusMuted");
+    statusLabel_->setStyleSheet("font-size:11px;");
     emit convolutionChanged(false, QString());
 }
 
@@ -332,8 +317,8 @@ void AudioAdvancedWidget::updateAfChain()
         .arg(QFileInfo(activeIrPath_).fileName())
         .arg(gainDb_ > 0 ? "+" : "")
         .arg(gainDb_));
-    statusLabel_->setStyleSheet(
-        "color:#4caf50; font-size:11px; background:transparent;");
+    statusLabel_->setObjectName("settingsStatusActive");
+    statusLabel_->setStyleSheet("font-size:11px;");
     emit convolutionChanged(true, activeIrPath_);
 }
 
@@ -350,9 +335,9 @@ void AudioAdvancedWidget::loadSettings()
     if (!activeIrPath_.isEmpty() && QFileInfo::exists(activeIrPath_)) {
         irPathLabel_->setText(QFileInfo(activeIrPath_).fileName());
         irPathLabel_->setToolTip(activeIrPath_);
-        irPathLabel_->setStyleSheet(
-            "color:#ddd; font-size:11px; background:#1a1a1a; border:1px solid #2a2a2a;"
-            "border-radius:3px; padding:4px 8px;");
+        irPathLabel_->setProperty("ready", true);
+        irPathLabel_->style()->unpolish(irPathLabel_);
+        irPathLabel_->style()->polish(irPathLabel_);
         convEnableCheck_->setEnabled(true);
     }
 
