@@ -29,9 +29,14 @@ private slots:
 private:
     void setupUI(const QString& newVersion, const QString& releaseNotes);
     void startDownload();
+    void startCurrentAssetDownload();
+    void resetDownloadBundle();
 
     QString installerUrl_;
     QString localInstallerPath_;
+    QStringList remoteBundleUrls_;
+    QStringList localBundlePaths_;
+    int currentDownloadIndex_ = 0;
 
     QLabel*       statusLabel_;
     QProgressBar* progressBar_;

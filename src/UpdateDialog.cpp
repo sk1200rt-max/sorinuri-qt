@@ -133,41 +133,90 @@ void UpdateDialog::startDownload() {
         return;
     }
 
-    localInstallerPath_ = updateDirectory.absoluteFilePath("Sorinuri-Setup-pending.exe");
-
-    // 이전 미완료 설치파일 정리
-    QFile::remove(localInstallerPath_);
-
-    // 스트리밍 저장 파일 열기
-    downloadFile_ = new QFile(localInstallerPath_, this);
-    if (!downloadFile_->open(QIODevice::WriteOnly)) {
-        statusLabel_->setText(
-            QString("⚠ 임시 파일 생성 실패: %1").arg(downloadFile_->errorString()));
+    const QUrl installerUrl(installerUrl_);
+    const QString installerFileName = QFileInfo(installerUrl.path()).fileName();
+    if (installerFileName.isEmpty() || !installerFileName.endsWith(".exe", Qt::CaseInsensitive)) {
+        statusLabel_->setText("⚠ 업데이트 주소가 올바르지 않습니다. 나중에 다시 시도해 주세요.");
         downloading_ = false;
         updateBtn_->setEnabled(true);
         skipBtn_->setEnabled(true);
         progressBar_->setVisible(false);
-        delete downloadFile_;
-        downloadFile_ = nullptr;
+        qWarning() << "[UpdateDialog] 잘못된 설치 파일 URL:" << installerUrl_;
         return;
     }
 
+    // App Control 호환 Inno Setup 패키지는 원본 EXE와 두 BIN 파일을 같은 폴더에 둔다.
+    // 세 파일을 모두 받은 뒤에만 EXE를 실행해 누락된 데이터 파일로 인한 설치 중단을 막는다.
+    const QString baseName = installerFileName.left(installerFileName.size() - 4);
+    remoteBundleUrls_ = {installerUrl.toString()};
+    localBundlePaths_ = {updateDirectory.absoluteFilePath(installerFileName)};
+    for (int part = 0; part < 2; ++part) {
+        QUrl partUrl(installerUrl);
+        partUrl.setPath(installerUrl.path().left(installerUrl.path().size() - 4)
+                        + QString("-%1.bin").arg(part));
+        remoteBundleUrls_.append(partUrl.toString());
+        localBundlePaths_.append(updateDirectory.absoluteFilePath(
+            QString("%1-%2.bin").arg(baseName).arg(part)));
+    }
+    localInstallerPath_ = localBundlePaths_.front();
+    currentDownloadIndex_ = 0;
+
+    // 이전 미완료 번들을 통째로 정리한다.
+    for (const QString& path : localBundlePaths_)
+        QFile::remove(path);
+    startCurrentAssetDownload();
+}
+
+void UpdateDialog::startCurrentAssetDownload() {
+    if (currentDownloadIndex_ < 0 || currentDownloadIndex_ >= localBundlePaths_.size()) {
+        downloading_ = false;
+        updateBtn_->setEnabled(true);
+        skipBtn_->setEnabled(true);
+        progressBar_->setVisible(false);
+        statusLabel_->setText("⚠ 업데이트 번들 순서가 올바르지 않습니다. 다시 시도해 주세요.");
+        qWarning() << "[UpdateDialog] 잘못된 번들 인덱스:" << currentDownloadIndex_;
+        return;
+    }
+
+    downloadFile_ = new QFile(localBundlePaths_.at(currentDownloadIndex_), this);
+    if (!downloadFile_->open(QIODevice::WriteOnly)) {
+        const QString error = downloadFile_->errorString();
+        resetDownloadBundle();
+        downloading_ = false;
+        updateBtn_->setEnabled(true);
+        skipBtn_->setEnabled(true);
+        progressBar_->setVisible(false);
+        statusLabel_->setText(QString("⚠ 업데이트 파일 생성 실패: %1").arg(error));
+        return;
+    }
+
+    statusLabel_->setText(QString("업데이트 파일 다운로드 중... (%1/%2)")
+                          .arg(currentDownloadIndex_ + 1)
+                          .arg(localBundlePaths_.size()));
     QNetworkRequest req;
-    req.setUrl(QUrl(installerUrl_));
+    req.setUrl(QUrl(remoteBundleUrls_.at(currentDownloadIndex_)));
     // Qt 측 전송 타임아웃 비활성화 (0 = 무제한)
     // Apache Timeout(600초)만 적용됨
     req.setTransferTimeout(0);
-    // HTTP Keep-Alive 유지
     req.setRawHeader("Connection", "keep-alive");
-
     currentReply_ = nam_->get(req);
 
     // 스트리밍: 수신 즉시 디스크에 쓰기 (readAll() 대신 readyRead 사용)
-    // → 90MB를 메모리에 올리지 않고 청크 단위로 디스크에 저장
+    // → 설치 파일을 메모리에 올리지 않고 청크 단위로 디스크에 저장
     connect(currentReply_, &QNetworkReply::readyRead,
             this, &UpdateDialog::onDownloadReadyRead);
     connect(currentReply_, &QNetworkReply::downloadProgress,
             this, &UpdateDialog::onDownloadProgress);
+}
+
+void UpdateDialog::resetDownloadBundle() {
+    if (downloadFile_) {
+        downloadFile_->close();
+        delete downloadFile_;
+        downloadFile_ = nullptr;
+    }
+    for (const QString& path : localBundlePaths_)
+        QFile::remove(path);
 }
 
 void UpdateDialog::onDownloadReadyRead() {
@@ -188,13 +237,14 @@ void UpdateDialog::onDownloadProgress(qint64 received, qint64 total) {
 }
 
 void UpdateDialog::onDownloadFinished(QNetworkReply* reply) {
+    const QNetworkReply::NetworkError networkError = reply->error();
+    const QString networkErrorText = reply->errorString();
     reply->deleteLater();
     currentReply_ = nullptr;
 
-    // 파일 닫기
+    // 혹시 남은 데이터를 먼저 쓴 뒤 현재 파일을 닫는다.
     if (downloadFile_) {
-        // 혹시 남은 데이터 마저 쓰기
-        QByteArray remaining = reply->readAll();
+        const QByteArray remaining = reply->readAll();
         if (!remaining.isEmpty())
             downloadFile_->write(remaining);
         downloadFile_->close();
@@ -202,43 +252,49 @@ void UpdateDialog::onDownloadFinished(QNetworkReply* reply) {
         downloadFile_ = nullptr;
     }
 
-    if (reply->error() != QNetworkReply::NoError) {
-        // 다운로드 실패: 임시파일 정리 후 재시도 가능 상태로 복원
-        QFile::remove(localInstallerPath_);
+    if (networkError != QNetworkReply::NoError) {
+        resetDownloadBundle();
         downloading_ = false;
         updateBtn_->setEnabled(true);
         skipBtn_->setEnabled(true);
         progressBar_->setValue(0);
         progressBar_->setVisible(false);
         statusLabel_->setText(
-            QString("⚠ 다운로드 실패: %1\n'지금 업데이트' 버튼을 다시 눌러 재시도하세요.")
-                .arg(reply->errorString()));
-        qWarning() << "[UpdateDialog] 다운로드 실패:" << reply->errorString();
+            QString("⚠ 업데이트 파일 다운로드 실패: %1\n'지금 업데이트' 버튼을 다시 눌러 재시도하세요.")
+                .arg(networkErrorText));
+        qWarning() << "[UpdateDialog] 업데이트 번들 다운로드 실패:" << networkErrorText;
         return;
     }
 
-    // 다운로드 완료 확인: 파일 크기 검증 (10MB 미만이면 손상된 파일)
-    QFileInfo fi(localInstallerPath_);
-    if (fi.size() < 10 * 1024 * 1024) {
-        QFile::remove(localInstallerPath_);
+    const QFileInfo downloadedFile(localBundlePaths_.at(currentDownloadIndex_));
+    const qint64 minimumSize = currentDownloadIndex_ == 0 ? 10 * 1024 * 1024 : 1;
+    if (!downloadedFile.exists() || downloadedFile.size() < minimumSize) {
+        const qint64 actualSize = downloadedFile.size();
+        resetDownloadBundle();
         downloading_ = false;
         updateBtn_->setEnabled(true);
         skipBtn_->setEnabled(true);
         progressBar_->setVisible(false);
-        statusLabel_->setText(
-            QString("⚠ 다운로드된 파일이 손상됐습니다 (%1 MB). 다시 시도해 주세요.")
-                .arg(fi.size() / 1024 / 1024));
-        qWarning() << "[UpdateDialog] 파일 크기 이상:" << fi.size() << "bytes";
+        statusLabel_->setText("⚠ 다운로드된 설치 파일이 손상됐습니다. 다시 시도해 주세요.");
+        qWarning() << "[UpdateDialog] 업데이트 번들 파일 크기 이상:" << actualSize
+                   << "index:" << currentDownloadIndex_;
+        return;
+    }
+
+    ++currentDownloadIndex_;
+    if (currentDownloadIndex_ < localBundlePaths_.size()) {
+        startCurrentAssetDownload();
         return;
     }
 
     statusLabel_->setText("설치 중...");
     progressBar_->setValue(100);
 
-    // 설치 파일은 반드시 로컬 절대 경로와 해당 폴더를 작업 경로로 지정해 실행한다.
-    // 실행이 실패하면 현재 앱을 종료하지 않고 사용자에게 재시도 경로를 남긴다.
-    const QString installerPath = fi.absoluteFilePath();
-    const QString workingDirectory = fi.absolutePath();
+    // 설치 EXE와 BIN 파일은 같은 로컬 절대 경로에 완전히 준비됐고,
+    // 작업 폴더도 지정해 실행한다. 실패하면 현재 앱을 종료하지 않는다.
+    const QFileInfo installerInfo(localInstallerPath_);
+    const QString installerPath = installerInfo.absoluteFilePath();
+    const QString workingDirectory = installerInfo.absolutePath();
     qint64 installerPid = 0;
     const bool started = QProcess::startDetached(
         installerPath, QStringList(), workingDirectory, &installerPid);
@@ -254,9 +310,9 @@ void UpdateDialog::onDownloadFinished(QNetworkReply* reply) {
         return;
     }
 
-    qDebug() << "[UpdateDialog] 설치 시작:" << installerPath
+    qDebug() << "[UpdateDialog] 설치 번들 시작:" << installerPath
              << "PID:" << installerPid
-             << "크기:" << fi.size() / 1024 / 1024 << "MB";
+             << "파일 수:" << localBundlePaths_.size();
     accept();
     QApplication::quit();
 }
