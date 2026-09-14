@@ -3,7 +3,7 @@
 
 #define MyAppName "소리누리"
 #define MyAppNameEn "Sorinuri"
-#define MyAppVersion "6.21.11"
+#define MyAppVersion "6.21.12"
 #define MyAppPublisher "Gaon Communication"
 #define MyAppURL "https://sorinuri.com"
 #define MyAppExeName "Sorinuri.exe"
@@ -23,6 +23,10 @@ DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
 OutputDir=..\dist
 OutputBaseFilename=Sorinuri-Setup-{#MyAppVersion}
+; Windows App Control이 단일 EXE loader가 %TEMP%에 복사해 실행하는 Setup을 차단할 수 있다.
+; loaderless 형식은 원본 EXE를 그대로 실행하므로 이 정책 충돌을 피한다.
+; 출력되는 Sorinuri-Setup-*.exe, Sorinuri-Setup-*-0.bin, Sorinuri-Setup-*-1.bin은 반드시 같은 폴더에 함께 배포한다.
+UseSetupLdr=no
 SetupIconFile=..\resources\sorinuri.ico
 ; 설치 실행 파일 자체의 크기를 줄여 Windows Defender/SmartScreen의 초기 파일 검사와
 ; 디스크 I/O 부담을 낮춘다. lzma2/normal은 해제 시 약 2MB만 필요해 저사양 환경에서도
@@ -67,8 +71,9 @@ Source: "..\dist\Sorinuri-Portable\*"; DestDir: "{app}"; Flags: ignoreversion re
 ; ffmpeg 번들 (화면 녹화 기능용) - 선택적 설치
 ; 빌드 시 dist/ffmpeg.exe가 있으면 자동 포함
 Source: "..\dist\ffmpeg.exe"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
-; Visual C++ 런타임 재배포 패키지 (설치 시 자동 실행)
-Source: "..\dist\vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: ignoreversion skipifsourcedoesntexist deleteafterinstall
+; Visual C++ 런타임 재배포 패키지는 Microsoft 서명 파일이나, {tmp}에서 실행하면
+; Windows App Control 정책이 차단할 수 있다. 관리자 설치 폴더에서 실행한 뒤 정리한다.
+Source: "..\dist\vc_redist.x64.exe"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist deleteafterinstall
 
 [Icons]
 ; 시작 메뉴·바탕화면 바로가기에 실행 파일의 다중 해상도 브랜드 아이콘을 명시한다.
@@ -86,7 +91,7 @@ Type: files; Name: "{group}\소리누리 제거.lnk"
 
 [Run]
 ; Visual C++ 런타임 자동 설치 (이미 설치되어 있으면 건너뜀)
-Filename: "{tmp}\vc_redist.x64.exe"; Parameters: "/install /quiet /norestart"; StatusMsg: "Visual C++ 런타임 설치 중..."; Flags: skipifdoesntexist waituntilterminated
+Filename: "{app}\vc_redist.x64.exe"; Parameters: "/install /quiet /norestart"; StatusMsg: "Visual C++ 런타임 설치 중..."; Flags: skipifdoesntexist waituntilterminated
 ; Windows 10/11의 기본 앱 선택(UserChoice)은 사용자 동의가 있는 시스템 UI에서만
 ; 변경할 수 있다. 설치 시에는 지원 형식을 ‘연결 프로그램’ 후보로만 등록한다.
 ; 설정 창을 자동 실행하거나 레지스트리 우회로 기본 앱을 강제하지 않아 사용자의 기존

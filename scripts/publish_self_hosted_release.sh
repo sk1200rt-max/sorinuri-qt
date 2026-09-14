@@ -23,8 +23,9 @@ fi
 : "${SORINURI_DEPLOY_PASSWORD:?Missing SORINURI_DEPLOY_PASSWORD}"
 
 INSTALLER="Sorinuri-Setup-${VERSION}.exe"
+INSTALLER_BINS=("Sorinuri-Setup-${VERSION}-0.bin" "Sorinuri-Setup-${VERSION}-1.bin")
 PORTABLE="Sorinuri-Qt-${VERSION}-Portable.zip"
-for file in "$RELEASE_DIR/$INSTALLER" "$RELEASE_DIR/$PORTABLE" "$NOTES_FILE"; do
+for file in "$RELEASE_DIR/$INSTALLER" "$RELEASE_DIR/${INSTALLER_BINS[0]}" "$RELEASE_DIR/${INSTALLER_BINS[1]}" "$RELEASE_DIR/$PORTABLE" "$NOTES_FILE"; do
   [[ -s "$file" ]] || { echo "Required release file missing: $file" >&2; exit 66; }
 done
 
@@ -33,6 +34,8 @@ cleanup() { rm -rf "$STAGING_DIR"; }
 trap cleanup EXIT
 
 cp "$RELEASE_DIR/$INSTALLER" "$STAGING_DIR/$INSTALLER"
+cp "$RELEASE_DIR/${INSTALLER_BINS[0]}" "$STAGING_DIR/${INSTALLER_BINS[0]}"
+cp "$RELEASE_DIR/${INSTALLER_BINS[1]}" "$STAGING_DIR/${INSTALLER_BINS[1]}"
 cp "$RELEASE_DIR/$PORTABLE" "$STAGING_DIR/$PORTABLE"
 cp "$NOTES_FILE" "$STAGING_DIR/release-notes.txt"
 python3 "$(dirname "$0")/create_update_manifest.py" \
@@ -40,7 +43,7 @@ python3 "$(dirname "$0")/create_update_manifest.py" \
   "$STAGING_DIR/release-notes.txt" "$STAGING_DIR/version.json"
 (
   cd "$STAGING_DIR"
-  sha256sum "$INSTALLER" "$PORTABLE" > "SHA256SUMS-${VERSION}.txt"
+  sha256sum "$INSTALLER" "${INSTALLER_BINS[0]}" "${INSTALLER_BINS[1]}" "$PORTABLE" > "SHA256SUMS-${VERSION}.txt"
 )
 
 REMOTE_ROOT="/var/www/sorinuri/downloads"
@@ -51,19 +54,21 @@ SCP_BASE=(sshpass -p "$SORINURI_DEPLOY_PASSWORD" scp -o StrictHostKeyChecking=ye
 
 "${SSH_BASE[@]}" "mkdir -p '$REMOTE_ROOT/.incoming' '$REMOTE_ROOT/backups' '$REMOTE_STAGE'"
 "${SCP_BASE[@]}" \
-  "$STAGING_DIR/$INSTALLER" "$STAGING_DIR/$PORTABLE" \
+  "$STAGING_DIR/$INSTALLER" "$STAGING_DIR/${INSTALLER_BINS[0]}" "$STAGING_DIR/${INSTALLER_BINS[1]}" "$STAGING_DIR/$PORTABLE" \
   "$STAGING_DIR/version.json" "$STAGING_DIR/SHA256SUMS-${VERSION}.txt" \
   "${SORINURI_DEPLOY_USER}@${SORINURI_DEPLOY_HOST}:${REMOTE_STAGE}/"
 
-"${SSH_BASE[@]}" "bash -s" -- "$VERSION" "$REMOTE_ROOT" "$REMOTE_STAGE" "$INSTALLER" "$PORTABLE" <<'REMOTE'
+"${SSH_BASE[@]}" "bash -s" -- "$VERSION" "$REMOTE_ROOT" "$REMOTE_STAGE" "$INSTALLER" "${INSTALLER_BINS[0]}" "${INSTALLER_BINS[1]}" "$PORTABLE" <<'REMOTE'
 set -euo pipefail
 VERSION="$1"
 ROOT="$2"
 STAGE="$3"
 INSTALLER="$4"
-PORTABLE="$5"
+INSTALLER_BIN_0="$5"
+INSTALLER_BIN_1="$6"
+PORTABLE="$7"
 
-for file in "$INSTALLER" "$PORTABLE" version.json "SHA256SUMS-${VERSION}.txt"; do
+for file in "$INSTALLER" "$INSTALLER_BIN_0" "$INSTALLER_BIN_1" "$PORTABLE" version.json "SHA256SUMS-${VERSION}.txt"; do
   test -s "$STAGE/$file"
 done
 
@@ -78,6 +83,8 @@ fi
 
 # Publish assets first; switch manifests last so clients only see complete files.
 mv -f "$STAGE/$INSTALLER" "$ROOT/$INSTALLER"
+mv -f "$STAGE/$INSTALLER_BIN_0" "$ROOT/$INSTALLER_BIN_0"
+mv -f "$STAGE/$INSTALLER_BIN_1" "$ROOT/$INSTALLER_BIN_1"
 mv -f "$STAGE/$PORTABLE" "$ROOT/$PORTABLE"
 mv -f "$STAGE/SHA256SUMS-${VERSION}.txt" "$ROOT/SHA256SUMS-${VERSION}.txt"
 mv -f "$STAGE/version.json" "$ROOT/version.json.new"

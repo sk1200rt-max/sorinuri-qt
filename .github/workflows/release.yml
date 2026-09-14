@@ -109,6 +109,11 @@ jobs:
         shell: bash
         run: PYTHONUTF8=1 python3 scripts/verify_update_install_flow.py
 
+      # ── Windows App Control 임시 폴더 실행 차단 회귀 검증 ──────────────
+      - name: Verify installer App Control policy compatibility
+        shell: bash
+        run: PYTHONUTF8=1 python3 scripts/verify_installer_app_control_policy.py
+
       # ── 통합 재생 대기열·YouTube·반복 모드 회귀 검증 ──────────────────
       - name: Verify unified playback queue
         shell: bash
@@ -285,8 +290,10 @@ jobs:
         shell: pwsh
         run: |
           $version = "${{ steps.version.outputs.version }}"
-          if (-not (Test-Path "dist\Sorinuri-Setup-$version.exe")) {
-            Write-Error "설치파일을 찾을 수 없습니다"
+          $installerPath = "dist\Sorinuri-Setup-$version.exe"
+          $installerBins = @(Get-ChildItem "dist\Sorinuri-Setup-$version-*.bin" -ErrorAction SilentlyContinue)
+          if (-not (Test-Path $installerPath) -or $installerBins.Count -lt 2) {
+            Write-Error "loaderless 설치 번들(EXE + BIN 2개)을 찾을 수 없습니다"
             Get-ChildItem dist/
             exit 1
           }
@@ -329,6 +336,7 @@ jobs:
           path: |
             dist/Sorinuri-Qt-${{ steps.version.outputs.version }}-Portable.zip
             dist/Sorinuri-Setup-${{ steps.version.outputs.version }}.exe
+            dist/Sorinuri-Setup-${{ steps.version.outputs.version }}-*.bin
             dist/signing-manifest-portable.txt
           if-no-files-found: error
           retention-days: 14
@@ -350,7 +358,7 @@ jobs:
             | 파일 | 설명 |
             |------|------|
             | `Sorinuri-Qt-${{ steps.version.outputs.version }}-Portable.zip` | 압축 해제 후 바로 실행 (설치 불필요) |
-            | `Sorinuri-Setup-${{ steps.version.outputs.version }}.exe` | 설치 마법사 (파일 연결, 시작 메뉴 등록) |
+            | `Sorinuri-Setup-${{ steps.version.outputs.version }}.exe` + `-0.bin`, `-1.bin` | 설치 번들: 세 파일을 같은 폴더에 둔 뒤 EXE 실행 |
 
             ### 시스템 요구사항
             - Windows 10 / 11 (64-bit)
@@ -359,6 +367,7 @@ jobs:
           files: |
             dist/Sorinuri-Qt-${{ steps.version.outputs.version }}-Portable.zip
             dist/Sorinuri-Setup-${{ steps.version.outputs.version }}.exe
+            dist/Sorinuri-Setup-${{ steps.version.outputs.version }}-*.bin
           # 실장비 테스트가 끝나기 전에는 GitHub 릴리즈도 공개하지 않는다.
           draft: true
           prerelease: true
