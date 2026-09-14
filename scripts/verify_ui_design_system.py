@@ -35,6 +35,9 @@ def main() -> int:
     originals = text("OriginalsWidget.cpp")
     main_window = text("MainWindow.cpp")
     album_art = text("AlbumArtExtractor.cpp")
+    settings_dialog = text("SettingsDialog.cpp")
+    audio_advanced = text("AudioAdvancedWidget.cpp")
+    video_advanced = text("VideoAdvancedWidget.cpp")
 
     require(theme, "namespace SorinuriUi", "공통 UiTheme 네임스페이스", errors)
     for token in ("Mint", "Surface", "SurfaceAlt", "Border", "menuStyle"):
@@ -126,6 +129,63 @@ def main() -> int:
         require(main_window, fragment, label, errors)
 
     require(theme, "toolTipStyle", "고대비 호버 안내문 테마", errors)
+
+    # 공유 WASAPI 기본값에서는 bitstream 선택지가 비활성화된다. 비활성 상태여도
+    # HiDPI 환경에서 설명과 코덱 이름을 읽을 수 있는 대비를 유지해야 한다.
+    for fragment, label in (
+        ("makeSettingsPage(\"settingsAudioPage\")", "오디오 설정 전용 테마 표면"),
+        ("SorinuriUi::TextMuted", "오디오 안내 텍스트 대비 토큰"),
+    ):
+        require(settings_dialog, fragment, label, errors)
+    for fragment, label in (
+        ("QCheckBox:disabled", "비활성 패스스루 텍스트 대비"),
+        ("QCheckBox::indicator:disabled", "비활성 패스스루 표시자 대비"),
+    ):
+        require(theme, fragment, label, errors)
+
+    # 모든 설정 화면은 하나의 다크 테마·대비 체계를 사용한다. 비디오·자막·일반·Last.fm과
+    # 하이엔드 오디오/비디오까지 동일하게 긴 행을 감싸고, disabled 상태를 식별할 수 있어야 한다.
+    for fragment, label in (
+        ("settingsPanelStyle", "공통 설정 패널 테마"),
+        ("QLineEdit:disabled", "비활성 입력 대비"),
+        ("QComboBox:disabled", "비활성 선택 상자 대비"),
+        ("QCheckBox:disabled", "비활성 체크박스 대비"),
+        ("QScrollBar::handle:vertical", "설정 스크롤바 대비"),
+    ):
+        require(theme, fragment, label, errors)
+    for fragment, label in (
+        ("makeSettingsPage", "설정 탭 공통 표면"),
+        ("prepareSettingsForm", "HiDPI 설정 폼 긴 행 처리"),
+        ("QFormLayout::WrapLongRows", "HiDPI 폼 줄바꿈"),
+        ("settingsVideoPage", "비디오 탭 테마"),
+        ("settingsSubtitlePage", "자막 탭 테마"),
+        ("settingsGeneralPage", "일반 탭 테마"),
+        ("settingsLastfmPage", "Last.fm 탭 테마"),
+        ("settingsHintStyle", "공통 힌트 대비"),
+        ("settingsNoticeStyle", "공통 주의 안내 대비"),
+        ("prepareSettingsButton", "설정 버튼 NoFocus 정책"),
+    ):
+        require(settings_dialog, fragment, label, errors)
+    for name, source in {
+        "AudioAdvancedWidget.cpp": audio_advanced,
+        "VideoAdvancedWidget.cpp": video_advanced,
+    }.items():
+        for fragment, label in (
+            ("UiTheme.h", "공통 테마 사용"),
+            ("SorinuriUi::settingsPanelStyle", "공통 설정 패널 테마"),
+            ("settingsDescription", "고대비 설명 라벨"),
+            ("settingsPath", "파일 경로 대비"),
+            ("settingsStatusMuted", "비활성 상태 대비"),
+        ):
+            require(source, fragment, f"{name} {label}", errors)
+        for fragment, label in (
+            ("#4fc3f7", "구형 파란 강조"),
+            ("#1565c0", "구형 파란 버튼"),
+            ("#666", "저대비 비활성 텍스트"),
+            ("#888", "저대비 안내 텍스트"),
+            ("#555", "저대비 상태 텍스트"),
+        ):
+            forbid(source, fragment, f"{name} {label}", errors)
 
     # 음악은 앨범아트 스테이지와 접이식 보조 패널로, 기존 고정 좌우 분할을 사용하지 않는다.
     for fragment, label in (
