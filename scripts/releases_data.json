@@ -1,5 +1,14 @@
 [
   {
+    "version": "6.21.12",
+    "date": "2026-09-14",
+    "title": "Windows App Control 설치 호환성 개선",
+    "desc": "임시 디렉터리 실행 차단 오류 4551을 피하도록 설치 패키지 구조를 보정했습니다.",
+    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.21.12.exe",
+    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.21.12-Portable.zip",
+    "tags": []
+  },
+  {
     "version": "6.21.11",
     "date": "2026-09-06",
     "title": "전체 화면 오버레이·Windows 아이콘·반응성 안정화",

@@ -17,10 +17,14 @@ required_dialog = [
     "QStandardPaths::writableLocation(QStandardPaths::TempLocation)",
     "QDir::tempPath()",
     'filePath("updates")',
-    "Sorinuri-Setup-pending.exe",
-    "updateDirectory.absoluteFilePath",
-    "const QString installerPath = fi.absoluteFilePath();",
-    "const QString workingDirectory = fi.absolutePath();",
+    "const QUrl installerUrl(installerUrl_);",
+    'QString("-%1.bin").arg(part)',
+    "remoteBundleUrls_.append(partUrl.toString());",
+    "localBundlePaths_.append(updateDirectory.absoluteFilePath(",
+    "startCurrentAssetDownload();",
+    "const QFileInfo installerInfo(localInstallerPath_);",
+    "const QString installerPath = installerInfo.absoluteFilePath();",
+    "const QString workingDirectory = installerInfo.absolutePath();",
     "QProcess::startDetached(",
     "workingDirectory, &installerPid",
     "if (!started)",
@@ -29,6 +33,13 @@ required_dialog = [
 for needle in required_dialog:
     if needle not in dialog:
         errors.append(f"업데이트 설치 안전 경로 누락: {needle}")
+
+for needle in ("void startCurrentAssetDownload();", "void resetDownloadBundle();", "QStringList remoteBundleUrls_;"):
+    if needle not in header:
+        errors.append(f"업데이트 설치 번들 상태 누락: {needle}")
+
+if "++currentDownloadIndex_" not in dialog or "if (currentDownloadIndex_ < localBundlePaths_.size())" not in dialog:
+    errors.append("설치 EXE 실행 전에 BIN 파일 두 개를 순차 다운로드하는 흐름이 보장되지 않습니다.")
 
 unsafe_launch = "QProcess::startDetached(localInstallerPath_, QStringList())"
 if unsafe_launch in dialog:
@@ -52,4 +63,4 @@ if errors:
         print(f"- {error}", file=sys.stderr)
     raise SystemExit(1)
 
-print("업데이트 설치 흐름 검증 통과: 로컬 절대 경로·작업 폴더·실행 실패 복구·파일 연결 설정 화면 미자동 실행 확인")
+print("업데이트 설치 흐름 검증 통과: 로컬 절대 경로·loaderless EXE/BIN 번들 다운로드·실행 실패 복구·파일 연결 설정 화면 미자동 실행 확인")
