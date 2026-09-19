@@ -1,6 +1,6 @@
 {
-  "version": "6.21.12",
-  "domain": "installer",
-  "purpose": "Windows App Control 정책의 임시 디렉터리 실행 차단 오류 4551을 피하는 설치 패키지 구조 보정",
-  "base_commit": "87d74974596115601d731f7f7bc639025f08dc9a"
+  "version": "6.21.13",
+  "domain": "renderer,ui,audio",
+  "purpose": "노트북 절전 복귀 렌더·멀티채널 오디오 안정화와 전체 화면 커서 자동 숨김",
+  "base_commit": "a5d7dc5cc0e64d7e6df3b7e8889035fa139426be"
 }
