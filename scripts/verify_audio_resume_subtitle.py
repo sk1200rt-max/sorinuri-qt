@@ -57,7 +57,8 @@ for needle in [
     "mpv_ = nullptr",
     "void MpvWidget::shutdown()",
     "mpv_render_context_free(renderCtx_)",
-    "if (shutdownStarted_ || renderCtx_ || !context()) return;",
+    "if (shutdownStarted_ || systemPowerTransition_.load() || mpvInitializationQueued_",
+    "|| renderCtx_ || !context()) return;",
     "core_->shutdown()",
     "if (mpvWidget_) mpvWidget_->shutdown()",
 ]:
