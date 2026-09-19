@@ -93,12 +93,24 @@ checks += [
      "QMetaObject::invokeMethod(w, \"discardHiddenFrame\", Qt::QueuedConnection);" in mpv_cpp and
      "mpv_render_context_render(renderCtx_, params);" in mpv_cpp,
      "오리지널·OTT처럼 영상이 비가시인 탭에서는 libmpv 프레임을 skip-render로 소비해 복귀 뒤 누적 프레임이 빠르게 소진되면 안 됩니다."),
-    ("setCursor(Qt::BlankCursor)" not in main_cpp and
-     "mpvWidget_->setCursor(Qt::BlankCursor)" not in main_cpp,
-     "UI를 숨길 때 영상 영역의 마우스 포인터를 숨기면 안 됩니다."),
-    ("if (cursor().shape() == Qt::BlankCursor) unsetCursor();" in main_cpp and
+    ("fullscreenCursorHideTimer_" in main_h and
+     "void resetFullscreenCursorHideTimer();" in main_h and
+     "void showFullscreenCursor();" in main_h and
+     "void hideFullscreenCursor();" in main_h and
+     "FULLSCREEN_CURSOR_HIDE_DELAY_MS = 1200" in main_cpp,
+     "전체 화면 영상의 중앙 포인터는 UI와 별도 타이머로 자동 숨김 처리해야 합니다."),
+    ("if (!isFullscreen_ || isMusicMode_ || !isPlaying_ || uiVisible_" in main_cpp and
+     "fullscreenPointerOnTop_ || fullscreenPointerOnBottom_" in main_cpp and
+     "QApplication::activePopupWidget() != nullptr" in main_cpp and
+     "setCursor(Qt::BlankCursor);" in main_cpp and
+     "mpvWidget_->setCursor(Qt::BlankCursor);" in main_cpp,
+     "상·하단 조작 영역, 일시정지, 팝업 또는 음악 모드에서는 포인터를 숨기면 안 됩니다."),
+    ("showFullscreenCursor();" in main_cpp and
+     "resetFullscreenCursorHideTimer();" in main_cpp and
+     "if (isFullscreen_) {\n        if (fullscreenEdgePollTimer_) fullscreenEdgePollTimer_->stop();\n        if (fullscreenCursorHideTimer_) fullscreenCursorHideTimer_->stop();" in main_cpp and
+     "if (cursor().shape() == Qt::BlankCursor) unsetCursor();" in main_cpp and
      "mpvWidget_->unsetCursor();" in main_cpp,
-     "이전 상태에서 숨겨진 포인터를 항상 복원해야 합니다."),
+     "전체 화면 해제·입력·일시정지 시 숨겨진 포인터를 즉시 복원해야 합니다."),
     ("if (!isFullscreen_) {\n        showTopUi();\n        showBottomUi();" in main_cpp and
      "void MainWindow::positionTitleBarOverlay()" in main_cpp and
      "void MainWindow::setTitleBarOverlayMode(bool fullscreenOverlay)" in main_cpp and

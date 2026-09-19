@@ -148,6 +148,9 @@ private:
     void showBottomUi();
     void revealUiForVideoEdge(const QPoint& videoPosition);
     void hideUI();
+    void resetFullscreenCursorHideTimer();
+    void showFullscreenCursor();
+    void hideFullscreenCursor();
     void syncFullscreenEdgeUi();  // 전체 화면의 숨겨진 상단 영역에서도 포인터 위치를 주기적으로 확인한다.
 
     // 이어보기 (재생 위치 저장/복원)
@@ -224,6 +227,9 @@ private:
     bool   isPlaying_         = false;
     bool   uiVisible_         = true;
     QTimer* uiHideTimer_      = nullptr;
+    // UI 표시와 별도로 전체 화면 중앙 영상 위의 포인터를 자동으로 숨긴다.
+    // 상·하단 조작 영역에서는 타이머를 멈춰 버튼 조작 중 커서가 사라지지 않게 한다.
+    QTimer* fullscreenCursorHideTimer_ = nullptr;
     // 전체 화면에서 상단 바가 숨겨진 경우 Windows가 해당 비클라이언트 경계 이동을
     // Qt MouseMove로 보내지 않아도, 가벼운 주기 확인으로 상단/하단 오버를 놓치지 않는다.
     QTimer* fullscreenEdgePollTimer_ = nullptr;
@@ -281,9 +287,21 @@ private:
     static const int RESIZE_MARGIN = 10;
     int getResizeEdge(const QPoint& pos) const;
 
-    // 절전 복귀·HDMI 장치 변경이 연속 도착해도 한 번만 오디오 출력을 복구한다.
+    // 절전 복귀·HDMI 장치 변경이 연속 도착해도 한 번만 기본 오디오 출력을 복구한다.
     void scheduleAudioOutputRecovery(int delayMs);
+    // Modern Standby가 endpoint를 일시 2.0/잘못된 채널 순서로 보고하는 시간을
+    // 넘겨, WASAPI 출력만 단계적으로 다시 열어 원본 5.1/7.1 협상을 복원한다.
+    void beginSleepAudioOutputRecovery();
+    void cancelSleepAudioOutputRecovery();
+    void finishSleepAudioOutputRecovery();
     QTimer* audioOutputRecoveryTimer_ = nullptr;
+    QTimer* sleepAudioStabilizationTimer_ = nullptr;
+    QTimer* sleepAudioVerificationTimer_ = nullptr;
+    QTimer* sleepAudioFinalCheckTimer_ = nullptr;
+    // 절전 뒤 앱이 종료돼도 다음 실행에서 첫 파일 로드 후 recovery를 재개한다.
+    bool sleepAudioRecoveryPending_ = false;
+    bool sleepAudioRecoveryScheduled_ = false;
+    int sleepAudioRecoveryFinalRetries_ = 0;
 
     // Windows: 표준 Snap 창 스타일을 유지한 상태에서 비클라이언트 영역만
     // 클라이언트로 확장한다. 초기 표시 뒤 한 번만 프레임 재계산을 요청한다.

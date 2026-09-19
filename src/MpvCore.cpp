@@ -918,6 +918,47 @@ void MpvCore::restoreAudioOutputAfterDeviceChange() {
     applyAudioSessionPolicy(true);
 }
 
+bool MpvCore::hasActiveMultichannelPcmContent() const {
+    if (!initialized_ || !mpv_) return false;
+
+    int64_t sourceChannels = 0;
+    if (mpv_get_property(mpv_, "audio-params/channel-count", MPV_FORMAT_INT64,
+                         &sourceChannels) < 0 || sourceChannels <= 2) {
+        return false;
+    }
+
+    // TrueHD/DTS-HD 등의 비트스트림은 PCM 채널 수와 직접 비교하면 안 된다.
+    // 이 경우 receiver가 원본 스트림을 직접 디코드하므로 WASAPI PCM 2.0 폴백
+    // 판단과 분리한다.
+    char* outputFormatRaw = mpv_get_property_string(mpv_, "audio-out-params/format");
+    const QString outputFormat = outputFormatRaw ? QString::fromUtf8(outputFormatRaw)
+                                                  : QString();
+    if (outputFormatRaw) mpv_free(outputFormatRaw);
+    return !outputFormat.contains("spdif", Qt::CaseInsensitive)
+           && !outputFormat.contains("bitstream", Qt::CaseInsensitive);
+}
+
+bool MpvCore::hasUnexpectedStereoFallbackForMultichannelContent() const {
+    if (!hasActiveMultichannelPcmContent()) return false;
+
+    int64_t outputChannels = 0;
+    if (mpv_get_property(mpv_, "audio-out-params/channel-count", MPV_FORMAT_INT64,
+                         &outputChannels) < 0 || outputChannels <= 0) {
+        // 출력이 아직 열리지 않은 상태는 다음 안정화 타이머가 다시 확인한다.
+        return false;
+    }
+
+    const bool unexpectedStereo = outputChannels <= 2;
+    if (unexpectedStereo) {
+        int64_t sourceChannels = 0;
+        mpv_get_property(mpv_, "audio-params/channel-count", MPV_FORMAT_INT64,
+                         &sourceChannels);
+        qWarning() << "[MPV] 절전 복귀 후 멀티채널 PCM이 stereo로 폴백됨:"
+                   << "source=" << sourceChannels << "output=" << outputChannels;
+    }
+    return unexpectedStereo;
+}
+
 void MpvCore::setAudioSessionPolicy(AudioSessionPolicy policy, bool reloadOutput) {
     if (audioSessionPolicy_ == policy) return;
     audioSessionPolicy_ = policy;

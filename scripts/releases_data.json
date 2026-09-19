@@ -1,5 +1,14 @@
 [
   {
+    "version": "6.21.13",
+    "date": "2026-09-19",
+    "title": "노트북 절전 복귀·멀티채널 및 전체 화면 안정화",
+    "desc": "Modern Standby 복귀 후 libmpv OpenGL 렌더 컨텍스트와 WASAPI 멀티채널 출력을 단계적으로 복구하고, 전체 화면 영상 재생 중 유휴 커서를 자동으로 숨깁니다.",
+    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.21.13.exe",
+    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.21.13-Portable.zip",
+    "tags": []
+  },
+  {
     "version": "6.21.12",
     "date": "2026-09-14",
     "title": "Windows App Control 설치 호환성 개선",
