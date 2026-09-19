@@ -88,6 +88,71 @@ MainWindow::MainWindow(bool multiInstanceSharedAudio, QWidget* parent)
         qInfo() << "[MainWindow] 절전/장치 변경 후 오디오 출력 복구 완료";
     });
 
+    // Modern Standby 뒤 일부 HDMI/USB 오디오 드라이버는 첫 열거에서 2.0 또는
+    // 잘못된 channel map을 잠시 보고한다. 첫 복구와 별도로 충분히 늦은 시점에
+    // WASAPI output만 다시 열어 정상 endpoint 상태를 다시 협상한다.
+    sleepAudioStabilizationTimer_ = new QTimer(this);
+    sleepAudioStabilizationTimer_->setSingleShot(true);
+    connect(sleepAudioStabilizationTimer_, &QTimer::timeout, this, [this]() {
+        if (!mpvWidget_ || !mpvWidget_->core()) return;
+        mpvWidget_->core()->restoreAudioOutputAfterDeviceChange();
+        qInfo() << "[MainWindow] 절전 복귀 안정화 단계: WASAPI 출력 재협상 완료";
+    });
+
+    sleepAudioVerificationTimer_ = new QTimer(this);
+    sleepAudioVerificationTimer_->setSingleShot(true);
+    connect(sleepAudioVerificationTimer_, &QTimer::timeout, this, [this]() {
+        if (!mpvWidget_ || !mpvWidget_->core()) return;
+        auto* core = mpvWidget_->core();
+        if (!core->hasActiveMultichannelPcmContent()) {
+            // 현재 stereo 또는 bitstream 파일에서는 PCM 5.1/7.1 채널을 판정할 수
+            // 없으므로 marker를 유지한다. 다음 멀티채널 파일에서만 완료 처리한다.
+            sleepAudioRecoveryScheduled_ = false;
+            qInfo() << "[MainWindow] 멀티채널 PCM 검증 보류: 다음 멀티채널 파일에서 재개";
+            return;
+        }
+        if (core->hasUnexpectedStereoFallbackForMultichannelContent()) {
+            // 5.1/7.1 PCM이 실제 출력에서 2.0으로 열린 경우만 마지막 재시도를
+            // 요청한다. stereo 콘텐츠와 bitstream에는 임의 변경을 하지 않는다.
+            core->restoreAudioOutputAfterDeviceChange();
+            if (sleepAudioFinalCheckTimer_) sleepAudioFinalCheckTimer_->start(2200);
+            qWarning() << "[MainWindow] 멀티채널 PCM stereo 폴백 감지 → 최종 WASAPI 재협상";
+            return;
+        }
+        finishSleepAudioOutputRecovery();
+    });
+
+    sleepAudioFinalCheckTimer_ = new QTimer(this);
+    sleepAudioFinalCheckTimer_->setSingleShot(true);
+    connect(sleepAudioFinalCheckTimer_, &QTimer::timeout, this, [this]() {
+        if (!mpvWidget_ || !mpvWidget_->core()) return;
+        auto* core = mpvWidget_->core();
+        if (!core->hasActiveMultichannelPcmContent()) {
+            sleepAudioRecoveryScheduled_ = false;
+            qInfo() << "[MainWindow] 최종 멀티채널 PCM 검증 보류: 다음 파일에서 재개";
+            return;
+        }
+        if (core->hasUnexpectedStereoFallbackForMultichannelContent()) {
+            // OS endpoint가 아직 2.0으로만 열리면 marker를 남긴다. 앱을 닫았다가
+            // 다시 열어도 첫 파일 로드 뒤 복구를 재시도해 PC 재부팅 의존을 줄인다.
+            if (++sleepAudioRecoveryFinalRetries_ < 3) {
+                core->restoreAudioOutputAfterDeviceChange();
+                sleepAudioFinalCheckTimer_->start(2200);
+                qWarning() << "[MainWindow] 멀티채널 endpoint 재협상 재시도"
+                           << sleepAudioRecoveryFinalRetries_ << "/2";
+                return;
+            }
+            sleepAudioRecoveryScheduled_ = false;
+            qWarning() << "[MainWindow] 절전 후 멀티채널 endpoint가 아직 안정화되지 않음; 다음 파일 로드 때 재시도";
+            return;
+        }
+        finishSleepAudioOutputRecovery();
+    });
+    sleepAudioRecoveryPending_ = settings_.value(
+        "audio/sleep_multichannel_recovery_pending", false).toBool();
+    if (sleepAudioRecoveryPending_)
+        qInfo() << "[MainWindow] 이전 절전 복귀의 멀티채널 복구를 다음 파일 로드 시 재개";
+
     setupUI();
     // MpvWidget은 setupUI()에서 생성되지만 libmpv는 첫 화면 이후 지연 초기화된다.
     // 따라서 coordinator가 전달한 세션 역할을 지금 설정하면 audio-exclusive/audio-spdif가
@@ -158,6 +223,44 @@ void MainWindow::enableMultiInstanceSharedAudio() {
 void MainWindow::scheduleAudioOutputRecovery(int delayMs) {
     if (!audioOutputRecoveryTimer_) return;
     audioOutputRecoveryTimer_->start(qMax(0, delayMs));
+}
+
+void MainWindow::beginSleepAudioOutputRecovery() {
+    sleepAudioRecoveryPending_ = true;
+    settings_.setValue("audio/sleep_multichannel_recovery_pending", true);
+    settings_.sync();
+
+    if (!mpvWidget_ || !mpvWidget_->core() || !mpvWidget_->core()->isInitialized()) {
+        qInfo() << "[MainWindow] 절전 멀티채널 복구 보류: MPV 초기화 또는 파일 로드 대기";
+        return;
+    }
+
+    // 첫 reopen은 endpoint 재열거가 끝날 시간을 주고, 두 번째 reopen은 채널 map이
+    // 잠시 잘못 열린 경우를 덮어쓴다. 모두 저장된 장치·shared/exclusive 정책과
+    // audio-channels=auto를 그대로 적용하며 다운믹스/정규화는 추가하지 않는다.
+    sleepAudioRecoveryScheduled_ = true;
+    sleepAudioRecoveryFinalRetries_ = 0;
+    scheduleAudioOutputRecovery(1800);
+    if (sleepAudioStabilizationTimer_) sleepAudioStabilizationTimer_->start(5200);
+    if (sleepAudioVerificationTimer_) sleepAudioVerificationTimer_->start(8200);
+    if (sleepAudioFinalCheckTimer_) sleepAudioFinalCheckTimer_->stop();
+    qInfo() << "[MainWindow] 절전 복귀 멀티채널 WASAPI 복구 단계 예약";
+}
+
+void MainWindow::cancelSleepAudioOutputRecovery() {
+    if (audioOutputRecoveryTimer_) audioOutputRecoveryTimer_->stop();
+    if (sleepAudioStabilizationTimer_) sleepAudioStabilizationTimer_->stop();
+    if (sleepAudioVerificationTimer_) sleepAudioVerificationTimer_->stop();
+    if (sleepAudioFinalCheckTimer_) sleepAudioFinalCheckTimer_->stop();
+    sleepAudioRecoveryScheduled_ = false;
+}
+
+void MainWindow::finishSleepAudioOutputRecovery() {
+    cancelSleepAudioOutputRecovery();
+    sleepAudioRecoveryPending_ = false;
+    settings_.remove("audio/sleep_multichannel_recovery_pending");
+    settings_.sync();
+    qInfo() << "[MainWindow] 절전 복귀 멀티채널 WASAPI 복구 확인 완료";
 }
 
 void MainWindow::setupUI() {
@@ -1038,6 +1141,16 @@ void MainWindow::onFileLoaded(const QString& path) {
                 controlBar_->setChapters(marks, dur);
         }
     });
+
+    // 절전 직후 앱을 닫아도 marker는 남는다. 다음 실행에서 실제 파일이 로드된 뒤
+    // 단계적 WASAPI 재협상을 다시 시작해, 재부팅만으로 채널 구성이 돌아오던
+    // 상황을 앱 내부의 출력 재초기화로 복구한다.
+    if (sleepAudioRecoveryPending_ && !sleepAudioRecoveryScheduled_) {
+        QTimer::singleShot(900, this, [this, path]() {
+            if (path != currentFilePath_ || !sleepAudioRecoveryPending_) return;
+            beginSleepAudioOutputRecovery();
+        });
+    }
 }
 
 namespace {
@@ -1045,6 +1158,8 @@ constexpr int TOP_UI_REVEAL_ZONE = 48;
 constexpr int BOTTOM_UI_REVEAL_ZONE = 48;
 // 전체 화면에서만 적용한다. 가장자리에서 벗어난 뒤 UI가 오래 남지 않도록 짧게 둔다.
 constexpr int UI_AUTO_HIDE_DELAY_MS = 900;
+// 영상 전체 화면 중앙에서는 포인터만 UI보다 조금 늦게 숨겨 조작 직후 위치를 확인할 수 있게 한다.
+constexpr int FULLSCREEN_CURSOR_HIDE_DELAY_MS = 1200;
 }
 
 void MainWindow::showTopUi() {
@@ -1060,6 +1175,7 @@ void MainWindow::showTopUi() {
     if (cursor().shape() == Qt::BlankCursor) unsetCursor();
     if (mpvWidget_) mpvWidget_->unsetCursor();
     if (musicPage_) musicPage_->unsetCursor();
+    if (fullscreenCursorHideTimer_) fullscreenCursorHideTimer_->stop();
     // 타이머는 포인터가 상·하단 표시 영역에서 벗어난 뒤에만 eventFilter가
     // 시작한다. 표시 영역 위에서 다시 시작하면 사용자가 머무는 중에도 메뉴가
     // 사라지는 문제가 생긴다.
@@ -1078,6 +1194,7 @@ void MainWindow::showBottomUi() {
 
     if (cursor().shape() == Qt::BlankCursor) unsetCursor();
     if (mpvWidget_) mpvWidget_->unsetCursor();
+    if (fullscreenCursorHideTimer_) fullscreenCursorHideTimer_->stop();
 }
 
 void MainWindow::showUI() {
@@ -1090,6 +1207,39 @@ void MainWindow::showUI() {
     }
     showTopUi();
     showBottomUi();
+}
+
+void MainWindow::showFullscreenCursor() {
+    if (!isFullscreen_ || isMusicMode_) return;
+    if (cursor().shape() == Qt::BlankCursor) unsetCursor();
+    if (mpvWidget_) mpvWidget_->unsetCursor();
+    if (fullscreenCursorHideTimer_) fullscreenCursorHideTimer_->stop();
+}
+
+void MainWindow::resetFullscreenCursorHideTimer() {
+    if (!isFullscreen_ || isMusicMode_ || !isPlaying_ || uiVisible_
+        || fullscreenPointerOnTop_ || fullscreenPointerOnBottom_) {
+        if (fullscreenCursorHideTimer_) fullscreenCursorHideTimer_->stop();
+        return;
+    }
+    if (!fullscreenCursorHideTimer_) {
+        fullscreenCursorHideTimer_ = new QTimer(this);
+        fullscreenCursorHideTimer_->setSingleShot(true);
+        connect(fullscreenCursorHideTimer_, &QTimer::timeout,
+                this, &MainWindow::hideFullscreenCursor);
+    }
+    fullscreenCursorHideTimer_->start(FULLSCREEN_CURSOR_HIDE_DELAY_MS);
+}
+
+void MainWindow::hideFullscreenCursor() {
+    // 포인터가 실제 조작 영역에 있거나 메뉴가 떠 있는 동안에는 절대로 숨기지 않는다.
+    if (!isFullscreen_ || isMusicMode_ || !isPlaying_ || uiVisible_
+        || fullscreenPointerOnTop_ || fullscreenPointerOnBottom_
+        || QApplication::activePopupWidget() != nullptr) {
+        return;
+    }
+    setCursor(Qt::BlankCursor);
+    if (mpvWidget_) mpvWidget_->setCursor(Qt::BlankCursor);
 }
 
 void MainWindow::revealUiForVideoEdge(const QPoint& globalPosition) {
@@ -1198,10 +1348,8 @@ void MainWindow::hideUI() {
         fullscreenPointerOnTop_ = false;
         fullscreenPointerOnBottom_ = false;
         uiVisible_ = false;
-        // 중앙 영상 영역에서는 UI만 숨긴다. 사용자가 화면을 조작할 수 있도록
-        // 전체 화면·창 모드·팝업 복귀 상태 모두에서 마우스 포인터는 유지한다.
-        if (cursor().shape() == Qt::BlankCursor) unsetCursor();
-        if (mpvWidget_) mpvWidget_->unsetCursor();
+        // 중앙 영상 영역은 UI를 숨긴 뒤 포인터도 자동 숨김 대상으로 전환한다.
+        resetFullscreenCursorHideTimer();
     }
 }
 
@@ -1229,6 +1377,7 @@ void MainWindow::onPlaybackStarted() {
         QTimer::singleShot(0, this, [this]() {
             revealUiForVideoEdge(QCursor::pos());
             if (!uiVisible_ && uiHideTimer_) uiHideTimer_->start(UI_AUTO_HIDE_DELAY_MS);
+            resetFullscreenCursorHideTimer();
         });
     } else {
         showUI();
@@ -1246,6 +1395,7 @@ void MainWindow::onPlaybackPaused() {
     controlBar_->setPlaying(false);
     // 일시정지 시 UI 항상 표시
     if (uiHideTimer_) uiHideTimer_->stop();
+    showFullscreenCursor();
     showUI();
     updateTaskbarProgress(lastPosition_, totalDuration_, true, false);
 #ifdef Q_OS_WIN
@@ -1427,6 +1577,18 @@ void MainWindow::onAudioFormatChanged(const QString& codec, int, int, const QStr
     // 헤더는 원본 코덱만 간결하게 표시하고, 실제 HDMI 출력은 하단 컨트롤바에 PCM/비트스트림
     // 레이아웃으로 표시한다. 수동 설정을 요구하는 팝업은 열지 않는다.
     titleBar_->setAudioBadge(codec.toUpper());
+
+    // 절전 직후 첫 파일 로드보다 오디오 endpoint 협상이 늦게 끝날 수 있다. 이전
+    // verification 단계가 아직 원본 채널을 읽지 못해 보류된 경우, 실제 5.1/7.1 PCM
+    // 포맷이 도착한 시점에만 복구를 다시 예약한다.
+    if (sleepAudioRecoveryPending_ && !sleepAudioRecoveryScheduled_
+        && mpvWidget_ && mpvWidget_->core()
+        && mpvWidget_->core()->hasActiveMultichannelPcmContent()) {
+        QTimer::singleShot(250, this, [this]() {
+            if (sleepAudioRecoveryPending_ && !sleepAudioRecoveryScheduled_)
+                beginSleepAudioOutputRecovery();
+        });
+    }
 }
 
 void MainWindow::onVideoInfoChanged(int, int, double, const QString&) {}
@@ -1493,6 +1655,9 @@ void MainWindow::onSubtitleSearch() {
 void MainWindow::toggleFullscreen() {
     if (isFullscreen_) {
         if (fullscreenEdgePollTimer_) fullscreenEdgePollTimer_->stop();
+        if (fullscreenCursorHideTimer_) fullscreenCursorHideTimer_->stop();
+        if (cursor().shape() == Qt::BlankCursor) unsetCursor();
+        if (mpvWidget_) mpvWidget_->unsetCursor();
         // 일반·최대화 창에서는 상단 여백을 한 번만 복원하고 두 바를 계속 표시한다.
         setTitleBarOverlayMode(false);
         if (fullscreenTopEdgeTrigger_) fullscreenTopEdgeTrigger_->hide();
@@ -1526,6 +1691,7 @@ void MainWindow::toggleFullscreen() {
         QTimer::singleShot(0, this, [this]() {
             positionTitleBarOverlay();
             positionVideoOverlayDeck();
+            resetFullscreenCursorHideTimer();
         });
     }
 }
@@ -1538,7 +1704,7 @@ void MainWindow::closeEvent(QCloseEvent* e)  {
     // 재생 중으로 남지 않게 한다. 오디오 장치 해제는 MpvWidget::shutdown에서
     // 동기적으로 완료될 때까지 창 닫기를 진행하지 않는다.
     if (smtcManager_) smtcManager_->setStopped();
-    if (audioOutputRecoveryTimer_) audioOutputRecoveryTimer_->stop();
+    cancelSleepAudioOutputRecovery();
 
     // QApplication 종료 전에 OpenGL render context와 libmpv를 동기 종료한다.
     // 이 경로가 완료된 뒤 창을 닫아 WASAPI 독점 핸들이 게임·브라우저를 막지 않게 한다.
@@ -2271,20 +2437,24 @@ bool MainWindow::nativeEvent(const QByteArray& type, void* msg, qintptr* result)
         // 배터리 모드 전환(PBT_APMPOWERSTATUSCHANGE)과 절전 복귀를
         // 하나의 if 블록에서 모두 처리하여 early-return 충돌 방지
         if (m->message == WM_POWERBROADCAST) {
+            if (m->wParam == PBT_APMSUSPEND) {
+                // Modern Standby는 복귀 후에야 OpenGL FBO/GPU가 바뀔 수 있다.
+                // 절전 진입 때 render callback을 먼저 끊어 죽은 FBO 대상 호출을 막는다.
+                if (mpvWidget_) mpvWidget_->prepareForSystemSuspend();
+                cancelSleepAudioOutputRecovery();
+                qInfo() << "[MainWindow] 절전 진입 감지 → libmpv render context 정지";
+            }
             // ─ 절전 복귀: 렌더링 컨텍스트 갱신 ─────────────────────────────
             if (m->wParam == PBT_APMRESUMESUSPEND ||
                 m->wParam == PBT_APMRESUMEAUTOMATIC ||
                 m->wParam == PBT_APMRESUMECRITICAL) {
                 qInfo() << "[MainWindow] 절전 복귀 감지 → 렌더링·오디오 출력 복구 예약";
-                // 렌더링은 빠르게 갱신하되, HDMI/WASAPI 엔드포인트는 드라이버가
-                // 완전히 복원된 뒤에만 정책을 재협상한다.
-                QTimer::singleShot(500, this, [this]() {
-                    if (mpvWidget_) {
-                        mpvWidget_->update();
-                        qInfo() << "[MainWindow] 절전 복귀 후 렌더링 재시작 완료";
-                    }
-                });
+                // 새 Qt OpenGL context가 유효해진 다음 libmpv render context를 만든다.
+                // 단순 update()로는 절전 전 FBO를 참조할 수 있어 재생·오디오와 분리한다.
+                if (mpvWidget_) mpvWidget_->recoverAfterSystemResume();
+                // HDMI/WASAPI 엔드포인트는 드라이버가 완전히 복원된 뒤에만 정책을 재협상한다.
                 scheduleAudioOutputRecovery(1200);
+                beginSleepAudioOutputRecovery();
             }
             // 전원 상태 변경에서 timeBeginPeriod(1)을 반복 요청하지 않는다.
             // Windows는 각 요청마다 동일한 timeEndPeriod 호출을 요구하며, libmpv는
@@ -2444,6 +2614,18 @@ void MainWindow::mousePressEvent(QMouseEvent* e) {
 }
 
 bool MainWindow::eventFilter(QObject* obj, QEvent* event) {
+    // 전체 화면 영상 위 입력은 커서를 즉시 되살린다. 중앙 영역에서는 이후 자동 숨김
+    // 타이머를 다시 시작하고, 상·하단 조작 영역에서는 reveal 로직이 타이머를 멈춘다.
+    const bool fullscreenVideoInput = isFullscreen_ && !isMusicMode_
+        && (event->type() == QEvent::MouseMove
+            || event->type() == QEvent::MouseButtonPress
+            || event->type() == QEvent::MouseButtonRelease
+            || event->type() == QEvent::Wheel
+            || event->type() == QEvent::KeyPress);
+    if (fullscreenVideoInput) {
+        showFullscreenCursor();
+    }
+
     // 숨겨진 상단 제목 표시줄을 대신하는 투명 트리거는 Windows 비클라이언트 경계의
     // MouseMove 유무와 관계없이 Enter만으로 상단 오버레이를 즉시 표시한다.
     if (obj == fullscreenTopEdgeTrigger_ && isFullscreen_ && !isMusicMode_
@@ -2458,6 +2640,9 @@ bool MainWindow::eventFilter(QObject* obj, QEvent* event) {
     if (event->type() == QEvent::MouseMove && isFullscreen_ && !isMusicMode_) {
         auto* me = static_cast<QMouseEvent*>(event);
         revealUiForVideoEdge(me->globalPosition().toPoint());
+        resetFullscreenCursorHideTimer();
+    } else if (fullscreenVideoInput) {
+        resetFullscreenCursorHideTimer();
     }
 
     if (obj == mpvWidget_) {

@@ -85,6 +85,10 @@ public:
     // 절전 복귀·HDMI 재연결 뒤 WASAPI 출력 정책을 다시 협상한다.
     // ao-reload 전에 장치·독점·채널·패스스루 설정을 모두 복원해 2.0 폴백을 방지한다.
     void restoreAudioOutputAfterDeviceChange();
+    // 원본 5.1/7.1 PCM이 절전 복귀 후 실제 WASAPI 출력에서 2.0으로만 열린
+    // 경우를 감지한다. 비트스트림과 정상 stereo/5.1/7.1은 복구 대상으로 보지 않는다.
+    bool hasUnexpectedStereoFallbackForMultichannelContent() const;
+    bool hasActiveMultichannelPcmContent() const;
     QVariantList audioDeviceList() const;
     bool deviceLikelySupportsPassthrough() const;
 

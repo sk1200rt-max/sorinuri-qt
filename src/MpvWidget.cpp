@@ -17,6 +17,14 @@ static void* getGlProcAddress(void* /*ctx*/, const char* name) {
     return reinterpret_cast<void*>(ctx->getProcAddress(QByteArray(name)));
 }
 
+namespace {
+// Modern Standby 복귀 직후에는 GPU·디스플레이 드라이버가 Qt 이벤트보다 늦게
+// 준비될 수 있다. 유효한 QOpenGLContext가 확인될 때까지 제한적으로 재시도한다.
+constexpr int SYSTEM_RESUME_RENDER_DELAY_MS = 750;
+constexpr int SYSTEM_RESUME_RENDER_RETRY_DELAY_MS = 250;
+constexpr int SYSTEM_RESUME_RENDER_MAX_ATTEMPTS = 16;
+}
+
 MpvWidget::MpvWidget(QWidget* parent) : QOpenGLWidget(parent) {
     setAutoFillBackground(false);
     // NoPartialUpdate: 매 프레임 전체 재렌더링 → 화면 끊김/잔상 없음
@@ -58,18 +66,16 @@ MpvWidget::~MpvWidget() {
 void MpvWidget::shutdown() {
     if (shutdownStarted_) return;
     shutdownStarted_ = true;
+    systemPowerTransition_.store(true);
     mpvInitializationQueued_ = false;
+    resumeRecoveryQueued_ = false;
 
     // libmpv를 종료하기 전에 Qt OpenGL 컨텍스트에 묶인 render context를 먼저
     // 해제한다. closeEvent에서 이 함수가 동기 완료되므로 WASAPI 독점 핸들이
     // QApplication 종료·객체 소멸까지 남지 않는다.
-    if (context()) {
+    if (context() && context()->isValid()) {
         makeCurrent();
-        if (renderCtx_) {
-            mpv_render_context_set_update_callback(renderCtx_, nullptr, nullptr);
-            mpv_render_context_free(renderCtx_);
-            renderCtx_ = nullptr;
-        }
+        releaseMpvRenderContext();
         doneCurrent();
     } else {
         renderCtx_ = nullptr;
@@ -84,15 +90,106 @@ void MpvWidget::shutdown() {
 // 이 슬롯에서 renderCtx_를 안전하게 해제하면 다음 initializeGL()에서 재생성됨
 void MpvWidget::onContextAboutToBeDestroyed() {
     qInfo() << "[MpvWidget] OpenGL 컨텍스트 파괴 감지 → renderCtx_ 안전 해제";
-    // makeCurrent()는 이미 컨텍스트가 파괴 중이라 호출 불필요
-    // DirectConnection으로 호출되므로 이미 컨텍스트는 현재이며 유효함
-    if (renderCtx_) {
-        // MPV 렌더 콜백 제거 (파괴된 컨텍스트로 콜백 호출 방지)
-        mpv_render_context_set_update_callback(renderCtx_, nullptr, nullptr);
-        mpv_render_context_free(renderCtx_);
+    // Qt 권장 수명주기: aboutToBeDestroyed 시에도 현재 컨텍스트를 명시적으로 만든
+    // 뒤 OpenGL 소유 render context를 해제한다. 이때 libmpv core·재생·오디오는
+    // 건드리지 않으므로 새 Qt 컨텍스트의 initializeGL()에서 안전하게 다시 연결된다.
+    if (context() && context()->isValid()) {
+        makeCurrent();
+        releaseMpvRenderContext();
+        doneCurrent();
+    } else {
         renderCtx_ = nullptr;
-        qInfo() << "[MpvWidget] renderCtx_ 해제 완료";
     }
+}
+
+void MpvWidget::releaseMpvRenderContext() {
+    if (!renderCtx_) return;
+    mpv_render_context_set_update_callback(renderCtx_, nullptr, nullptr);
+    mpv_render_context_free(renderCtx_);
+    renderCtx_ = nullptr;
+    updateQueued_.store(false);
+    hiddenFrameDiscardQueued_.store(false);
+    presentationRefreshPending_.store(false);
+    if (context()) {
+        disconnect(context(), &QOpenGLContext::aboutToBeDestroyed,
+                   this, &MpvWidget::onContextAboutToBeDestroyed);
+    }
+    qInfo() << "[MpvWidget] renderCtx_ 해제 완료";
+}
+
+void MpvWidget::prepareForSystemSuspend() {
+    if (shutdownStarted_ || systemPowerTransition_.exchange(true)) return;
+    mpvInitializationQueued_ = false;
+    resumeRecoveryQueued_ = false;
+    resumeRecoveryAttempts_ = 0;
+    updateQueued_.store(false);
+    hiddenFrameDiscardQueued_.store(false);
+    presentationRefreshPending_.store(false);
+
+    // 절전 진입 전에 아직 유효한 Qt GL context에서 libmpv render context를 먼저
+    // 해제한다. 이후 절전 중 callback이 죽은 FBO를 대상으로 repaint를 예약하지 않는다.
+    if (renderCtx_ && context() && context()->isValid()) {
+        makeCurrent();
+        releaseMpvRenderContext();
+        doneCurrent();
+    } else if (renderCtx_) {
+        // 컨텍스트가 이미 사라진 상태라면 OpenGL 호출을 하지 않는다. resume 복구는
+        // 새 Qt 컨텍스트 위에서만 진행해 access violation을 피한다.
+        renderCtx_ = nullptr;
+    }
+    qInfo() << "[MpvWidget] 시스템 절전 진입: libmpv render context 정지";
+}
+
+void MpvWidget::recoverAfterSystemResume() {
+    if (shutdownStarted_ || resumeRecoveryQueued_) return;
+    systemPowerTransition_.store(true);
+    resumeRecoveryQueued_ = true;
+    resumeRecoveryAttempts_ = 0;
+    QTimer::singleShot(SYSTEM_RESUME_RENDER_DELAY_MS,
+                       this, &MpvWidget::performSystemResumeRecovery);
+    qInfo() << "[MpvWidget] 시스템 복귀: libmpv render context 복구 예약";
+}
+
+void MpvWidget::performSystemResumeRecovery() {
+    resumeRecoveryQueued_ = false;
+    if (shutdownStarted_) return;
+
+    // GPU/Qt가 아직 surface를 만들지 못했으면 제한 횟수 안에서만 다시 확인한다.
+    if (!isValid() || !context() || !context()->isValid()) {
+        if (++resumeRecoveryAttempts_ < SYSTEM_RESUME_RENDER_MAX_ATTEMPTS) {
+            resumeRecoveryQueued_ = true;
+            QTimer::singleShot(SYSTEM_RESUME_RENDER_RETRY_DELAY_MS,
+                               this, &MpvWidget::performSystemResumeRecovery);
+            return;
+        }
+        systemPowerTransition_.store(false);
+        qWarning() << "[MpvWidget] 시스템 복귀 후 Qt OpenGL context 준비 시간 초과";
+        return;
+    }
+
+    makeCurrent();
+    // 절전 진입 이벤트를 놓쳤거나 플랫폼이 context를 보존한 경우에도 기존 render
+    // context를 현재 Qt context에 다시 묶지 않는다. 항상 새 context를 만든다.
+    releaseMpvRenderContext();
+    const bool ready = initializeMpvRenderContext();
+    doneCurrent();
+
+    if (!ready) {
+        if (++resumeRecoveryAttempts_ < SYSTEM_RESUME_RENDER_MAX_ATTEMPTS) {
+            resumeRecoveryQueued_ = true;
+            QTimer::singleShot(SYSTEM_RESUME_RENDER_RETRY_DELAY_MS,
+                               this, &MpvWidget::performSystemResumeRecovery);
+            return;
+        }
+        systemPowerTransition_.store(false);
+        qWarning() << "[MpvWidget] 시스템 복귀 후 libmpv render context 복구 실패";
+        return;
+    }
+
+    resumeRecoveryAttempts_ = 0;
+    systemPowerTransition_.store(false);
+    if (presentationActive_.load()) update();
+    qInfo() << "[MpvWidget] 시스템 복귀 후 libmpv render context 복구 완료";
 }
 
 void MpvWidget::initializeGL() {
@@ -115,14 +212,15 @@ void MpvWidget::initializeGL() {
 }
 
 void MpvWidget::queueDeferredMpvInitialization() {
-    if (shutdownStarted_ || mpvInitializationQueued_ || renderCtx_ || !context()) return;
+    if (shutdownStarted_ || systemPowerTransition_.load() || mpvInitializationQueued_
+        || renderCtx_ || !context()) return;
     mpvInitializationQueued_ = true;
 
     // 첫 프레임이 화면에 반영될 시간을 보장한다. 이 지연 동안 파일 열기 요청은
     // MainWindow의 pendingStartupFiles_에 보관되며 mpvInitialized 이후 처리된다.
     QTimer::singleShot(80, this, [this]() {
         mpvInitializationQueued_ = false;
-        if (shutdownStarted_ || renderCtx_ || !context()) return;
+        if (shutdownStarted_ || systemPowerTransition_.load() || renderCtx_ || !context()) return;
 
         makeCurrent();
         const bool ready = initializeMpvRenderContext();
@@ -162,6 +260,12 @@ bool MpvWidget::initializeMpvRenderContext() {
 }
 
 void MpvWidget::paintGL() {
+    // 절전·복귀 전환 중에는 libmpv가 이전 FBO에 접근하지 않게 빈 프레임만 그린다.
+    if (systemPowerTransition_.load()) {
+        glClearColor(0, 0, 0, 1);
+        glClear(GL_COLOR_BUFFER_BIT);
+        return;
+    }
     if (!renderCtx_) {
         glClearColor(0, 0, 0, 1);
         glClear(GL_COLOR_BUFFER_BIT);
@@ -326,7 +430,7 @@ void MpvWidget::setPresentationActive(bool active) {
     // 출력에는 명령을 보내지 않으므로 OTT/오리지널 화면에서도 재생 위치와 오디오는
     // 계속 진행된다. 복귀 때는 최신 프레임만 한 번 요청해 누적 프레임을 빠르게 훑는
     // 것처럼 보이는 현상을 피한다.
-    if (active && renderCtx_) {
+    if (active && renderCtx_ && !systemPowerTransition_.load()) {
         presentationRefreshPending_.store(false);
         // 숨김 탭에서 복귀할 때도 GUI 큐에는 최신 프레임 갱신 하나만 남긴다.
         if (!updateQueued_.exchange(true)) {
@@ -339,7 +443,8 @@ void MpvWidget::discardHiddenFrame() {
     // GUI 스레드에서만 OpenGL context를 current로 만들고 render API를 호출한다.
     // callback thread는 이 작업을 예약만 하므로 tab 전환 중에도 UI thread 안전성이 유지된다.
     hiddenFrameDiscardQueued_.store(false);
-    if (shutdownStarted_ || presentationActive_.load() || !renderCtx_ || !presentationRefreshPending_.exchange(false)) {
+    if (shutdownStarted_ || systemPowerTransition_.load() || presentationActive_.load()
+        || !renderCtx_ || !presentationRefreshPending_.exchange(false)) {
         return;
     }
 
@@ -347,7 +452,8 @@ void MpvWidget::discardHiddenFrame() {
     // MPV_RENDER_PARAM_SKIP_RENDERING은 화면 target/FBO를 사용하지 않으면서 현재
     // 프레임을 소비됐다고 libmpv에 알린다. 따라서 오리지널·OTT 탐색 중에도
     // 프레임이 쌓였다가 플레이어 복귀 순간 빠르게 소진되지 않는다.
-    if (!shutdownStarted_ && !presentationActive_.load() && renderCtx_) {
+    if (!shutdownStarted_ && !systemPowerTransition_.load()
+        && !presentationActive_.load() && renderCtx_) {
         int skipRendering = 1;
         mpv_render_param params[] = {
             { MPV_RENDER_PARAM_SKIP_RENDERING, &skipRendering },
@@ -379,6 +485,7 @@ void MpvWidget::onUpdate(void* ctx) {
     // 대기로 기록한다. 재생·디코드·오디오에는 관여하지 않는다.
     MpvWidget* w = reinterpret_cast<MpvWidget*>(ctx);
     if (!w) return;
+    if (w->systemPowerTransition_.load()) return;
     if (!w->presentationActive_.load()) {
         w->presentationRefreshPending_.store(true);
         // 비가시 탭도 최신 프레임 하나를 skip-render로 소비한다. 이벤트는 최대
@@ -398,7 +505,7 @@ void MpvWidget::onUpdate(void* ctx) {
 void MpvWidget::maybeUpdate() {
     // 예약 상태는 GUI 스레드에서 먼저 해제해 다음 최신 프레임 하나만 다시 예약한다.
     updateQueued_.store(false);
-    if (!renderCtx_) return;
+    if (systemPowerTransition_.load() || !renderCtx_) return;
     // 서비스 전환과 콜백 사이의 경합도 GUI 스레드에서 한 번 더 막는다.
     if (!presentationActive_.load()) {
         presentationRefreshPending_.store(true);

@@ -32,6 +32,11 @@ public:
     // MpvCore를 동기 종료하여 WASAPI 독점 핸들이 다른 앱을 막지 않게 한다.
     void shutdown();
 
+    // Windows 절전 진입 때 libmpv의 새 OpenGL repaint 예약을 막고, 복귀 뒤 Qt의
+    // 유효한 컨텍스트에서 render context만 다시 만든다. MPV 재생·오디오 세션은 유지한다.
+    void prepareForSystemSuspend();
+    void recoverAfterSystemResume();
+
     // MPV 초기화 완료 여부 확인 (시작 파일 로드 타이밍 제어에 사용)
     bool isMpvInitialized() const;
 
@@ -63,11 +68,18 @@ private:
     // OpenGL 컨텍스트가 current인 GUI 스레드에서만 호출한다.
     bool initializeMpvRenderContext();
     void queueDeferredMpvInitialization();
+    void releaseMpvRenderContext();
+    void performSystemResumeRecovery();
 
     MpvCore*             core_       = nullptr;
     mpv_render_context*  renderCtx_  = nullptr;
     bool mpvInitializationQueued_ = false;
     bool  shutdownStarted_ = false;
+    // 절전 중 또는 복귀 렌더 컨텍스트 교체 중에는 libmpv callback이 오래된 FBO에
+    // repaint를 예약하지 않도록 한다. 재생 시계·오디오 출력은 이 플래그와 무관하다.
+    std::atomic_bool systemPowerTransition_{false};
+    bool resumeRecoveryQueued_ = false;
+    int resumeRecoveryAttempts_ = 0;
     bool  screenChangedConnected_ = false;  // 멀티모니터 감지 연결 여부
     std::atomic_bool presentationActive_{true};        // 화면에 실제로 보이는 영상 표면만 repaint
     std::atomic_bool presentationRefreshPending_{false};
