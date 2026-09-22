@@ -8,6 +8,9 @@
 #include "MiniPlayerWidget.h"
 #include "UpdateChecker.h"
 #include "UpdateDialog.h"
+#if defined(SORINURI_STORE_BUILD) && defined(Q_OS_WIN)
+#include "StoreUpdateManager.h"
+#endif
 #include "AlbumArtExtractor.h"
 #include "UiTheme.h"
 #include <QApplication>
@@ -186,9 +189,17 @@ MainWindow::MainWindow(bool multiInstanceSharedAudio, QWidget* parent)
         if (settings_.value("remote/enabled", false).toBool())
             startRemoteServer();
     });
-#if !defined(SORINURI_STORE_BUILD)
+#if defined(SORINURI_STORE_BUILD) && defined(Q_OS_WIN)
+    // Store 설치본도 앱 실행 시 Microsoft Store에 새 MSIX가 있는지 확인한다.
+    // Store API가 Windows의 다운로드·설치 권한 창을 표시하므로 사용자가 Store 앱을
+    // 직접 열 필요는 없다. API 자체의 확인 빈도 제한(최대 30분 간격)은 준수한다.
+    QTimer::singleShot(5000, this, [this]() {
+        auto* storeUpdater = new StoreUpdateManager(this);
+        storeUpdater->checkForUpdates(this);
+    });
+#else
     // 자체 서버/Inno Setup 버전만 설치 EXE 기반 업데이트를 확인한다.
-    // Microsoft Store MSIX 버전은 Store가 검증된 패키지 업데이트를 제공한다.
+    // Store 설치본은 위 StoreUpdateManager 경로에서만 검증된 MSIX를 요청한다.
     QTimer::singleShot(5000, this, [this]() {
         auto* updater = new UpdateChecker(this);
         connect(updater, &UpdateChecker::updateAvailable,

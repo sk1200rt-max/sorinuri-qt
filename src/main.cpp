@@ -29,6 +29,9 @@ extern "C" {
 }
 #include <windows.h>
 #include <timeapi.h>
+#if defined(SORINURI_STORE_BUILD)
+#include <winrt/base.h>
+#endif
 #pragma comment(lib, "winmm.lib")
 #endif
 
@@ -63,6 +66,14 @@ int main(int argc, char* argv[])
 #ifdef _WIN32
     // 기본값 15.6ms → MPV의 display-resample 프레임 타이밍이 부정확해짐
     timeBeginPeriod(1);
+#if defined(SORINURI_STORE_BUILD)
+    // StoreContext와 Windows 권한 UI는 UI 스레드의 WinRT apartment를 요구한다.
+    // RAII로 묶어 다중 인스턴스·파일 연결의 조기 종료 경로에서도 균형 있게 해제한다.
+    struct StoreWinrtApartment final {
+        StoreWinrtApartment() { winrt::init_apartment(winrt::apartment_type::single_threaded); }
+        ~StoreWinrtApartment() { winrt::uninit_apartment(); }
+    } storeWinrtApartment;
+#endif
 #endif
 
     // QApplication 생성 전에 설정해야 OpenGL 컨텍스트 협상 시간 단축
@@ -80,7 +91,7 @@ int main(int argc, char* argv[])
     QApplication app(argc, argv);
     app.setApplicationName("Sorinuri");
     app.setApplicationDisplayName("소리누리");
-    app.setApplicationVersion("6.21.13");
+    app.setApplicationVersion("6.21.14");
     app.setOrganizationName("Sorinuri");
     app.setWindowIcon(QIcon(":/icons/sorinuri-v62111.ico"));
 
