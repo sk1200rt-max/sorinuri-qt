@@ -1,6 +1,6 @@
 {
-  "version": "6.21.13",
-  "domain": "renderer,ui,audio",
-  "purpose": "노트북 절전 복귀 렌더·멀티채널 오디오 안정화와 전체 화면 커서 자동 숨김",
-  "base_commit": "a5d7dc5cc0e64d7e6df3b7e8889035fa139426be"
+  "version": "6.21.14",
+  "domain": "ui,installer",
+  "purpose": "Microsoft Store 설치본 실행 시 공식 Store 업데이트 확인·다운로드·설치 권한 요청",
+  "base_commit": "10ddb7b12facaea6e35396717044709f8cb05d63"
 }
