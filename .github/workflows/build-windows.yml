@@ -137,6 +137,11 @@ jobs:
         shell: bash
         run: PYTHONUTF8=1 python3 scripts/verify_msix_store_package.py
 
+      # ── Microsoft Store 앱 실행 시 업데이트 확인·설치 권한 UI 검증 ──────
+      - name: Verify Microsoft Store startup update flow
+        shell: bash
+        run: PYTHONUTF8=1 python3 scripts/verify_store_startup_update.py
+
       # ── Windows App Control 임시 폴더 실행 차단 회귀 검증 ──────────────
       - name: Verify installer App Control policy compatibility
         shell: bash
@@ -655,7 +660,7 @@ jobs:
 
       - name: Generate version-staging.json
         env:
-          APP_VERSION: "6.21.13"
+          APP_VERSION: "6.21.14"
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
         run: python3 scripts/make_version_json.py "$APP_VERSION" "$DEPLOY_HOST" staging
 
@@ -665,7 +670,7 @@ jobs:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
-          APP_VERSION: "6.21.13"
+          APP_VERSION: "6.21.14"
         run: |
           if [ -z "$SSH_KEY" ] || [ -z "$DEPLOY_HOST" ]; then
             echo "배포 Secrets 미설정 - 건너뜀"
