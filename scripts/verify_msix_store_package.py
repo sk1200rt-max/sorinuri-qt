@@ -30,6 +30,7 @@ def require(text: str, needle: str, file_name: str) -> None:
 def main() -> int:
     cmake = read("CMakeLists.txt")
     window = read("src/MainWindow.cpp")
+    store_updater = read("src/StoreUpdateManager.cpp")
     manifest = read("packaging/msix/AppxManifest.xml.in")
     packer = read("scripts/build_store_msix.ps1")
     local_packer = read("scripts/build_local_test_msix.ps1")
@@ -40,8 +41,19 @@ def main() -> int:
 
     require(cmake, 'option(SORINURI_STORE_BUILD', "CMakeLists.txt")
     require(cmake, 'target_compile_definitions(Sorinuri PRIVATE SORINURI_STORE_BUILD=1)', "CMakeLists.txt")
-    require(window, '#if !defined(SORINURI_STORE_BUILD)', "src/MainWindow.cpp")
+    # Store package never starts the self-hosted EXE updater. It may request only the
+    # official StoreContext update flow, which keeps MSIX signing and rollback in Windows.
+    require(window, '#if defined(SORINURI_STORE_BUILD) && defined(Q_OS_WIN)', "src/MainWindow.cpp")
+    require(window, 'storeUpdater->checkForUpdates(this);', "src/MainWindow.cpp")
+    require(window, '#else', "src/MainWindow.cpp")
     require(window, 'updater->checkForUpdates();', "src/MainWindow.cpp")
+    require(store_updater, 'RequestDownloadAndInstallStorePackageUpdatesAsync',
+            "src/StoreUpdateManager.cpp")
+    for forbidden in ('UpdateDialog', 'Sorinuri-Setup-pending.exe', 'installer_url', 'QProcess::startDetached'):
+        if forbidden in store_updater:
+            raise AssertionError(
+                f"Store update manager가 자체 EXE updater를 참조하면 안 됩니다: {forbidden}"
+            )
 
     for required in (
         'uap10:RuntimeBehavior="packagedClassicApp"',
