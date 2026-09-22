@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(Sorinuri VERSION 6.21.13 LANGUAGES CXX)
+project(Sorinuri VERSION 6.21.14 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -104,6 +104,8 @@ set(SOURCES
     src/UpdateChecker.h
     src/UpdateDialog.cpp
     src/UpdateDialog.h
+    src/StoreUpdateManager.cpp
+    src/StoreUpdateManager.h
     src/AlbumArtExtractor.cpp
     src/AlbumArtExtractor.h
     src/SubtitleDownloader.cpp
@@ -218,10 +220,15 @@ if(WIN32)
     )
 endif()
 
-# Store MSIX 버전은 자체 설치 EXE updater를 실행하지 않는다. 런타임 동작은
-# AppxManifest의 full-trust packagedClassicApp 선언과 Store 업데이트가 담당한다.
+# Store MSIX 버전은 자체 설치 EXE updater를 실행하지 않는다. 실행 시에는
+# Microsoft Store API로 업데이트를 확인하고, Windows가 제공하는 권한 UI를 통해
+# 검증된 Store 패키지의 다운로드·설치를 요청한다.
 if(SORINURI_STORE_BUILD)
     target_compile_definitions(Sorinuri PRIVATE SORINURI_STORE_BUILD=1)
+    if(WIN32)
+        # C++/WinRT StoreContext activation과 IInitializeWithWindow owner 설정에 필요하다.
+        target_link_libraries(Sorinuri PRIVATE windowsapp)
+    endif()
 endif()
 
 # Windows: DLL 복사
