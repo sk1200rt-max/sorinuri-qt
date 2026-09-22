@@ -1,6 +1,6 @@
 {
-  "version": "6.21.14",
-  "domain": "ui,installer",
-  "purpose": "Microsoft Store 설치본 실행 시 공식 Store 업데이트 확인·다운로드·설치 권한 요청",
-  "base_commit": "10ddb7b12facaea6e35396717044709f8cb05d63"
+  "version": "6.21.15",
+  "domain": "installer",
+  "purpose": "Microsoft Store 자동 업데이트 C++17 coroutine 빌드 호환성 수정",
+  "base_commit": "67da42de02d2e33dfdf097b652988e45cf6710af"
 }
