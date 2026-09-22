@@ -1,5 +1,14 @@
 [
   {
+    "version": "6.21.14",
+    "date": "2026-09-22",
+    "title": "Microsoft Store 실행 업데이트 확인",
+    "desc": "Microsoft Store로 설치한 소리누리가 실행 후 최신 MSIX를 자동으로 확인하고, 업데이트가 있으면 Windows의 검증된 다운로드·설치 권한 창을 표시합니다.",
+    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.21.14.exe",
+    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.21.14-Portable.zip",
+    "tags": []
+  },
+  {
     "version": "6.21.13",
     "date": "2026-09-19",
     "title": "노트북 절전 복귀·멀티채널 및 전체 화면 안정화",

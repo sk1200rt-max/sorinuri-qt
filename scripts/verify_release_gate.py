@@ -50,6 +50,9 @@ DOMAINS: dict[str, tuple[str, ...]] = {
     ),
     "installer": (
         "installer/", "packaging/", "resources/sorinuri.rc", "src/UpdateDialog.cpp", "src/UpdateDialog.h",
+        # Store MSIX는 Inno EXE를 실행하지 않고 Windows Store API로만 패키지 업데이트를
+        # 요청한다. 이 경로도 설치·업데이트 배포 영역으로 함께 통제한다.
+        "src/StoreUpdateManager.cpp", "src/StoreUpdateManager.h",
     ),
 }
 
