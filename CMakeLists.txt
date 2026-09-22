@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(Sorinuri VERSION 6.21.14 LANGUAGES CXX)
+project(Sorinuri VERSION 6.21.15 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -226,6 +226,12 @@ endif()
 if(SORINURI_STORE_BUILD)
     target_compile_definitions(Sorinuri PRIVATE SORINURI_STORE_BUILD=1)
     if(WIN32)
+        # 프로젝트의 기본 언어 표준은 C++17을 유지한다. StoreContext의 비동기
+        # WinRT API는 C++/WinRT coroutine을 사용하므로 MSVC에서 /await 확장을
+        # 명시적으로 켜야 한다. 이 옵션은 Store MSIX 변형에만 적용한다.
+        if(MSVC)
+            target_compile_options(Sorinuri PRIVATE /await)
+        endif()
         # C++/WinRT StoreContext activation과 IInitializeWithWindow owner 설정에 필요하다.
         target_link_libraries(Sorinuri PRIVATE windowsapp)
     endif()
