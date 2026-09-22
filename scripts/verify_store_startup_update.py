@@ -36,6 +36,7 @@ def main() -> int:
         "src/StoreUpdateManager.cpp",
         "src/StoreUpdateManager.h",
         "target_compile_definitions(Sorinuri PRIVATE SORINURI_STORE_BUILD=1)",
+        "target_compile_options(Sorinuri PRIVATE /await)",
         "target_link_libraries(Sorinuri PRIVATE windowsapp)",
     ):
         require(cmake, needle, "CMakeLists.txt")
