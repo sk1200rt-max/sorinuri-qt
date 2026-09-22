@@ -1,5 +1,14 @@
 [
   {
+    "version": "6.21.15",
+    "date": "2026-09-22",
+    "title": "Microsoft Store 자동 업데이트 빌드 호환성 수정",
+    "desc": "Microsoft Store 설치본의 공식 Store 업데이트 확인·다운로드·설치 요청이 C++17 MSIX 빌드에서도 정상 컴파일되도록 보완",
+    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.21.15.exe",
+    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.21.15-Portable.zip",
+    "tags": []
+  },
+  {
     "version": "6.21.14",
     "date": "2026-09-22",
     "title": "Microsoft Store 실행 업데이트 확인",
