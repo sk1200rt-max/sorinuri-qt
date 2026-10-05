@@ -8,6 +8,7 @@
 #include <QFileDialog>
 #include <QProcess>
 #include <QCoreApplication>
+#include <QTabBar>
 #include "UiTheme.h"
 
 static QLabel* makeSectionTitle(const QString& text, QWidget* parent) {
