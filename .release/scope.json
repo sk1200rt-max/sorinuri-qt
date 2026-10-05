@@ -1,6 +1,6 @@
 {
-  "version": "6.21.15",
-  "domain": "installer",
-  "purpose": "Microsoft Store 자동 업데이트 C++17 coroutine 빌드 호환성 수정",
-  "base_commit": "67da42de02d2e33dfdf097b652988e45cf6710af"
+  "version": "6.21.16",
+  "domain": "ui,installer",
+  "purpose": "고급 설정 패널 겹침·아이콘 리소스·자막 단축키 안내 수정",
+  "base_commit": "8a80a0637dbfc2740f9350ed1bf12de7df4cfec6"
 }

@@ -37,7 +37,7 @@ DOMAINS: dict[str, tuple[str, ...]] = {
         "src/TrackSelector.h", "src/TitleBar.cpp", "src/TitleBar.h", "src/UiTheme.h",
         "src/MusicWidget.cpp", "src/MusicWidget.h", "src/CompactPlayerWidget.cpp",
         "src/CompactPlayerWidget.h", "src/ProFeaturesWidget.cpp", "src/ProFeaturesWidget.h",
-        "src/OttWidget.cpp", "src/OttWidget.h",
+        "src/OttWidget.cpp", "src/OttWidget.h", "src/ShortcutOverlay.cpp", "src/ShortcutOverlay.h",
         # 설치·창·인앱 공통 아이콘은 UI 승인 범위에서만 교체할 수 있다.
         "resources/sorinuri-app.png", "resources/sorinuri.ico", "resources/icons/sorinuri.ico",
         "resources/sorinuri-app-v62111.png", "resources/sorinuri-v62111.ico",

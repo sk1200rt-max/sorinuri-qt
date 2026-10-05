@@ -46,7 +46,9 @@ static QSlider* makeHSlider(int min, int max, int val, QWidget* parent = nullptr
 }
 
 ProFeaturesWidget::ProFeaturesWidget(QWidget* parent) : QWidget(parent) {
-    setFixedHeight(124);  // 탭 헤더와 내용·조작 여백을 고배율에서도 안정적으로 확보
+    // The old fixed height clipped advanced tabs and caused overlap with the
+    // transport bar. The parent overlay now reserves the required space.
+    setMinimumHeight(260);
     setStyleSheet(QString("background: %1; border-top: 1px solid %2;")
                   .arg(SorinuriUi::SurfaceAlt, SorinuriUi::Border));
 
@@ -60,6 +62,8 @@ ProFeaturesWidget::ProFeaturesWidget(QWidget* parent) : QWidget(parent) {
         "QTabBar::tab:selected { background: #101718; color: #00D4B4; border-color: #00D4B4; }"
         "QTabBar::tab:hover { color: #F2F7F6; }");
     tabWidget_->setDocumentMode(true);
+    tabWidget_->tabBar()->setUsesScrollButtons(true);
+    tabWidget_->tabBar()->setElideMode(Qt::ElideRight);
 
     // ── 패널 닫기 버튼 (탭바 오른쪽 코너) ────────────────────────
     // 앱 종료가 아니라 패널만 닫힘 → MainWindow::toggleProFeatures() 호출

@@ -61,7 +61,7 @@ void ShortcutOverlay::paintEvent(QPaintEvent*) {
         {"V","자막 트랙 전환"},
         {"W / E","자막 크기 +/-"},
         {"J / K","자막 앞/뒤 이동"},
-        {"Z / Shift+Z","자막 딜레이 ±100ms"},
+        {"Z / Shift+Z","자막 딜레이 ±100ms (최대 ±2초)"},
         {""  ,"화면",true},
         {"F / F11","전체화면 토글"},
         {"Esc","전체화면 해제"},

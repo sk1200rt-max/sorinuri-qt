@@ -1,5 +1,14 @@
 [
   {
+    "version": "6.21.16",
+    "date": "2026-10-05",
+    "title": "고급 설정 화면·아이콘·자막 단축키 개선",
+    "desc": "고급 설정 패널이 하단 재생 바와 겹치지 않도록 레이아웃을 수정하고, 실행 파일 아이콘 리소스를 통일했으며, 자막 딜레이 단축키 안내를 보강했습니다.",
+    "installer": "https://sorinuri.com/downloads/Sorinuri-Setup-6.21.16.exe",
+    "portable": "https://sorinuri.com/downloads/Sorinuri-Qt-6.21.16-Portable.zip",
+    "tags": []
+  },
+  {
     "version": "6.21.15",
     "date": "2026-09-22",
     "title": "Microsoft Store 자동 업데이트 빌드 호환성 수정",

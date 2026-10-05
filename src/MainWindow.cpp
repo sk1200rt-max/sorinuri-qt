@@ -425,10 +425,13 @@ void MainWindow::setupUI() {
 void MainWindow::ensureProFeatures() {
     if (proFeatures_) return;
 
-    proFeatures_ = new ProFeaturesWidget(this);
+    // Keep the professional panel inside the bottom overlay deck so it cannot
+    // be covered by the transport controls in fullscreen or high-DPI mode.
+    proFeatures_ = new ProFeaturesWidget(videoOverlayDeck_);
+    proFeatures_->setFixedHeight(300);
     proFeatures_->hide();
-    if (auto* layout = qobject_cast<QVBoxLayout*>(centralWidget()->layout()))
-        layout->addWidget(proFeatures_);
+    if (auto* layout = qobject_cast<QVBoxLayout*>(videoOverlayDeck_->layout()))
+        layout->insertWidget(0, proFeatures_);
 
     auto* core = mpvWidget_->core();
     proFeatures_->connectMpv(core);
@@ -2051,6 +2054,10 @@ void MainWindow::showOriginalsPage() {
     if (proFeatures_ && proFeatures_->isVisible()) {
         proFeatures_->hide();
         isProFeaturesOpen_ = false;
+        if (videoOverlayDeck_) {
+            videoOverlayDeck_->setFixedHeight(78);
+            positionVideoOverlayDeck();
+        }
     }
     playerStack_->setCurrentWidget(originalsPage_);
     // 오리지널에서도 현재 재생 상태·대기열을 확인할 수 있는 공통 하단 바는 유지한다.
@@ -2071,6 +2078,13 @@ void MainWindow::toggleProFeatures() {
     if (isProFeaturesOpen_) {
         showUI();
         if (uiHideTimer_) uiHideTimer_->stop();
+    }
+
+    // Reserve space for both the panel and the transport row. The mpv render
+    // surface and vo=libmpv initialization remain untouched.
+    if (videoOverlayDeck_) {
+        videoOverlayDeck_->setFixedHeight(isProFeaturesOpen_ ? 378 : 78);
+        positionVideoOverlayDeck();
     }
 
     // 처음 열 때 지연 초기화 위젯 생성 및 탭 추가
